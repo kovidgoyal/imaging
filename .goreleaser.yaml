@@ -16,12 +16,7 @@ before:
     - go generate ./...
 
 builds:
-  - env:
-      - CGO_ENABLED=0
-    goos:
-      - linux
-      - windows
-      - darwin
+  - skip: true
 
 archives:
   - format: tar.gz
