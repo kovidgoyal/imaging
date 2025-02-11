@@ -19,7 +19,7 @@ def main():
         ans = 'n'
     if ans.lower() != 'y':
         return
-    os.environ['GITHUB_TOKEN'] = open(os.path.join(os.environ['PENV'], 'github-token')).read().strip()
+    os.environ['GITHUB_TOKEN'] = open(os.path.join(os.environ['PENV'], 'github-token')).read().strip().partition(':')[2]
     run('git', 'tag', '-a', 'v' + version, '-m', f'version {version}')
     run('git', 'push')
     run('goreleaser', 'release', '--clean')
