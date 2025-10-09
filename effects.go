@@ -15,7 +15,6 @@ func gaussianBlurKernel(x, sigma float64) float64 {
 // Example:
 //
 //	dstImage := imaging.Blur(srcImage, 3.5)
-//
 func Blur(img image.Image, sigma float64) *image.NRGBA {
 	if sigma <= 0 {
 		return Clone(img)
@@ -36,7 +35,7 @@ func blurHorizontal(img image.Image, kernel []float64) *image.NRGBA {
 	dst := image.NewNRGBA(image.Rect(0, 0, src.w, src.h))
 	radius := len(kernel) - 1
 
-	parallel(0, src.h, func(ys <-chan int) {
+	if err := safe_parallel(0, src.h, func(ys <-chan int) {
 		scanLine := make([]uint8, src.w*4)
 		scanLineF := make([]float64, len(scanLine))
 		for y := range ys {
@@ -76,7 +75,9 @@ func blurHorizontal(img image.Image, kernel []float64) *image.NRGBA {
 				}
 			}
 		}
-	})
+	}); err != nil {
+		panic(err)
+	}
 
 	return dst
 }
@@ -86,7 +87,7 @@ func blurVertical(img image.Image, kernel []float64) *image.NRGBA {
 	dst := image.NewNRGBA(image.Rect(0, 0, src.w, src.h))
 	radius := len(kernel) - 1
 
-	parallel(0, src.w, func(xs <-chan int) {
+	if err := safe_parallel(0, src.w, func(xs <-chan int) {
 		scanLine := make([]uint8, src.h*4)
 		scanLineF := make([]float64, len(scanLine))
 		for x := range xs {
@@ -126,7 +127,9 @@ func blurVertical(img image.Image, kernel []float64) *image.NRGBA {
 				}
 			}
 		}
-	})
+	}); err != nil {
+		panic(err)
+	}
 
 	return dst
 }
@@ -137,7 +140,6 @@ func blurVertical(img image.Image, kernel []float64) *image.NRGBA {
 // Example:
 //
 //	dstImage := imaging.Sharpen(srcImage, 3.5)
-//
 func Sharpen(img image.Image, sigma float64) *image.NRGBA {
 	if sigma <= 0 {
 		return Clone(img)
@@ -147,7 +149,7 @@ func Sharpen(img image.Image, sigma float64) *image.NRGBA {
 	dst := image.NewNRGBA(image.Rect(0, 0, src.w, src.h))
 	blurred := Blur(img, sigma)
 
-	parallel(0, src.h, func(ys <-chan int) {
+	if err := safe_parallel(0, src.h, func(ys <-chan int) {
 		scanLine := make([]uint8, src.w*4)
 		for y := range ys {
 			src.scan(0, y, src.w, y+1, scanLine)
@@ -163,7 +165,9 @@ func Sharpen(img image.Image, sigma float64) *image.NRGBA {
 				j++
 			}
 		}
-	})
+	}); err != nil {
+		panic(err)
+	}
 
 	return dst
 }

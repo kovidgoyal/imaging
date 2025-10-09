@@ -19,7 +19,7 @@ func Histogram(img image.Image) [256]float64 {
 		return histogram
 	}
 
-	parallel(0, src.h, func(ys <-chan int) {
+	if err := safe_parallel(0, src.h, func(ys <-chan int) {
 		var tmpHistogram [256]float64
 		var tmpTotal float64
 		scanLine := make([]uint8, src.w*4)
@@ -43,7 +43,9 @@ func Histogram(img image.Image) [256]float64 {
 		}
 		total += tmpTotal
 		mu.Unlock()
-	})
+	}); err != nil {
+		panic(err)
+	}
 
 	for i := 0; i < 256; i++ {
 		histogram[i] = histogram[i] / total

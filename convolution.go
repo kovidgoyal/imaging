@@ -70,7 +70,7 @@ func convolve(img image.Image, kernel []float64, options *ConvolveOptions) *imag
 		}
 	}
 
-	parallel(0, h, func(ys <-chan int) {
+	if err := safe_parallel(0, h, func(ys <-chan int) {
 		for y := range ys {
 			for x := 0; x < w; x++ {
 				var r, g, b float64
@@ -123,7 +123,9 @@ func convolve(img image.Image, kernel []float64, options *ConvolveOptions) *imag
 				d[3] = src.Pix[srcOff+3]
 			}
 		}
-	})
+	}); err != nil {
+		panic(err)
+	}
 
 	return dst
 }

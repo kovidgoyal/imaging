@@ -1,9 +1,11 @@
 package imaging
 
 import (
+	"fmt"
 	"image"
 	"math"
 	"runtime"
+	"strings"
 	"sync"
 	"sync/atomic"
 )
@@ -16,8 +18,28 @@ func SetMaxProcs(value int) {
 	atomic.StoreInt64(&maxProcs, int64(value))
 }
 
+func format_stacktrace_on_panic(r any) (err error) {
+	pcs := make([]uintptr, 512)
+	n := runtime.Callers(3, pcs)
+	lines := []string{}
+	frames := runtime.CallersFrames(pcs[:n])
+	lines = append(lines, fmt.Sprintf("\r\nPanicked with error: %s\r\nStacktrace (most recent call first):\r\n", r))
+	found_first_frame := false
+	for frame, more := frames.Next(); more; frame, more = frames.Next() {
+		if !found_first_frame {
+			if strings.HasPrefix(frame.Function, "runtime.") {
+				continue
+			}
+			found_first_frame = true
+		}
+		lines = append(lines, fmt.Sprintf("%s\r\n\t%s:%d\r\n", frame.Function, frame.File, frame.Line))
+	}
+	text := strings.Join(lines, "")
+	return fmt.Errorf("%s", strings.TrimSpace(text))
+}
+
 // parallel processes the data in separate goroutines.
-func parallel(start, stop int, fn func(<-chan int)) {
+func safe_parallel(start, stop int, fn func(<-chan int)) (err error) {
 	count := stop - start
 	if count < 1 {
 		return
@@ -42,11 +64,17 @@ func parallel(start, stop int, fn func(<-chan int)) {
 	for i := 0; i < procs; i++ {
 		wg.Add(1)
 		go func() {
-			defer wg.Done()
+			defer func() {
+				if r := recover(); r != nil {
+					err = format_stacktrace_on_panic(r)
+				}
+				wg.Done()
+			}()
 			fn(c)
 		}()
 	}
 	wg.Wait()
+	return
 }
 
 // absint returns the absolute value of i.

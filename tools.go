@@ -30,12 +30,14 @@ func Clone(img image.Image) *image.NRGBA {
 	src := newScanner(img)
 	dst := image.NewNRGBA(image.Rect(0, 0, src.w, src.h))
 	size := src.w * 4
-	parallel(0, src.h, func(ys <-chan int) {
+	if err := safe_parallel(0, src.h, func(ys <-chan int) {
 		for y := range ys {
 			i := y * dst.Stride
 			src.scan(0, y, src.w, y+1, dst.Pix[i:i+size])
 		}
-	})
+	}); err != nil {
+		panic(err)
+	}
 	return dst
 }
 
@@ -103,12 +105,14 @@ func Crop(img image.Image, rect image.Rectangle) *image.NRGBA {
 	src := newScanner(img)
 	dst := image.NewNRGBA(image.Rect(0, 0, r.Dx(), r.Dy()))
 	rowSize := r.Dx() * 4
-	parallel(r.Min.Y, r.Max.Y, func(ys <-chan int) {
+	if err := safe_parallel(r.Min.Y, r.Max.Y, func(ys <-chan int) {
 		for y := range ys {
 			i := (y - r.Min.Y) * dst.Stride
 			src.scan(r.Min.X, y, r.Max.X, y+1, dst.Pix[i:i+rowSize])
 		}
-	})
+	}); err != nil {
+		panic(err)
+	}
 	return dst
 }
 
@@ -142,7 +146,7 @@ func Paste(background, img image.Image, pos image.Point) *image.NRGBA {
 	}
 
 	src := newScanner(img)
-	parallel(interRect.Min.Y, interRect.Max.Y, func(ys <-chan int) {
+	if err := safe_parallel(interRect.Min.Y, interRect.Max.Y, func(ys <-chan int) {
 		for y := range ys {
 			x1 := interRect.Min.X - pasteRect.Min.X
 			x2 := interRect.Max.X - pasteRect.Min.X
@@ -152,7 +156,9 @@ func Paste(background, img image.Image, pos image.Point) *image.NRGBA {
 			i2 := i1 + interRect.Dx()*4
 			src.scan(x1, y1, x2, y2, dst.Pix[i1:i2])
 		}
-	})
+	}); err != nil {
+		panic(err)
+	}
 	return dst
 }
 
@@ -184,7 +190,6 @@ func PasteCenter(background, img image.Image) *image.NRGBA {
 //
 //	// Blend two opaque images of the same size.
 //	dstImage := imaging.Overlay(imageOne, imageTwo, image.Pt(0, 0), 0.5)
-//
 func Overlay(background, img image.Image, pos image.Point, opacity float64) *image.NRGBA {
 	opacity = math.Min(math.Max(opacity, 0.0), 1.0) // Ensure 0.0 <= opacity <= 1.0.
 	dst := Clone(background)
@@ -195,7 +200,7 @@ func Overlay(background, img image.Image, pos image.Point, opacity float64) *ima
 		return dst
 	}
 	src := newScanner(img)
-	parallel(interRect.Min.Y, interRect.Max.Y, func(ys <-chan int) {
+	if err := safe_parallel(interRect.Min.Y, interRect.Max.Y, func(ys <-chan int) {
 		scanLine := make([]uint8, interRect.Dx()*4)
 		for y := range ys {
 			x1 := interRect.Min.X - pasteRect.Min.X
@@ -233,7 +238,9 @@ func Overlay(background, img image.Image, pos image.Point, opacity float64) *ima
 				j += 4
 			}
 		}
-	})
+	}); err != nil {
+		panic(err)
+	}
 	return dst
 }
 

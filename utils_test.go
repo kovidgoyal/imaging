@@ -36,11 +36,13 @@ func testParallelN(n, procs int) bool {
 	data := make([]bool, n)
 	before := runtime.GOMAXPROCS(0)
 	runtime.GOMAXPROCS(procs)
-	parallel(0, n, func(is <-chan int) {
+	if err := safe_parallel(0, n, func(is <-chan int) {
 		for i := range is {
 			data[i] = true
 		}
-	})
+	}); err != nil {
+		panic(err)
+	}
 	runtime.GOMAXPROCS(before)
 	for i := 0; i < n; i++ {
 		if !data[i] {
@@ -63,11 +65,13 @@ func TestParallelMaxProcs(t *testing.T) {
 func testParallelMaxProcsN(n, procs int) bool {
 	data := make([]bool, n)
 	SetMaxProcs(procs)
-	parallel(0, n, func(is <-chan int) {
+	if err := safe_parallel(0, n, func(is <-chan int) {
 		for i := range is {
 			data[i] = true
 		}
-	})
+	}); err != nil {
+		panic(err)
+	}
 	SetMaxProcs(0)
 	for i := 0; i < n; i++ {
 		if !data[i] {
