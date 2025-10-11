@@ -2,6 +2,7 @@
 # License: GPLv3 Copyright: 2024, Kovid Goyal <kovid at kovidgoyal.net>
 
 import os
+import re
 import subprocess
 
 
@@ -12,7 +13,10 @@ def run(*args: str):
 
 
 def main():
-    version = input('Enter the version to publish: ')
+    with open('doc.go') as f:
+        raw = f.read()
+        m = re.search(r'ImagingVersion\{(\d+), (\d+), (\d+)\}', raw)
+        version = '.'.join(m.groups())
     try:
         ans = input(f'Publish version \033[91m{version}\033[m (y/n): ')
     except KeyboardInterrupt:
