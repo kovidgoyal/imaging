@@ -43,4 +43,4 @@ func (v ImagingVersion) Before(o ImagingVersion) bool {
 	return !v.Equal(o) && !v.After(o)
 }
 
-var Version = ImagingVersion{1, 6, 5}
+var Version = ImagingVersion{1, 7, 0}
