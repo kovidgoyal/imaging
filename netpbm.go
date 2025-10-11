@@ -13,8 +13,8 @@ import (
 
 var _ = fmt.Print
 
-// skipComments reads ahead past any comment lines (starting with #) and returns the first non-comment, non-empty line.
-func skipComments(br *bufio.Reader) (string, error) {
+// skip_comments reads ahead past any comment lines (starting with #) and returns the first non-comment, non-empty line.
+func skip_comments(br *bufio.Reader) (string, error) {
 	for {
 		line, err := br.ReadString('\n')
 		if err != nil {
@@ -74,7 +74,7 @@ func read_ppm_header(br *bufio.Reader, magic string) (ans header, err error) {
 	var fields []uint
 	for len(fields) < required_num_fields {
 		var line string
-		if line, err = skipComments(br); err != nil {
+		if line, err = skip_comments(br); err != nil {
 			return
 		}
 		for x := range strings.FieldsSeq(line) {
@@ -101,7 +101,7 @@ func read_pam_header(br *bufio.Reader) (ans header, err error) {
 	ans.data_type = rgb
 	ans.num_channels = 3
 	for {
-		line, err := skipComments(br)
+		line, err := skip_comments(br)
 		if err != nil {
 			return ans, err
 		}
@@ -125,6 +125,12 @@ func read_pam_header(br *bufio.Reader) (ans header, err error) {
 				return ans, fmt.Errorf("invalid height %#v in header: %w", payload, err)
 			}
 			ans.height = uint(w)
+		case "MAXVAL":
+			w, err := strconv.ParseUint(payload, 10, 0)
+			if err != nil {
+				return ans, fmt.Errorf("invalid maxval %#v in header: %w", payload, err)
+			}
+			ans.maxval = uint32(w)
 		case "DEPTH":
 			w, err := strconv.ParseUint(payload, 10, 0)
 			if err != nil {
@@ -485,9 +491,7 @@ func DecodeNetPBM(r io.Reader) (img image.Image, err error) {
 			return nil, fmt.Errorf("insufficient color data in netPBM file, need %d more bytes", len(binary_data))
 		}
 		return ans, nil
-	case "P5":
-		return decode_binary_data(br, h)
-	case "P6":
+	case "P5", "P6", "P7":
 		return decode_binary_data(br, h)
 	default:
 		return nil, fmt.Errorf("invalid format for PPM: %#v", h.format)
@@ -497,10 +501,10 @@ func DecodeNetPBM(r io.Reader) (img image.Image, err error) {
 // Register this decoder with Go's image package
 func init() {
 	image.RegisterFormat("pbm", "P1", DecodeNetPBM, DecodeNetPBMConfig)
-	image.RegisterFormat("pbm", "P4", DecodeNetPBM, DecodeNetPBMConfig)
 	image.RegisterFormat("pgm", "P2", DecodeNetPBM, DecodeNetPBMConfig)
-	image.RegisterFormat("pgm", "P5", DecodeNetPBM, DecodeNetPBMConfig)
 	image.RegisterFormat("ppm", "P3", DecodeNetPBM, DecodeNetPBMConfig)
+	image.RegisterFormat("pbm", "P4", DecodeNetPBM, DecodeNetPBMConfig)
+	image.RegisterFormat("pgm", "P5", DecodeNetPBM, DecodeNetPBMConfig)
 	image.RegisterFormat("ppm", "P6", DecodeNetPBM, DecodeNetPBMConfig)
 	image.RegisterFormat("pam", "P7", DecodeNetPBM, DecodeNetPBMConfig)
 }
