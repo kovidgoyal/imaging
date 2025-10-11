@@ -17,7 +17,7 @@ func FlipH(img image.Image) *image.NRGBA {
 		for dstY := range ys {
 			i := dstY * dst.Stride
 			srcY := dstY
-			src.scan(0, srcY, src.w, srcY+1, dst.Pix[i:i+rowSize])
+			src.Scan(0, srcY, src.w, srcY+1, dst.Pix[i:i+rowSize])
 			reverse(dst.Pix[i : i+rowSize])
 		}
 	}); err != nil {
@@ -37,7 +37,7 @@ func FlipV(img image.Image) *image.NRGBA {
 		for dstY := range ys {
 			i := dstY * dst.Stride
 			srcY := dstH - dstY - 1
-			src.scan(0, srcY, src.w, srcY+1, dst.Pix[i:i+rowSize])
+			src.Scan(0, srcY, src.w, srcY+1, dst.Pix[i:i+rowSize])
 		}
 	}); err != nil {
 		panic(err)
@@ -56,7 +56,7 @@ func Transpose(img image.Image) *image.NRGBA {
 		for dstY := range ys {
 			i := dstY * dst.Stride
 			srcX := dstY
-			src.scan(srcX, 0, srcX+1, src.h, dst.Pix[i:i+rowSize])
+			src.Scan(srcX, 0, srcX+1, src.h, dst.Pix[i:i+rowSize])
 		}
 	}); err != nil {
 		panic(err)
@@ -75,7 +75,7 @@ func Transverse(img image.Image) *image.NRGBA {
 		for dstY := range ys {
 			i := dstY * dst.Stride
 			srcX := dstH - dstY - 1
-			src.scan(srcX, 0, srcX+1, src.h, dst.Pix[i:i+rowSize])
+			src.Scan(srcX, 0, srcX+1, src.h, dst.Pix[i:i+rowSize])
 			reverse(dst.Pix[i : i+rowSize])
 		}
 	}); err != nil {
@@ -95,7 +95,7 @@ func Rotate90(img image.Image) *image.NRGBA {
 		for dstY := range ys {
 			i := dstY * dst.Stride
 			srcX := dstH - dstY - 1
-			src.scan(srcX, 0, srcX+1, src.h, dst.Pix[i:i+rowSize])
+			src.Scan(srcX, 0, srcX+1, src.h, dst.Pix[i:i+rowSize])
 		}
 	}); err != nil {
 		panic(err)
@@ -114,7 +114,7 @@ func Rotate180(img image.Image) *image.NRGBA {
 		for dstY := range ys {
 			i := dstY * dst.Stride
 			srcY := dstH - dstY - 1
-			src.scan(0, srcY, src.w, srcY+1, dst.Pix[i:i+rowSize])
+			src.Scan(0, srcY, src.w, srcY+1, dst.Pix[i:i+rowSize])
 			reverse(dst.Pix[i : i+rowSize])
 		}
 	}); err != nil {
@@ -134,7 +134,7 @@ func Rotate270(img image.Image) *image.NRGBA {
 		for dstY := range ys {
 			i := dstY * dst.Stride
 			srcX := dstY
-			src.scan(srcX, 0, srcX+1, src.h, dst.Pix[i:i+rowSize])
+			src.Scan(srcX, 0, srcX+1, src.h, dst.Pix[i:i+rowSize])
 			reverse(dst.Pix[i : i+rowSize])
 		}
 	}); err != nil {

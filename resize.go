@@ -112,7 +112,7 @@ func resizeHorizontal(img image.Image, width int, filter ResampleFilter) *image.
 	if err := safe_parallel(0, src.h, func(ys <-chan int) {
 		scanLine := make([]uint8, src.w*4)
 		for y := range ys {
-			src.scan(0, y, src.w, y+1, scanLine)
+			src.Scan(0, y, src.w, y+1, scanLine)
 			j0 := y * dst.Stride
 			for x := range weights {
 				var r, g, b, a float64
@@ -149,7 +149,7 @@ func resizeVertical(img image.Image, height int, filter ResampleFilter) *image.N
 	if err := safe_parallel(0, src.w, func(xs <-chan int) {
 		scanLine := make([]uint8, src.h*4)
 		for x := range xs {
-			src.scan(x, 0, x+1, src.h, scanLine)
+			src.Scan(x, 0, x+1, src.h, scanLine)
 			for y := range weights {
 				var r, g, b, a float64
 				for _, w := range weights[y] {
@@ -192,7 +192,7 @@ func resizeNearest(img image.Image, width, height int) *image.NRGBA {
 				dstOff := y * dst.Stride
 				for x := 0; x < width; x++ {
 					srcX := int((float64(x) + 0.5) * dx)
-					src.scan(srcX, srcY, srcX+1, srcY+1, dst.Pix[dstOff:dstOff+4])
+					src.Scan(srcX, srcY, srcX+1, srcY+1, dst.Pix[dstOff:dstOff+4])
 					dstOff += 4
 				}
 			}

@@ -24,7 +24,7 @@ func Histogram(img image.Image) [256]float64 {
 		var tmpTotal float64
 		scanLine := make([]uint8, src.w*4)
 		for y := range ys {
-			src.scan(0, y, src.w, y+1, scanLine)
+			src.Scan(0, y, src.w, y+1, scanLine)
 			i := 0
 			for x := 0; x < src.w; x++ {
 				s := scanLine[i : i+3 : i+3]

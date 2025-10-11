@@ -88,7 +88,7 @@ func TestScanner(t *testing.T) {
 			s := newScanner(tc.img)
 			for y := r.Min.Y; y < r.Max.Y; y++ {
 				buf := make([]byte, r.Dx()*4)
-				s.scan(0, y-r.Min.Y, r.Dx(), y+1-r.Min.Y, buf)
+				s.Scan(0, y-r.Min.Y, r.Dx(), y+1-r.Min.Y, buf)
 				wantBuf := readRow(tc.img, y)
 				if !compareBytes(buf, wantBuf, 1) {
 					fmt.Println(tc.img)
@@ -97,7 +97,7 @@ func TestScanner(t *testing.T) {
 			}
 			for x := r.Min.X; x < r.Max.X; x++ {
 				buf := make([]byte, r.Dy()*4)
-				s.scan(x-r.Min.X, 0, x+1-r.Min.X, r.Dy(), buf)
+				s.Scan(x-r.Min.X, 0, x+1-r.Min.X, r.Dy(), buf)
 				wantBuf := readColumn(tc.img, x)
 				if !compareBytes(buf, wantBuf, 1) {
 					t.Fatalf("scan vertical line (x=%d): got %v want %v", x, buf, wantBuf)

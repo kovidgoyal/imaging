@@ -39,7 +39,7 @@ func blurHorizontal(img image.Image, kernel []float64) *image.NRGBA {
 		scanLine := make([]uint8, src.w*4)
 		scanLineF := make([]float64, len(scanLine))
 		for y := range ys {
-			src.scan(0, y, src.w, y+1, scanLine)
+			src.Scan(0, y, src.w, y+1, scanLine)
 			for i, v := range scanLine {
 				scanLineF[i] = float64(v)
 			}
@@ -91,7 +91,7 @@ func blurVertical(img image.Image, kernel []float64) *image.NRGBA {
 		scanLine := make([]uint8, src.h*4)
 		scanLineF := make([]float64, len(scanLine))
 		for x := range xs {
-			src.scan(x, 0, x+1, src.h, scanLine)
+			src.Scan(x, 0, x+1, src.h, scanLine)
 			for i, v := range scanLine {
 				scanLineF[i] = float64(v)
 			}
@@ -152,7 +152,7 @@ func Sharpen(img image.Image, sigma float64) *image.NRGBA {
 	if err := safe_parallel(0, src.h, func(ys <-chan int) {
 		scanLine := make([]uint8, src.w*4)
 		for y := range ys {
-			src.scan(0, y, src.w, y+1, scanLine)
+			src.Scan(0, y, src.w, y+1, scanLine)
 			j := y * dst.Stride
 			for i := 0; i < src.w*4; i++ {
 				val := int(scanLine[i])<<1 - int(blurred.Pix[j])

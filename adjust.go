@@ -13,7 +13,7 @@ func Grayscale(img image.Image) *image.NRGBA {
 	if err := safe_parallel(0, src.h, func(ys <-chan int) {
 		for y := range ys {
 			i := y * dst.Stride
-			src.scan(0, y, src.w, y+1, dst.Pix[i:i+src.w*4])
+			src.Scan(0, y, src.w, y+1, dst.Pix[i:i+src.w*4])
 			for x := 0; x < src.w; x++ {
 				d := dst.Pix[i : i+3 : i+3]
 				r := d[0]
@@ -40,7 +40,7 @@ func Invert(img image.Image) *image.NRGBA {
 	if err := safe_parallel(0, src.h, func(ys <-chan int) {
 		for y := range ys {
 			i := y * dst.Stride
-			src.scan(0, y, src.w, y+1, dst.Pix[i:i+src.w*4])
+			src.Scan(0, y, src.w, y+1, dst.Pix[i:i+src.w*4])
 			for x := 0; x < src.w; x++ {
 				d := dst.Pix[i : i+3 : i+3]
 				d[0] = 255 - d[0]
@@ -242,7 +242,7 @@ func adjustLUT(img image.Image, lut []uint8) *image.NRGBA {
 	if err := safe_parallel(0, src.h, func(ys <-chan int) {
 		for y := range ys {
 			i := y * dst.Stride
-			src.scan(0, y, src.w, y+1, dst.Pix[i:i+src.w*4])
+			src.Scan(0, y, src.w, y+1, dst.Pix[i:i+src.w*4])
 			for x := 0; x < src.w; x++ {
 				d := dst.Pix[i : i+3 : i+3]
 				d[0] = lut[d[0]]
@@ -278,7 +278,7 @@ func AdjustFunc(img image.Image, fn func(c color.NRGBA) color.NRGBA) *image.NRGB
 	if err := safe_parallel(0, src.h, func(ys <-chan int) {
 		for y := range ys {
 			i := y * dst.Stride
-			src.scan(0, y, src.w, y+1, dst.Pix[i:i+src.w*4])
+			src.Scan(0, y, src.w, y+1, dst.Pix[i:i+src.w*4])
 			for x := 0; x < src.w; x++ {
 				d := dst.Pix[i : i+4 : i+4]
 				r := d[0]
