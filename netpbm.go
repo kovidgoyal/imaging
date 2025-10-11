@@ -330,23 +330,28 @@ func rescale(v uint32, num, den uint32) uint32 {
 	return (v * num) / den
 }
 
-func rescale_binary_data(b []uint8, num, den uint32) {
-	for i, v := range b {
-		b[i] = uint8(rescale(uint32(v), num, den))
-	}
+func rescale_binary_data(b []uint8, num, den uint32) error {
+	return run_in_parallel_over_range(0, func(start, end int) {
+		for i := start; i < end; i++ {
+			b[i] = uint8(rescale(uint32(b[i]), num, den))
+		}
+	}, 0, len(b))
 }
 
 func rescale_binary_data16(b []uint8, num, den uint32) error {
 	if len(b)&1 != 0 {
 		return fmt.Errorf("pixel data is not a multiple of two but uses 16 bits per channel")
 	}
-	for i := 0; i < len(b); i += 2 {
-		v := uint32((uint16(b[i]) << 8) | uint16(b[i+1]))
-		v = rescale(v, num, den)
-		b[i] = uint8(v >> 8)
-		b[i+1] = uint8(v)
-	}
-	return nil
+	return run_in_parallel_over_range(0, func(start, end int) {
+		start *= 2
+		end *= 2
+		for i := start; i < end; i += 2 {
+			v := uint32((uint16(b[i]) << 8) | uint16(b[i+1]))
+			v = rescale(v, num, den)
+			b[i] = uint8(v >> 8)
+			b[i+1] = uint8(v)
+		}
+	}, 0, len(b)/2)
 }
 
 func decode_binary_data(br *bufio.Reader, h header) (ans image.Image, err error) {
@@ -361,7 +366,9 @@ func decode_binary_data(br *bufio.Reader, h header) (ans image.Image, err error)
 	}
 	switch {
 	case h.maxval < 255:
-		rescale_binary_data(binary_data, 255, h.maxval)
+		if err = rescale_binary_data(binary_data, 255, h.maxval); err != nil {
+			return nil, err
+		}
 	case 255 < h.maxval && h.maxval < 65535:
 		if err = rescale_binary_data16(binary_data, 65535, h.maxval); err != nil {
 			return nil, err
@@ -381,26 +388,28 @@ func decode_binary_data(br *bufio.Reader, h header) (ans image.Image, err error)
 		if h.maxval > 255 {
 			g := image.NewNRGBA64(r)
 			b := g.Pix
-			for range h.width * h.height {
-				gray1, gray2 := binary_data[0], binary_data[1]
-				b[0], b[1] = gray1, gray2
-				b[2], b[3] = gray1, gray2
-				b[4], b[5] = gray1, gray2
-				b[6], b[7] = binary_data[2], binary_data[3]
-				b = b[8:]
-				binary_data = binary_data[4:]
+			if err = run_in_parallel_over_range(0, func(start, end int) {
+				for i := start; i < end; i++ {
+					src := binary_data[i*4 : i*4+4]
+					dest := b[i*8 : i*8+8]
+					gray1, gray2 := src[0], src[1]
+					dest[0], dest[1], dest[2], dest[3], dest[4], dest[5] = gray1, gray2, gray1, gray2, gray1, gray2
+					dest[6], dest[7] = src[2], src[3]
+				}
+			}, 0, int(h.width*h.height)); err != nil {
+				return nil, err
 			}
 		}
 		g := image.NewNRGBA(r)
 		b := g.Pix
-		for range h.width * h.height {
-			gray := binary_data[0]
-			b[0] = gray
-			b[1] = gray
-			b[2] = gray
-			b[3] = binary_data[1]
-			b = b[4:]
-			binary_data = binary_data[2:]
+		if err = run_in_parallel_over_range(0, func(start, end int) {
+			for i := start; i < end; i++ {
+				src := binary_data[i*2 : i*2+2]
+				dest := b[i*4 : i*4+4]
+				dest[0], dest[1], dest[2], dest[3] = src[0], src[0], src[0], src[1]
+			}
+		}, 0, int(h.width*h.height)); err != nil {
+			return nil, err
 		}
 		return g, nil
 	case 3:
@@ -408,12 +417,15 @@ func decode_binary_data(br *bufio.Reader, h header) (ans image.Image, err error)
 		if h.maxval > 255 {
 			g := image.NewNRGBA64(r)
 			b := g.Pix
-			for range h.width * h.height {
-				copy(b[:6], binary_data[:6])
-				b[6] = 255
-				b[7] = 255
-				b = b[8:]
-				binary_data = binary_data[6:]
+			if err = run_in_parallel_over_range(0, func(start, end int) {
+				for i := start; i < end; i++ {
+					src := binary_data[i*6 : i*6+6]
+					dest := b[i*8 : i*8+8]
+					copy(dest[:6], src)
+					dest[6], dest[7] = 255, 255
+				}
+			}, 0, int(h.width*h.height)); err != nil {
+				return nil, err
 			}
 			return g, nil
 		}

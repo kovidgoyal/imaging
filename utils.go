@@ -77,6 +77,48 @@ func safe_parallel(start, stop int, fn func(<-chan int)) (err error) {
 	return
 }
 
+// Run the specified function in parallel over chunks from the specified range.
+// If the function panics, it is turned into a regular error.
+func run_in_parallel_over_range(num_procs int, f func(int, int), start, limit int) (err error) {
+	num_items := limit - start
+	if num_procs <= 0 {
+		num_procs = runtime.NumCPU()
+	}
+	num_procs = max(1, min(num_procs, num_items))
+	if num_procs < 2 {
+		defer func() {
+			if r := recover(); r != nil {
+				err = format_stacktrace_on_panic(r)
+			}
+		}()
+		f(start, limit)
+		return
+	}
+	chunk_sz := max(1, num_items/num_procs)
+	var wg sync.WaitGroup
+	echan := make(chan error, num_procs)
+	for start < limit {
+		end := min(start+chunk_sz, limit)
+		wg.Add(1)
+		go func(start, end int) {
+			defer func() {
+				if r := recover(); r != nil {
+					echan <- format_stacktrace_on_panic(r)
+				}
+				wg.Done()
+			}()
+			f(start, end)
+		}(start, end)
+		start = end
+	}
+	wg.Wait()
+	close(echan)
+	for qerr := range echan {
+		return qerr
+	}
+	return
+}
+
 // absint returns the absolute value of i.
 func absint(i int) int {
 	if i < 0 {
