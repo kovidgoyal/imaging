@@ -1,13 +1,12 @@
 package imaging
 
 import (
-	"fmt"
 	"image"
 	"math"
 	"runtime"
-	"strings"
-	"sync"
 	"sync/atomic"
+
+	"github.com/kovidgoyal/go-parallel"
 )
 
 var max_procs atomic.Int64
@@ -18,69 +17,16 @@ func SetMaxProcs(value int) {
 	max_procs.Store(int64(value))
 }
 
-func format_stacktrace_on_panic(r any) (err error) {
-	pcs := make([]uintptr, 512)
-	n := runtime.Callers(3, pcs)
-	lines := []string{}
-	frames := runtime.CallersFrames(pcs[:n])
-	lines = append(lines, fmt.Sprintf("\r\nPanicked with error: %s\r\nStacktrace (most recent call first):\r\n", r))
-	found_first_frame := false
-	for frame, more := frames.Next(); more; frame, more = frames.Next() {
-		if !found_first_frame {
-			if strings.HasPrefix(frame.Function, "runtime.") {
-				continue
-			}
-			found_first_frame = true
-		}
-		lines = append(lines, fmt.Sprintf("%s\r\n\t%s:%d\r\n", frame.Function, frame.File, frame.Line))
-	}
-	text := strings.Join(lines, "")
-	return fmt.Errorf("%s", strings.TrimSpace(text))
-}
-
 // Run the specified function in parallel over chunks from the specified range.
 // If the function panics, it is turned into a regular error.
 func run_in_parallel_over_range(num_procs int, f func(int, int), start, limit int) (err error) {
-	num_items := limit - start
 	if num_procs <= 0 {
 		num_procs = runtime.GOMAXPROCS(0)
 		if mp := int(max_procs.Load()); mp > 0 {
 			num_procs = min(num_procs, mp)
 		}
 	}
-	num_procs = max(1, min(num_procs, num_items))
-	if num_procs < 2 {
-		defer func() {
-			if r := recover(); r != nil {
-				err = format_stacktrace_on_panic(r)
-			}
-		}()
-		f(start, limit)
-		return
-	}
-	chunk_sz := max(1, num_items/num_procs)
-	var wg sync.WaitGroup
-	echan := make(chan error, num_procs)
-	for start < limit {
-		end := min(start+chunk_sz, limit)
-		wg.Add(1)
-		go func(start, end int) {
-			defer func() {
-				if r := recover(); r != nil {
-					echan <- format_stacktrace_on_panic(r)
-				}
-				wg.Done()
-			}()
-			f(start, end)
-		}(start, end)
-		start = end
-	}
-	wg.Wait()
-	close(echan)
-	for qerr := range echan {
-		return qerr
-	}
-	return
+	return parallel.Run_in_parallel_over_range(num_procs, f, start, limit)
 }
 
 // absint returns the absolute value of i.
