@@ -10,8 +10,8 @@ import (
 func Grayscale(img image.Image) *image.NRGBA {
 	src := newScanner(img)
 	dst := image.NewNRGBA(image.Rect(0, 0, src.w, src.h))
-	if err := safe_parallel(0, src.h, func(ys <-chan int) {
-		for y := range ys {
+	if err := run_in_parallel_over_range(0, func(start, limit int) {
+		for y := start; y < limit; y++ {
 			i := y * dst.Stride
 			src.Scan(0, y, src.w, y+1, dst.Pix[i:i+src.w*4])
 			for x := 0; x < src.w; x++ {
@@ -27,7 +27,7 @@ func Grayscale(img image.Image) *image.NRGBA {
 				i += 4
 			}
 		}
-	}); err != nil {
+	}, 0, src.h); err != nil {
 		panic(err)
 	}
 	return dst
@@ -37,8 +37,8 @@ func Grayscale(img image.Image) *image.NRGBA {
 func Invert(img image.Image) *image.NRGBA {
 	src := newScanner(img)
 	dst := image.NewNRGBA(image.Rect(0, 0, src.w, src.h))
-	if err := safe_parallel(0, src.h, func(ys <-chan int) {
-		for y := range ys {
+	if err := run_in_parallel_over_range(0, func(start, limit int) {
+		for y := start; y < limit; y++ {
 			i := y * dst.Stride
 			src.Scan(0, y, src.w, y+1, dst.Pix[i:i+src.w*4])
 			for x := 0; x < src.w; x++ {
@@ -49,7 +49,7 @@ func Invert(img image.Image) *image.NRGBA {
 				i += 4
 			}
 		}
-	}); err != nil {
+	}, 0, src.h); err != nil {
 		panic(err)
 	}
 	return dst
@@ -212,14 +212,14 @@ func AdjustSigmoid(img image.Image, midpoint, factor float64) *image.NRGBA {
 	e := 1.0e-6
 
 	if factor > 0 {
-		for i := 0; i < 256; i++ {
+		for i := range 256 {
 			x := float64(i) / 255.0
 			sigX := sigmoid(a, b, x)
 			f := (sigX - sig0) / (sig1 - sig0)
 			lut[i] = clamp(f * 255.0)
 		}
 	} else {
-		for i := 0; i < 256; i++ {
+		for i := range 256 {
 			x := float64(i) / 255.0
 			arg := math.Min(math.Max((sig1-sig0)*x+sig0, e), 1.0-e)
 			f := a - math.Log(1.0/arg-1.0)/b
@@ -239,8 +239,8 @@ func adjustLUT(img image.Image, lut []uint8) *image.NRGBA {
 	src := newScanner(img)
 	dst := image.NewNRGBA(image.Rect(0, 0, src.w, src.h))
 	lut = lut[0:256]
-	if err := safe_parallel(0, src.h, func(ys <-chan int) {
-		for y := range ys {
+	if err := run_in_parallel_over_range(0, func(start, limit int) {
+		for y := start; y < limit; y++ {
 			i := y * dst.Stride
 			src.Scan(0, y, src.w, y+1, dst.Pix[i:i+src.w*4])
 			for x := 0; x < src.w; x++ {
@@ -251,7 +251,7 @@ func adjustLUT(img image.Image, lut []uint8) *image.NRGBA {
 				i += 4
 			}
 		}
-	}); err != nil {
+	}, 0, src.h); err != nil {
 		panic(err)
 	}
 	return dst
@@ -275,8 +275,8 @@ func adjustLUT(img image.Image, lut []uint8) *image.NRGBA {
 func AdjustFunc(img image.Image, fn func(c color.NRGBA) color.NRGBA) *image.NRGBA {
 	src := newScanner(img)
 	dst := image.NewNRGBA(image.Rect(0, 0, src.w, src.h))
-	if err := safe_parallel(0, src.h, func(ys <-chan int) {
-		for y := range ys {
+	if err := run_in_parallel_over_range(0, func(start, limit int) {
+		for y := start; y < limit; y++ {
 			i := y * dst.Stride
 			src.Scan(0, y, src.w, y+1, dst.Pix[i:i+src.w*4])
 			for x := 0; x < src.w; x++ {
@@ -293,7 +293,7 @@ func AdjustFunc(img image.Image, fn func(c color.NRGBA) color.NRGBA) *image.NRGB
 				i += 4
 			}
 		}
-	}); err != nil {
+	}, 0, src.h); err != nil {
 		panic(err)
 	}
 	return dst

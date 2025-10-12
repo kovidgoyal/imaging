@@ -13,14 +13,14 @@ func FlipH(img image.Image) *image.NRGBA {
 	dstH := src.h
 	rowSize := dstW * 4
 	dst := image.NewNRGBA(image.Rect(0, 0, dstW, dstH))
-	if err := safe_parallel(0, dstH, func(ys <-chan int) {
-		for dstY := range ys {
+	if err := run_in_parallel_over_range(0, func(start, limit int) {
+		for dstY := start; dstY < limit; dstY++ {
 			i := dstY * dst.Stride
 			srcY := dstY
 			src.Scan(0, srcY, src.w, srcY+1, dst.Pix[i:i+rowSize])
 			reverse(dst.Pix[i : i+rowSize])
 		}
-	}); err != nil {
+	}, 0, dstH); err != nil {
 		panic(err)
 	}
 	return dst
@@ -33,13 +33,13 @@ func FlipV(img image.Image) *image.NRGBA {
 	dstH := src.h
 	rowSize := dstW * 4
 	dst := image.NewNRGBA(image.Rect(0, 0, dstW, dstH))
-	if err := safe_parallel(0, dstH, func(ys <-chan int) {
-		for dstY := range ys {
+	if err := run_in_parallel_over_range(0, func(start, limit int) {
+		for dstY := start; dstY < limit; dstY++ {
 			i := dstY * dst.Stride
 			srcY := dstH - dstY - 1
 			src.Scan(0, srcY, src.w, srcY+1, dst.Pix[i:i+rowSize])
 		}
-	}); err != nil {
+	}, 0, dstH); err != nil {
 		panic(err)
 	}
 	return dst
@@ -52,13 +52,13 @@ func Transpose(img image.Image) *image.NRGBA {
 	dstH := src.w
 	rowSize := dstW * 4
 	dst := image.NewNRGBA(image.Rect(0, 0, dstW, dstH))
-	if err := safe_parallel(0, dstH, func(ys <-chan int) {
-		for dstY := range ys {
+	if err := run_in_parallel_over_range(0, func(start, limit int) {
+		for dstY := start; dstY < limit; dstY++ {
 			i := dstY * dst.Stride
 			srcX := dstY
 			src.Scan(srcX, 0, srcX+1, src.h, dst.Pix[i:i+rowSize])
 		}
-	}); err != nil {
+	}, 0, dstH); err != nil {
 		panic(err)
 	}
 	return dst
@@ -71,14 +71,14 @@ func Transverse(img image.Image) *image.NRGBA {
 	dstH := src.w
 	rowSize := dstW * 4
 	dst := image.NewNRGBA(image.Rect(0, 0, dstW, dstH))
-	if err := safe_parallel(0, dstH, func(ys <-chan int) {
-		for dstY := range ys {
+	if err := run_in_parallel_over_range(0, func(start, limit int) {
+		for dstY := start; dstY < limit; dstY++ {
 			i := dstY * dst.Stride
 			srcX := dstH - dstY - 1
 			src.Scan(srcX, 0, srcX+1, src.h, dst.Pix[i:i+rowSize])
 			reverse(dst.Pix[i : i+rowSize])
 		}
-	}); err != nil {
+	}, 0, dstH); err != nil {
 		panic(err)
 	}
 	return dst
@@ -91,13 +91,13 @@ func Rotate90(img image.Image) *image.NRGBA {
 	dstH := src.w
 	rowSize := dstW * 4
 	dst := image.NewNRGBA(image.Rect(0, 0, dstW, dstH))
-	if err := safe_parallel(0, dstH, func(ys <-chan int) {
-		for dstY := range ys {
+	if err := run_in_parallel_over_range(0, func(start, limit int) {
+		for dstY := start; dstY < limit; dstY++ {
 			i := dstY * dst.Stride
 			srcX := dstH - dstY - 1
 			src.Scan(srcX, 0, srcX+1, src.h, dst.Pix[i:i+rowSize])
 		}
-	}); err != nil {
+	}, 0, dstH); err != nil {
 		panic(err)
 	}
 	return dst
@@ -110,14 +110,14 @@ func Rotate180(img image.Image) *image.NRGBA {
 	dstH := src.h
 	rowSize := dstW * 4
 	dst := image.NewNRGBA(image.Rect(0, 0, dstW, dstH))
-	if err := safe_parallel(0, dstH, func(ys <-chan int) {
-		for dstY := range ys {
+	if err := run_in_parallel_over_range(0, func(start, limit int) {
+		for dstY := start; dstY < limit; dstY++ {
 			i := dstY * dst.Stride
 			srcY := dstH - dstY - 1
 			src.Scan(0, srcY, src.w, srcY+1, dst.Pix[i:i+rowSize])
 			reverse(dst.Pix[i : i+rowSize])
 		}
-	}); err != nil {
+	}, 0, dstH); err != nil {
 		panic(err)
 	}
 	return dst
@@ -130,14 +130,14 @@ func Rotate270(img image.Image) *image.NRGBA {
 	dstH := src.w
 	rowSize := dstW * 4
 	dst := image.NewNRGBA(image.Rect(0, 0, dstW, dstH))
-	if err := safe_parallel(0, dstH, func(ys <-chan int) {
-		for dstY := range ys {
+	if err := run_in_parallel_over_range(0, func(start, limit int) {
+		for dstY := start; dstY < limit; dstY++ {
 			i := dstY * dst.Stride
 			srcX := dstY
 			src.Scan(srcX, 0, srcX+1, src.h, dst.Pix[i:i+rowSize])
 			reverse(dst.Pix[i : i+rowSize])
 		}
-	}); err != nil {
+	}, 0, dstH); err != nil {
 		panic(err)
 	}
 	return dst
@@ -178,15 +178,15 @@ func Rotate(img image.Image, angle float64, bgColor color.Color) *image.NRGBA {
 	bgColorNRGBA := color.NRGBAModel.Convert(bgColor).(color.NRGBA)
 	sin, cos := math.Sincos(math.Pi * angle / 180)
 
-	if err := safe_parallel(0, dstH, func(ys <-chan int) {
-		for dstY := range ys {
-			for dstX := 0; dstX < dstW; dstX++ {
+	if err := run_in_parallel_over_range(0, func(start, limit int) {
+		for dstY := start; dstY < limit; dstY++ {
+			for dstX := range dstW {
 				xf, yf := rotatePoint(float64(dstX)-dstXOff, float64(dstY)-dstYOff, sin, cos)
 				xf, yf = xf+srcXOff, yf+srcYOff
 				interpolatePoint(dst, dstX, dstY, src, xf, yf, bgColorNRGBA)
 			}
 		}
-	}); err != nil {
+	}, 0, dstH); err != nil {
 		panic(err)
 	}
 
@@ -255,7 +255,7 @@ func interpolatePoint(dst *image.NRGBA, dstX, dstY int, src *image.NRGBA, xf, yf
 	}
 
 	var r, g, b, a float64
-	for i := 0; i < 4; i++ {
+	for i := range 4 {
 		p := points[i]
 		w := weights[i]
 		if p.In(bounds) {

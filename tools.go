@@ -30,12 +30,12 @@ func Clone(img image.Image) *image.NRGBA {
 	src := newScanner(img)
 	dst := image.NewNRGBA(image.Rect(0, 0, src.w, src.h))
 	size := src.w * 4
-	if err := safe_parallel(0, src.h, func(ys <-chan int) {
-		for y := range ys {
+	if err := run_in_parallel_over_range(0, func(start, limit int) {
+		for y := start; y < limit; y++ {
 			i := y * dst.Stride
 			src.Scan(0, y, src.w, y+1, dst.Pix[i:i+size])
 		}
-	}); err != nil {
+	}, 0, src.h); err != nil {
 		panic(err)
 	}
 	return dst
@@ -105,12 +105,12 @@ func Crop(img image.Image, rect image.Rectangle) *image.NRGBA {
 	src := newScanner(img)
 	dst := image.NewNRGBA(image.Rect(0, 0, r.Dx(), r.Dy()))
 	rowSize := r.Dx() * 4
-	if err := safe_parallel(r.Min.Y, r.Max.Y, func(ys <-chan int) {
-		for y := range ys {
+	if err := run_in_parallel_over_range(0, func(start, limit int) {
+		for y := start; y < limit; y++ {
 			i := (y - r.Min.Y) * dst.Stride
 			src.Scan(r.Min.X, y, r.Max.X, y+1, dst.Pix[i:i+rowSize])
 		}
-	}); err != nil {
+	}, r.Min.Y, r.Max.Y); err != nil {
 		panic(err)
 	}
 	return dst
@@ -146,8 +146,8 @@ func Paste(background, img image.Image, pos image.Point) *image.NRGBA {
 	}
 
 	src := newScanner(img)
-	if err := safe_parallel(interRect.Min.Y, interRect.Max.Y, func(ys <-chan int) {
-		for y := range ys {
+	if err := run_in_parallel_over_range(0, func(start, limit int) {
+		for y := start; y < limit; y++ {
 			x1 := interRect.Min.X - pasteRect.Min.X
 			x2 := interRect.Max.X - pasteRect.Min.X
 			y1 := y - pasteRect.Min.Y
@@ -156,7 +156,7 @@ func Paste(background, img image.Image, pos image.Point) *image.NRGBA {
 			i2 := i1 + interRect.Dx()*4
 			src.Scan(x1, y1, x2, y2, dst.Pix[i1:i2])
 		}
-	}); err != nil {
+	}, interRect.Min.Y, interRect.Max.Y); err != nil {
 		panic(err)
 	}
 	return dst
@@ -200,9 +200,9 @@ func Overlay(background, img image.Image, pos image.Point, opacity float64) *ima
 		return dst
 	}
 	src := newScanner(img)
-	if err := safe_parallel(interRect.Min.Y, interRect.Max.Y, func(ys <-chan int) {
+	if err := run_in_parallel_over_range(0, func(start, limit int) {
 		scanLine := make([]uint8, interRect.Dx()*4)
-		for y := range ys {
+		for y := start; y < limit; y++ {
 			x1 := interRect.Min.X - pasteRect.Min.X
 			x2 := interRect.Max.X - pasteRect.Min.X
 			y1 := y - pasteRect.Min.Y
@@ -238,7 +238,7 @@ func Overlay(background, img image.Image, pos image.Point, opacity float64) *ima
 				j += 4
 			}
 		}
-	}); err != nil {
+	}, interRect.Min.Y, interRect.Max.Y); err != nil {
 		panic(err)
 	}
 	return dst

@@ -109,9 +109,9 @@ func resizeHorizontal(img image.Image, width int, filter ResampleFilter) *image.
 	src := newScanner(img)
 	dst := image.NewNRGBA(image.Rect(0, 0, width, src.h))
 	weights := precomputeWeights(width, src.w, filter)
-	if err := safe_parallel(0, src.h, func(ys <-chan int) {
+	if err := run_in_parallel_over_range(0, func(start, limit int) {
 		scanLine := make([]uint8, src.w*4)
-		for y := range ys {
+		for y := start; y < limit; y++ {
 			src.Scan(0, y, src.w, y+1, scanLine)
 			j0 := y * dst.Stride
 			for x := range weights {
@@ -136,7 +136,7 @@ func resizeHorizontal(img image.Image, width int, filter ResampleFilter) *image.
 				}
 			}
 		}
-	}); err != nil {
+	}, 0, src.h); err != nil {
 		panic(err)
 	}
 	return dst
@@ -146,9 +146,9 @@ func resizeVertical(img image.Image, height int, filter ResampleFilter) *image.N
 	src := newScanner(img)
 	dst := image.NewNRGBA(image.Rect(0, 0, src.w, height))
 	weights := precomputeWeights(height, src.h, filter)
-	if err := safe_parallel(0, src.w, func(xs <-chan int) {
+	if err := run_in_parallel_over_range(0, func(start, limit int) {
 		scanLine := make([]uint8, src.h*4)
-		for x := range xs {
+		for x := start; x < limit; x++ {
 			src.Scan(x, 0, x+1, src.h, scanLine)
 			for y := range weights {
 				var r, g, b, a float64
@@ -172,7 +172,7 @@ func resizeVertical(img image.Image, height int, filter ResampleFilter) *image.N
 				}
 			}
 		}
-	}); err != nil {
+	}, 0, src.w); err != nil {
 		panic(err)
 	}
 	return dst
@@ -186,34 +186,34 @@ func resizeNearest(img image.Image, width, height int) *image.NRGBA {
 
 	if dx > 1 && dy > 1 {
 		src := newScanner(img)
-		if err := safe_parallel(0, height, func(ys <-chan int) {
-			for y := range ys {
+		if err := run_in_parallel_over_range(0, func(start, limit int) {
+			for y := start; y < limit; y++ {
 				srcY := int((float64(y) + 0.5) * dy)
 				dstOff := y * dst.Stride
-				for x := 0; x < width; x++ {
+				for x := range width {
 					srcX := int((float64(x) + 0.5) * dx)
 					src.Scan(srcX, srcY, srcX+1, srcY+1, dst.Pix[dstOff:dstOff+4])
 					dstOff += 4
 				}
 			}
-		}); err != nil {
+		}, 0, height); err != nil {
 			panic(err)
 		}
 	} else {
 		src := toNRGBA(img)
-		if err := safe_parallel(0, height, func(ys <-chan int) {
-			for y := range ys {
+		if err := run_in_parallel_over_range(0, func(start, limit int) {
+			for y := start; y < limit; y++ {
 				srcY := int((float64(y) + 0.5) * dy)
 				srcOff0 := srcY * src.Stride
 				dstOff := y * dst.Stride
-				for x := 0; x < width; x++ {
+				for x := range width {
 					srcX := int((float64(x) + 0.5) * dx)
 					srcOff := srcOff0 + srcX*4
 					copy(dst.Pix[dstOff:dstOff+4], src.Pix[srcOff:srcOff+4])
 					dstOff += 4
 				}
 			}
-		}); err != nil {
+		}, 0, height); err != nil {
 			panic(err)
 		}
 	}

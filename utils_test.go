@@ -4,7 +4,6 @@ import (
 	"image"
 	"math"
 	"runtime"
-	"sync/atomic"
 	"testing"
 )
 
@@ -36,15 +35,15 @@ func testParallelN(n, procs int) bool {
 	data := make([]bool, n)
 	before := runtime.GOMAXPROCS(0)
 	runtime.GOMAXPROCS(procs)
-	if err := safe_parallel(0, n, func(is <-chan int) {
-		for i := range is {
+	if err := run_in_parallel_over_range(0, func(start, limit int) {
+		for i := start; i < limit; i++ {
 			data[i] = true
 		}
-	}); err != nil {
+	}, 0, n); err != nil {
 		panic(err)
 	}
 	runtime.GOMAXPROCS(before)
-	for i := 0; i < n; i++ {
+	for i := range n {
 		if !data[i] {
 			return false
 		}
@@ -65,15 +64,15 @@ func TestParallelMaxProcs(t *testing.T) {
 func testParallelMaxProcsN(n, procs int) bool {
 	data := make([]bool, n)
 	SetMaxProcs(procs)
-	if err := safe_parallel(0, n, func(is <-chan int) {
-		for i := range is {
+	if err := run_in_parallel_over_range(0, func(start, limit int) {
+		for i := start; i < limit; i++ {
 			data[i] = true
 		}
-	}); err != nil {
+	}, 0, n); err != nil {
 		panic(err)
 	}
 	SetMaxProcs(0)
-	for i := 0; i < n; i++ {
+	for i := range n {
 		if !data[i] {
 			return false
 		}
@@ -84,7 +83,7 @@ func testParallelMaxProcsN(n, procs int) bool {
 func TestSetMaxProcs(t *testing.T) {
 	for _, p := range []int{-1, 0, 10} {
 		SetMaxProcs(p)
-		if int(atomic.LoadInt64(&maxProcs)) != p {
+		if int(max_procs.Load()) != p {
 			t.Fatalf("test [set max procs %d] failed", p)
 		}
 	}

@@ -10,12 +10,12 @@ import (
 	"sync/atomic"
 )
 
-var maxProcs int64
+var max_procs atomic.Int64
 
 // SetMaxProcs limits the number of concurrent processing goroutines to the given value.
 // A value <= 0 clears the limit.
 func SetMaxProcs(value int) {
-	atomic.StoreInt64(&maxProcs, int64(value))
+	max_procs.Store(int64(value))
 }
 
 func format_stacktrace_on_panic(r any) (err error) {
@@ -38,51 +38,15 @@ func format_stacktrace_on_panic(r any) (err error) {
 	return fmt.Errorf("%s", strings.TrimSpace(text))
 }
 
-// parallel processes the data in separate goroutines.
-func safe_parallel(start, stop int, fn func(<-chan int)) (err error) {
-	count := stop - start
-	if count < 1 {
-		return
-	}
-
-	procs := runtime.GOMAXPROCS(0)
-	limit := int(atomic.LoadInt64(&maxProcs))
-	if procs > limit && limit > 0 {
-		procs = limit
-	}
-	if procs > count {
-		procs = count
-	}
-
-	c := make(chan int, count)
-	for i := start; i < stop; i++ {
-		c <- i
-	}
-	close(c)
-
-	var wg sync.WaitGroup
-	for i := 0; i < procs; i++ {
-		wg.Add(1)
-		go func() {
-			defer func() {
-				if r := recover(); r != nil {
-					err = format_stacktrace_on_panic(r)
-				}
-				wg.Done()
-			}()
-			fn(c)
-		}()
-	}
-	wg.Wait()
-	return
-}
-
 // Run the specified function in parallel over chunks from the specified range.
 // If the function panics, it is turned into a regular error.
 func run_in_parallel_over_range(num_procs int, f func(int, int), start, limit int) (err error) {
 	num_items := limit - start
 	if num_procs <= 0 {
-		num_procs = runtime.NumCPU()
+		num_procs = runtime.GOMAXPROCS(0)
+		if mp := int(max_procs.Load()); mp > 0 {
+			num_procs = min(num_procs, mp)
+		}
 	}
 	num_procs = max(1, min(num_procs, num_items))
 	if num_procs < 2 {
