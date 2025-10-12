@@ -2,8 +2,10 @@
 # License: GPLv3 Copyright: 2024, Kovid Goyal <kovid at kovidgoyal.net>
 
 import os
-import re
 import subprocess
+
+
+VERSION = "1.7.1"
 
 
 def run(*args: str):
@@ -13,10 +15,7 @@ def run(*args: str):
 
 
 def main():
-    with open('doc.go') as f:
-        raw = f.read()
-        m = re.search(r'ImagingVersion\{(\d+), (\d+), (\d+)\}', raw)
-        version = '.'.join(m.groups())
+    version = VERSION
     try:
         ans = input(f'Publish version \033[91m{version}\033[m (y/n): ')
     except KeyboardInterrupt:
