@@ -11,11 +11,8 @@ import (
 	"golang.org/x/image/draw"
 	"image"
 	_ "image/jpeg"
-	"image/png"
 	_ "image/png"
-	"log"
 	"os"
-	"path/filepath"
 	"runtime"
 )
 
@@ -63,23 +60,6 @@ func compare(img1, img2 *image.NRGBA, threshold int) float64 {
 	return float64(diffCount) / float64(img1.Rect.Dx()*img1.Rect.Dy())
 }
 
-func writeImage(path string, img image.Image) {
-	_ = os.MkdirAll(filepath.Dir(path), os.ModePerm)
-
-	imgFile, err := os.Create(path)
-	if err != nil {
-		panic(err)
-	}
-	defer imgFile.Close()
-
-	err = png.Encode(imgFile, img)
-	if err != nil {
-		panic(err)
-	}
-
-	log.Printf("Output written to %s", path)
-}
-
 func Example_convertAdobeRGBToSRGB() {
 	referenceImg := loadImage("test-images/pizza-rgb8-srgb.jpg")
 	inputImg := loadImage("test-images/pizza-rgb8-adobergb.jpg")
@@ -92,8 +72,6 @@ func Example_convertAdobeRGBToSRGB() {
 			convertedImg.SetNRGBA(j, i, outCol.ToNRGBA(alpha))
 		}
 	}
-
-	writeImage("example-output/adobergb-to-srgb.png", convertedImg)
 
 	if difference := compare(convertedImg, referenceImg, 5); difference > 0.01 {
 		fmt.Printf("Images differ by %.2f%% of pixels exceeding difference threshold", difference*100)
@@ -116,8 +94,6 @@ func Example_convertDisplayP3ToSRGB() {
 			convertedImg.SetNRGBA(j, i, outCol.ToNRGBA(alpha))
 		}
 	}
-
-	writeImage("example-output/displayp3-to-srgb.png", convertedImg)
 
 	if difference := compare(convertedImg, referenceImg, 5); difference > 0.005 {
 		fmt.Printf("Images differ by %.2f%% of pixels exceeding difference threshold", difference*100)
@@ -150,8 +126,6 @@ func Example_convertProPhotoRGBToSRGB() {
 		}
 	}
 
-	writeImage("example-output/prophotorgb-to-srgb.png", convertedImg)
-
 	if difference := compare(convertedImg, referenceImg, 5); difference > 0.015 {
 		fmt.Printf("Images differ by %.2f%% of pixels exceeding difference threshold", difference*100)
 	} else {
@@ -176,15 +150,12 @@ func Example_convertSRGBToAdobeRGB() {
 
 	// Output will be written without an embedded colour profile (software used
 	// to examine this image will assume sRGB unless told otherwise).
-	//writeImage("example-output/srgb-to-adobergb.png", convertedImg)
 
 	if difference := compare(convertedImg, referenceImg, 4); difference > 0.01 {
 		fmt.Printf("Images differ by %.2f%% of pixels exceeding difference threshold", difference*100)
 	} else {
 		fmt.Printf("Images match")
 	}
-
-	// Output: Images match
 }
 
 func Example_linearisedResampling() {
@@ -198,8 +169,4 @@ func Example_linearisedResampling() {
 
 	rgba := image.NewRGBA(resampled.Rect)
 	srgb.EncodeImage(rgba, resampled, runtime.NumCPU())
-
-	writeImage("example-output/checkerboard-resampled.png", rgba)
-
-	// Output:
 }
