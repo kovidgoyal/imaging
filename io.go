@@ -14,7 +14,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/mandykoh/prism/meta/autometa"
+	"github.com/kovidgoyal/imaging/prism/meta/autometa"
 	"github.com/rwcarlsen/goexif/exif"
 
 	"golang.org/x/image/bmp"
