@@ -174,3 +174,10 @@ func decodeUTF16BE(data []byte) string {
 	_, _ = binary.Decode(data, binary.BigEndian, codeUnits)
 	return string(utf16.Decode(codeUnits))
 }
+
+func sigDecoder(raw []byte) (any, error) {
+	if len(raw) < 12 {
+		return nil, errors.New("sig tag too short")
+	}
+	return signature(raw[8:12]), nil
+}

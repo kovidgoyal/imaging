@@ -30,6 +30,8 @@ func parse_tag(sig Signature, data []byte) (result any, err error) {
 		return nil, &unsupported{sig}
 	case DescSignature, DeviceManufacturerDescriptionSignature, DeviceModelDescriptionSignature:
 		return parse_text_tag(data)
+	case SignateTagSignature:
+		return sigDecoder(data)
 	}
 }
 

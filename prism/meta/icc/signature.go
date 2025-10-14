@@ -5,6 +5,7 @@ type Signature uint32
 const (
 	ProfileFileSignature Signature = 0x61637370 // 'acsp'
 	TextTagSignature     Signature = 0x74657874 // 'text'
+	SignateTagSignature  Signature = 0x73696720 // 'sig '
 
 	DescSignature                          Signature = 0x64657363 // 'desc'
 	MultiLocalisedUnicodeSignature         Signature = 0x6D6C7563 // 'mluc'
@@ -29,6 +30,16 @@ func maskNull(b byte) byte {
 	default:
 		return b
 	}
+}
+
+func signature(b []byte) Signature {
+	return Signature(uint32(b[0])<<24 | uint32(b[1])<<16 | uint32(b[2])<<8 | uint32(b[3]))
+}
+
+func SignatureFromString(sig string) Signature {
+	var b []byte = []byte{0x20, 0x20, 0x20, 0x20}
+	copy(b, sig)
+	return signature(b)
 }
 
 func (s Signature) String() string {
