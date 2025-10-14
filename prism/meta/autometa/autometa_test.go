@@ -76,8 +76,10 @@ func TestProfileRecognition(t *testing.T) {
 				t.Fatal(err)
 			}
 			d, err := p.Description()
+			man, err := p.DeviceManufacturerDescription()
+			mod, err := p.DeviceModelDescription()
 			if actual := p.WellKnownProfile(); actual != expected {
-				t.Fatalf("Incorrect profile for img: %s, expected %s, got %s\nHeader: %s\nDescription: %s", imgname, expected, actual, p.Header, d)
+				t.Fatalf("Incorrect profile for img: %s, expected %s, got %s\n%s\nDescription: %s\nManufacturer: %s\nModel: %s", imgname, expected, actual, p.Header, d, man, mod)
 			}
 		})
 	}

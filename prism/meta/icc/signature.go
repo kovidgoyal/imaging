@@ -4,6 +4,7 @@ type Signature uint32
 
 const (
 	ProfileFileSignature Signature = 0x61637370 // 'acsp'
+	TextTagSignature     Signature = 0x74657874 // 'text'
 
 	DescSignature                          Signature = 0x64657363 // 'desc'
 	MultiLocalisedUnicodeSignature         Signature = 0x6D6C7563 // 'mluc'
