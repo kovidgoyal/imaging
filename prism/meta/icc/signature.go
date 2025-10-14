@@ -3,9 +3,12 @@ package icc
 type Signature uint32
 
 const (
-	ProfileFileSignature           Signature = 0x61637370 // 'acsp'
-	DescSignature                  Signature = 0x64657363 // 'desc'
-	MultiLocalisedUnicodeSignature Signature = 0x6D6C7563 // 'mluc'
+	ProfileFileSignature Signature = 0x61637370 // 'acsp'
+
+	DescSignature                          Signature = 0x64657363 // 'desc'
+	MultiLocalisedUnicodeSignature         Signature = 0x6D6C7563 // 'mluc'
+	DeviceManufacturerDescriptionSignature Signature = 0x646d6e64 // 'dmnd'
+	DeviceModelDescriptionSignature        Signature = 0x646d6464 // 'dmdd'
 
 	AdobeManufacturerSignature      Signature = 0x41444245 // 'ADBE'
 	AppleManufacturerSignature      Signature = 0x6170706c // 'appl'

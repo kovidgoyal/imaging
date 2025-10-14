@@ -12,7 +12,7 @@ const (
 
 func WellKnownProfileFromDescription(x string) WellKnownProfile {
 	switch x {
-	case "sRGB IEC61966-2.1", "sRGB2014", "sRGB_ICC_v4_Appearance.icc":
+	case "sRGB IEC61966-2.1", "sRGB_ICC_v4_Appearance.icc":
 		return SRGBProfile
 	case "Adobe RGB (1998)":
 		return AdobeRGBProfile
@@ -49,7 +49,22 @@ func (p *Profile) Description() (string, error) {
 	return p.TagTable.getProfileDescription()
 }
 
+func (p *Profile) DeviceManufacturerDescription() (string, error) {
+	return p.TagTable.getDeviceManufacturerDescription()
+}
+
+func (p *Profile) DeviceModelDescription() (string, error) {
+	return p.TagTable.getDeviceModelDescription()
+}
+
 func (p *Profile) WellKnownProfile() WellKnownProfile {
+	model, err := p.DeviceModelDescription()
+	if err == nil {
+		switch model {
+		case "IEC 61966-2-1 Default RGB Colour Space - sRGB":
+			return SRGBProfile
+		}
+	}
 	d, err := p.Description()
 	if err == nil {
 		if ans := WellKnownProfileFromDescription(d); ans != UnknownProfile {

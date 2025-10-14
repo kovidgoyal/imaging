@@ -182,8 +182,10 @@ func TestProfileReader(t *testing.T) {
 					t.Fatalf("failed reading profile: %s with error: %s", fname, err)
 				}
 				d, err := p.Description()
+				man, err := p.DeviceManufacturerDescription()
+				model, err := p.DeviceModelDescription()
 				if actual := p.WellKnownProfile(); actual != expected {
-					t.Fatalf("Incorrect profile for img: %s, expected %s, got %s\nHeader: %s\nDescription: %s", fname, expected, actual, p.Header, d)
+					t.Fatalf("Incorrect profile for img: %s, expected %s, got %s\nHeader: %s\nDescription: %s\nDeviceManufacturer: %s\nDevice Model: %s", fname, expected, actual, p.Header, d, man, model)
 				}
 			}
 		})

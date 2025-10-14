@@ -13,8 +13,8 @@ func (t *TagTable) add(sig Signature, data []byte) {
 	t.entries[sig] = data
 }
 
-func (t *TagTable) getProfileDescription() (string, error) {
-	data, ok := t.entries[DescSignature]
+func (t *TagTable) getDescription(s Signature) (string, error) {
+	data, ok := t.entries[s]
 	if !ok {
 		return "", fmt.Errorf("no description tag in ICC profile")
 	}
@@ -46,6 +46,19 @@ func (t *TagTable) getProfileDescription() (string, error) {
 	default:
 		return "", fmt.Errorf("unknown profile description type (%v)", Signature(sig))
 	}
+
+}
+
+func (t *TagTable) getProfileDescription() (string, error) {
+	return t.getDescription(DescSignature)
+}
+
+func (t *TagTable) getDeviceManufacturerDescription() (string, error) {
+	return t.getDescription(DeviceManufacturerDescriptionSignature)
+}
+
+func (t *TagTable) getDeviceModelDescription() (string, error) {
+	return t.getDescription(DeviceModelDescriptionSignature)
 }
 
 func emptyTagTable() TagTable {
