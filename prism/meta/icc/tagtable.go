@@ -95,3 +95,9 @@ func emptyTagTable() TagTable {
 		entries: make(map[Signature][]byte),
 	}
 }
+
+type ChannelTransformer interface {
+	Transform(output, workspace []float64, input ...float64) error
+	IsSuitableFor(num_input_channels int, num_output_channels int) bool
+	WorkspaceSize() int
+}
