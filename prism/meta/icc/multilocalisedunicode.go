@@ -2,8 +2,9 @@ package icc
 
 import (
 	"bytes"
+	"encoding/binary"
 	"fmt"
-	"github.com/kovidgoyal/imaging/prism/meta/binary"
+	"io"
 	"unicode/utf16"
 )
 
@@ -55,78 +56,42 @@ func parseMultiLocalisedUnicode(data []byte) (MultiLocalisedUnicode, error) {
 	}
 
 	reader := bytes.NewReader(data)
-
-	sig, err := binary.ReadU32Big(reader)
-	if err != nil {
+	type Header struct {
+		Sig, Reserved, RecordCount, RecordSize uint32
+	}
+	var h Header
+	if err := binary.Read(reader, binary.BigEndian, &h); err != nil {
 		return result, err
 	}
-	if s := Signature(sig); s != MultiLocalisedUnicodeSignature {
+
+	if s := Signature(h.Sig); s != MultiLocalisedUnicodeSignature {
 		return result, fmt.Errorf("expected %v but got %v", MultiLocalisedUnicodeSignature, s)
 	}
-
-	// Reserved field
-	_, err = binary.ReadU32Big(reader)
-	if err != nil {
-		return result, err
+	recordCount, recordSize := h.RecordCount, h.RecordSize
+	type RecordHeader struct {
+		Language, Country          [2]byte
+		StringLength, StringOffset uint32
 	}
-
-	recordCount, err := binary.ReadU32Big(reader)
-	if err != nil {
-		return result, err
-	}
-
-	recordSize, err := binary.ReadU32Big(reader)
-	if err != nil {
-		return result, err
-	}
+	var rh RecordHeader
 
 	for range recordCount {
-		language := [2]byte{}
-		n, err := reader.Read(language[:])
-		if err != nil {
-			return result, err
+		if err := binary.Read(reader, binary.BigEndian, &rh); err != nil {
+			return result, fmt.Errorf("failed to read multilang record header: %w", err)
 		}
-		if n < len(language) {
-			return result, fmt.Errorf("unexpected eof when reading language code")
-		}
-
-		country := [2]byte{}
-		n, err = reader.Read(country[:])
-		if err != nil {
-			return result, err
-		}
-		if n < len(country) {
-			return result, fmt.Errorf("unexpected eof when reading country code")
-		}
-
-		stringLength, err := binary.ReadU32Big(reader)
-		if err != nil {
-			return result, err
-		}
-
-		stringOffset, err := binary.ReadU32Big(reader)
-		if err != nil {
-			return result, err
-		}
-
-		if uint64(stringOffset+stringLength) > uint64(len(data)) {
+		if uint64(rh.StringOffset)+uint64(rh.StringLength) > uint64(len(data)) {
 			return result, fmt.Errorf("record exceeds tag data length")
 		}
-
-		recordStringBytes := data[stringOffset : stringOffset+stringLength]
+		recordStringBytes := data[rh.StringOffset : rh.StringOffset+rh.StringLength]
 		recordStringUTF16 := make([]uint16, len(recordStringBytes)/2)
-		for j := range len(recordStringUTF16) {
-			recordStringUTF16[j], err = binary.ReadU16Big(reader)
-			if err != nil {
-				return result, err
-			}
+		if err := binary.Read(reader, binary.BigEndian, recordStringUTF16); err != nil {
+			return result, err
 		}
-		result.setString(language, country, string(utf16.Decode(recordStringUTF16)))
+		result.setString(rh.Language, rh.Country, string(utf16.Decode(recordStringUTF16)))
 
 		// Skip to next record
-		for j := uint32(12); j < recordSize; j++ {
-			_, err := reader.ReadByte()
-			if err != nil {
+		if recordSize > 12 {
+			skip := make([]byte, recordSize-12)
+			if _, err := io.ReadFull(reader, skip); err != nil {
 				return result, err
 			}
 		}

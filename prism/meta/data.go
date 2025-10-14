@@ -2,8 +2,12 @@ package meta
 
 import (
 	"bytes"
+	"fmt"
+
 	"github.com/kovidgoyal/imaging/prism/meta/icc"
 )
+
+var _ = fmt.Println
 
 // Data represents the metadata for an image.
 type Data struct {

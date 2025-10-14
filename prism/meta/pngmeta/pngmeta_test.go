@@ -3,11 +3,16 @@ package pngmeta
 import (
 	"bytes"
 	"compress/zlib"
-	"github.com/kovidgoyal/imaging/prism/meta/binary"
+	"encoding/binary"
+	"io"
 	"testing"
 )
 
 var extractMetadata = ExtractMetadata
+
+func write(w io.Writer, x uint32) {
+	_ = binary.Write(w, binary.BigEndian, x)
+}
 
 func TestExtractMetadata(t *testing.T) {
 
@@ -29,7 +34,7 @@ func TestExtractMetadata(t *testing.T) {
 	writeICCProfileChunk := func(dst *bytes.Buffer, compressedICCData []byte) {
 		profileName := []byte("SomeProfile")
 
-		_ = binary.WriteU32Big(dst, uint32(len(profileName)+2+len(compressedICCData)))
+		write(dst, uint32(len(profileName)+2+len(compressedICCData)))
 		dst.Write(chunkTypeiCCP[:])
 		dst.Write(profileName)
 		dst.WriteByte(0x00)
@@ -37,7 +42,7 @@ func TestExtractMetadata(t *testing.T) {
 		dst.Write(compressedICCData)
 
 		dummyCRC := uint32(0)
-		_ = binary.WriteU32Big(dst, dummyCRC)
+		write(dst, dummyCRC)
 	}
 
 	t.Run("returns error with invalid PNG signature", func(t *testing.T) {
@@ -70,12 +75,12 @@ func TestExtractMetadata(t *testing.T) {
 		data := &bytes.Buffer{}
 		data.Write(pngSignature[:])
 
-		_ = binary.WriteU32Big(data, 13)
+		write(data, 13)
 		data.Write(chunkTypeIHDR[:])
 		headerData := [13]byte{0, 0, 0, 15, 0, 0, 0, 16, 8}
 		data.Write(headerData[:])
 		dummyCRC := uint32(0)
-		_ = binary.WriteU32Big(data, dummyCRC)
+		write(data, dummyCRC)
 
 		md, err := extractMetadata(data)
 
@@ -111,12 +116,12 @@ func TestExtractMetadata(t *testing.T) {
 		data := &bytes.Buffer{}
 		data.Write(pngSignature[:])
 
-		_ = binary.WriteU32Big(data, 13)
+		write(data, 13)
 		data.Write(chunkTypeIHDR[:])
 		headerData := [13]byte{0, 0, 0, 15, 0, 0, 0, 16, 8}
 		data.Write(headerData[:])
 		dummyCRC := uint32(0)
-		_ = binary.WriteU32Big(data, dummyCRC)
+		write(data, dummyCRC)
 
 		invalidICCProfileData := []byte("NOT COMPRESSED ICC PROFLE DATA")
 		writeICCProfileChunk(data, invalidICCProfileData)
@@ -158,12 +163,12 @@ func TestExtractMetadata(t *testing.T) {
 		data := &bytes.Buffer{}
 		data.Write(pngSignature[:])
 
-		_ = binary.WriteU32Big(data, 13)
+		write(data, 13)
 		data.Write(chunkTypeIHDR[:])
 		headerData := [13]byte{0, 0, 0, 15, 0, 0, 0, 16, 8}
 		data.Write(headerData[:])
 		dummyCRC := uint32(0)
-		_ = binary.WriteU32Big(data, dummyCRC)
+		write(data, dummyCRC)
 
 		iccProfileData := []byte{1, 2, 3, 4}
 		writeICCProfileChunk(data, compressICCProfileData(iccProfileData))
@@ -212,21 +217,21 @@ func TestExtractMetadata(t *testing.T) {
 		data := &bytes.Buffer{}
 		data.Write(pngSignature[:])
 
-		_ = binary.WriteU32Big(data, 13)
+		write(data, 13)
 		data.Write(chunkTypeIHDR[:])
 		headerData := [13]byte{0, 0, 0, 16, 0, 0, 0, 16, 8}
 		data.Write(headerData[:])
 		dummyCRC := uint32(0)
-		_ = binary.WriteU32Big(data, dummyCRC)
+		write(data, dummyCRC)
 
 		iccProfileData := []byte{1, 2, 3, 4}
 		writeICCProfileChunk(data, compressICCProfileData(iccProfileData))
 
-		_ = binary.WriteU32Big(data, 4)
+		write(data, 4)
 		data.Write(chunkTypeIDAT[:])
 		imageData := []byte{5, 6, 7, 8}
 		data.Write(imageData)
-		_ = binary.WriteU32Big(data, dummyCRC)
+		write(data, dummyCRC)
 
 		_, err := extractMetadata(data)
 
@@ -248,14 +253,14 @@ func TestExtractMetadata(t *testing.T) {
 		data := &bytes.Buffer{}
 		data.Write(pngSignature[:])
 
-		_ = binary.WriteU32Big(data, 13)
+		write(data, 13)
 		data.Write(chunkTypeIHDR[:])
 		headerData := [13]byte{}
 		data.Write(headerData[:])
 		dummyCRC := uint32(0)
-		_ = binary.WriteU32Big(data, dummyCRC)
+		write(data, dummyCRC)
 
-		_ = binary.WriteU32Big(data, 999)
+		write(data, 999)
 		data.Write(chunkTypeIDAT[:])
 		imageData := []byte{1, 2, 3, 4}
 		data.Write(imageData)

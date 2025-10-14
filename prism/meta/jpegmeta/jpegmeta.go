@@ -1,12 +1,13 @@
 package jpegmeta
 
 import (
-	"bufio"
 	"bytes"
 	"fmt"
-	"github.com/kovidgoyal/imaging/prism/meta"
-	"github.com/kovidgoyal/imaging/prism/meta/binary"
 	"io"
+
+	"github.com/kovidgoyal/go-parallel"
+	"github.com/kovidgoyal/imaging/prism/meta"
+	"github.com/kovidgoyal/imaging/streams"
 )
 
 // Format specifies the image format handled by this package
@@ -27,14 +28,15 @@ var iccProfileIdentifier = []byte("ICC_PROFILE\x00")
 // An error is returned if basic metadata could not be extracted. The returned
 // stream still provides the full image data.
 func Load(r io.Reader) (md *meta.Data, imgStream io.Reader, err error) {
-	rewindBuffer := &bytes.Buffer{}
-	tee := io.TeeReader(r, rewindBuffer)
-	md, err = ExtractMetadata(bufio.NewReader(tee))
-	return md, io.MultiReader(rewindBuffer, r), err
+	imgStream, err = streams.CallbackWithSeekable(r, func(r io.Reader) (err error) {
+		md, err = ExtractMetadata(r)
+		return
+	})
+	return
 }
 
 // Same as Load() except that no new stream is provided
-func ExtractMetadata(r binary.Reader) (md *meta.Data, err error) {
+func ExtractMetadata(r io.Reader) (md *meta.Data, err error) {
 	metadataExtracted := false
 	md = &meta.Data{Format: Format}
 	segReader := NewSegmentReader(r)
@@ -44,7 +46,7 @@ func ExtractMetadata(r binary.Reader) (md *meta.Data, err error) {
 			if !metadataExtracted {
 				md = nil
 			}
-			err = fmt.Errorf("panic while extracting image metadata: %v", r)
+			err = parallel.Format_stacktrace_on_panic(r, 1)
 		}
 	}()
 

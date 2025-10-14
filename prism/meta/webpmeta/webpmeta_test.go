@@ -2,9 +2,9 @@ package webpmeta
 
 import (
 	"bytes"
+	"encoding/binary"
+	"strings"
 	"testing"
-
-	"github.com/kovidgoyal/imaging/prism/meta/binary"
 )
 
 var extractMetadata = ExtractMetadata
@@ -44,8 +44,8 @@ func TestExtractMetadata(t *testing.T) {
 
 		if err == nil {
 			t.Errorf("Expected error but succeeded")
-		} else if expected, actual := "unexpected EOF reading chunk type", err.Error(); expected != actual {
-			t.Errorf("Expected error '%s' but got '%s'", expected, actual)
+		} else if !strings.Contains(err.Error(), "unexpected EOF") {
+			t.Errorf("Expected error EOF but got '%#v'", err)
 		}
 	})
 
@@ -60,7 +60,7 @@ func TestExtractMetadata(t *testing.T) {
 		}
 
 		if md == nil {
-			t.Errorf("Expected metdata but got none")
+			t.Errorf("Expected metadata but got none")
 		} else {
 			iccData, iccErr := md.ICCProfileData()
 
@@ -88,7 +88,7 @@ func TestExtractMetadata(t *testing.T) {
 		iccProfileData := []byte{1, 2, 3, 4}
 		data.Write([]byte("RIFF\xc0Z\x04\x00WEBPVP8X\x0a\x00\x00\x00\x34\x00\x00\x00\xaf\x04\x00\xaf\x04\x00"))
 		data.Write(chunkTypeICCP[:])
-		binary.WriteU32Little(data, uint32(len(iccProfileData)))
+		binary.Write(data, binary.LittleEndian, uint32(len(iccProfileData)))
 		data.Write(iccProfileData)
 
 		md, err := extractMetadata(data)

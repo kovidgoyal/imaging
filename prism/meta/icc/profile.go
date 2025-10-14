@@ -12,7 +12,7 @@ const (
 
 func WellKnownProfileFromDesription(x string) WellKnownProfile {
 	switch x {
-	case "sRGB IEC61966-2.1":
+	case "sRGB IEC61966-2.1", "sRGB2014":
 		return SRGBProfile
 	case "Adobe RGB (1998)":
 		return AdobeRGBProfile

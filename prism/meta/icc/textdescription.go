@@ -1,9 +1,8 @@
 package icc
 
 import (
-	"bytes"
+	"encoding/binary"
 	"fmt"
-	"github.com/kovidgoyal/imaging/prism/meta/binary"
 )
 
 type TextDescription struct {
@@ -12,43 +11,21 @@ type TextDescription struct {
 
 func parseTextDescription(data []byte) (TextDescription, error) {
 	desc := TextDescription{}
-
-	reader := bytes.NewReader(data)
-
-	sig, err := binary.ReadU32Big(reader)
-	if err != nil {
+	var b [3]uint32
+	if n, err := binary.Decode(data, binary.BigEndian, b[:]); err != nil {
 		return desc, err
+	} else {
+		data = data[n:]
 	}
-	if s := Signature(sig); s != DescSignature {
+
+	if s := Signature(b[0]); s != DescSignature {
 		return desc, fmt.Errorf("expected %v but got %v", DescSignature, s)
 	}
+	asciiCount := b[2]
 
-	// Reserved field
-	_, err = binary.ReadU32Big(reader)
-	if err != nil {
-		return desc, err
+	if asciiCount > 1 {
+		desc.ASCII = string(data[:asciiCount-1]) // skip terminating null
 	}
-
-	asciiCount, err := binary.ReadU32Big(reader)
-	if err != nil {
-		return desc, err
-	}
-
-	asciiBytes := make([]byte, asciiCount-1)
-	for i := 0; i < len(asciiBytes); i++ {
-		asciiBytes[i], err = reader.ReadByte()
-		if err != nil {
-			return desc, err
-		}
-	}
-
-	// Skip terminating null
-	_, err = reader.ReadByte()
-	if err != nil {
-		return desc, err
-	}
-
-	desc.ASCII = string(asciiBytes)
 
 	return desc, nil
 }

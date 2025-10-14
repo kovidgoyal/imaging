@@ -1,14 +1,12 @@
 package webpmeta
 
 import (
-	"bufio"
-	"bytes"
 	"errors"
 	"fmt"
 	"io"
 
 	"github.com/kovidgoyal/imaging/prism/meta"
-	"github.com/kovidgoyal/imaging/prism/meta/binary"
+	"github.com/kovidgoyal/imaging/streams"
 )
 
 // Format specifies the image format handled by this package
@@ -39,14 +37,15 @@ const bitsPerComponent = 8
 // An error is returned if basic metadata could not be extracted. The returned
 // stream still provides the full image data.
 func Load(r io.Reader) (md *meta.Data, imgStream io.Reader, err error) {
-	rewindBuffer := &bytes.Buffer{}
-	tee := io.TeeReader(r, rewindBuffer)
-	md, err = ExtractMetadata(bufio.NewReader(tee))
-	return md, io.MultiReader(rewindBuffer, r), err
+	imgStream, err = streams.CallbackWithSeekable(r, func(r io.Reader) (err error) {
+		md, err = ExtractMetadata(r)
+		return
+	})
+	return
 }
 
 // Same as Load() except that no new stream is provided
-func ExtractMetadata(r binary.Reader) (md *meta.Data, err error) {
+func ExtractMetadata(r io.Reader) (md *meta.Data, err error) {
 	md = &meta.Data{Format: Format}
 
 	defer func() {
@@ -69,7 +68,7 @@ func ExtractMetadata(r binary.Reader) (md *meta.Data, err error) {
 	return md, nil
 }
 
-func parseFormat(r binary.Reader, md *meta.Data, format webpFormat, chunkLen uint32) error {
+func parseFormat(r io.Reader, md *meta.Data, format webpFormat, chunkLen uint32) error {
 	switch format {
 	case webpFormatExtended:
 		return parseWebpExtended(r, md, chunkLen)
@@ -82,14 +81,13 @@ func parseFormat(r binary.Reader, md *meta.Data, format webpFormat, chunkLen uin
 	}
 }
 
-func parseWebpSimple(r binary.Reader, md *meta.Data, chunkLen uint32) error {
-	if err := skip(r, 3); err != nil {
+func parseWebpSimple(r io.Reader, md *meta.Data, chunkLen uint32) error {
+	var buf [10]byte
+	b := buf[:]
+	if _, err := io.ReadFull(r, b); err != nil {
 		return err
 	}
-	var b [7]byte
-	if _, err := io.ReadFull(r, b[:]); err != nil {
-		return err
-	}
+	b = b[3:]
 	if b[0] != 0x9d || b[1] != 0x01 || b[2] != 0x2a {
 		return errors.New("corrupted WebP VP8 frame")
 	}
@@ -99,39 +97,22 @@ func parseWebpSimple(r binary.Reader, md *meta.Data, chunkLen uint32) error {
 	return nil
 }
 
-func parseWebpLossless(r binary.Reader, md *meta.Data, chunkLen uint32) error {
-	sig, err := r.ReadByte()
-	if err != nil {
+func parseWebpLossless(r io.Reader, md *meta.Data, chunkLen uint32) error {
+	var b [5]byte
+	if _, err := io.ReadFull(r, b[:]); err != nil {
 		return err
 	}
-	if sig != 0x2f {
+	if b[0] != 0x2f {
 		return errors.New("corrupted lossless WebP")
 	}
 	// Next 28 bits are width-1 and height-1.
-	b0, err := r.ReadByte()
-	if err != nil {
-		return err
-	}
-	b1, err := r.ReadByte()
-	if err != nil {
-		return err
-	}
-	b2, err := r.ReadByte()
-	if err != nil {
-		return err
-	}
-	b3, err := r.ReadByte()
-	if err != nil {
-		return err
-	}
-
-	w := uint32(b0)
-	w |= uint32(b1&((1<<6)-1)) << 8
+	w := uint32(b[1])
+	w |= uint32(b[2]&((1<<6)-1)) << 8
 	w &= 0x3FFF
 
-	h := uint32((b1 >> 6) & ((1 << 2) - 1))
-	h |= uint32(b2) << 2
-	h |= uint32(b3&((1<<4)-1)) << 10
+	h := uint32((b[2] >> 6) & ((1 << 2) - 1))
+	h |= uint32(b[3]) << 2
+	h |= uint32(b[4]&((1<<4)-1)) << 10
 	h &= 0x3FFF
 
 	md.PixelWidth = w + 1
@@ -140,32 +121,21 @@ func parseWebpLossless(r binary.Reader, md *meta.Data, chunkLen uint32) error {
 	return nil
 }
 
-func parseWebpExtended(r binary.Reader, md *meta.Data, chunkLen uint32) error {
+func parseWebpExtended(r io.Reader, md *meta.Data, chunkLen uint32) error {
 	if chunkLen != 10 {
 		return fmt.Errorf("unexpected VP8X chunk length: %d", chunkLen)
 	}
-	flags, err := r.ReadByte()
-	if err != nil {
+	var hb [10]byte
+	h := hb[:]
+	if _, err := io.ReadFull(r, h); err != nil {
 		return err
 	}
-	hasProfile := flags&(1<<5) != 0
-	// Next 3 bytes are reserved, skip them.
-	for i := 0; i < 3; i++ {
-		if _, err = r.ReadByte(); err != nil {
-			return err
-		}
-	}
-	// Next 6 bytes are width-1 and height-1.
-	w, err := binary.ReadU24Little(r)
-	if err != nil {
-		return err
-	}
-	h, err := binary.ReadU24Little(r)
-	if err != nil {
-		return err
-	}
+	hasProfile := h[0]&(1<<5) != 0
+	h = h[4:]
+	w := uint32(h[0]) | uint32(h[1])<<8 | uint32(h[2])<<16
+	ht := uint32(h[3]) | uint32(h[4])<<8 | uint32(h[5])<<16
 	md.PixelWidth = w + 1
-	md.PixelHeight = h + 1
+	md.PixelHeight = ht + 1
 	md.BitsPerComponent = bitsPerComponent
 
 	if hasProfile {
@@ -180,7 +150,7 @@ func parseWebpExtended(r binary.Reader, md *meta.Data, chunkLen uint32) error {
 	return nil
 }
 
-func readICCP(r binary.Reader, chunkLen uint32) ([]byte, error) {
+func readICCP(r io.Reader, chunkLen uint32) ([]byte, error) {
 	// Skip to the end of the chunk.
 	if err := skip(r, chunkLen-10); err != nil {
 		return nil, err
@@ -203,7 +173,7 @@ func readICCP(r binary.Reader, chunkLen uint32) ([]byte, error) {
 	return data, nil
 }
 
-func verifySignature(r binary.Reader) error {
+func verifySignature(r io.Reader) error {
 	ch, err := readChunkHeader(r)
 	if err != nil {
 		return err
@@ -221,7 +191,7 @@ func verifySignature(r binary.Reader) error {
 	return nil
 }
 
-func readWebPFormat(r binary.Reader) (format webpFormat, length uint32, err error) {
+func readWebPFormat(r io.Reader) (format webpFormat, length uint32, err error) {
 	ch, err := readChunkHeader(r)
 	if err != nil {
 		return 0, 0, err
@@ -238,12 +208,6 @@ func readWebPFormat(r binary.Reader) (format webpFormat, length uint32, err erro
 	}
 }
 
-func skip(r io.ByteReader, length uint32) error {
-	for i := uint32(0); i < length; i++ {
-		_, err := r.ReadByte()
-		if err != nil {
-			return err
-		}
-	}
-	return nil
+func skip(r io.Reader, length uint32) error {
+	return streams.Skip(r, int64(length))
 }

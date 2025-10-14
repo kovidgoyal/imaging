@@ -3,14 +3,14 @@ package icc
 import (
 	"bufio"
 	"bytes"
+	"encoding/binary"
 	"fmt"
 	"io"
 	"math/rand"
 	"os"
 	"path"
+	"strings"
 	"testing"
-
-	"github.com/kovidgoyal/imaging/prism/meta/binary"
 )
 
 func TestProfileReader(t *testing.T) {
@@ -32,7 +32,7 @@ func TestProfileReader(t *testing.T) {
 
 	writeHeader := func(w io.Writer, profileSig [4]byte) {
 		profileSize = uint32(rand.Int31())
-		_ = binary.WriteU32Big(w, profileSize)
+		binary.Write(w, binary.BigEndian, profileSize)
 
 		_, _ = w.Write([]byte{'t', 'e', 's', 't'})                 // Preferred CMM
 		_, _ = w.Write([]byte{4, 0, 0, 0})                         // Version
@@ -54,7 +54,7 @@ func TestProfileReader(t *testing.T) {
 	}
 
 	writeTagTable := func(w io.Writer, tags map[[4]byte][]byte) {
-		_ = binary.WriteU32Big(w, uint32(len(tags)))
+		_ = binary.Write(w, binary.BigEndian, uint32(len(tags)))
 
 		offset := 128 + 4 + len(tags)*12
 
@@ -62,8 +62,8 @@ func TestProfileReader(t *testing.T) {
 
 		for tagSig, tagData := range tags {
 			_, _ = w.Write(tagSig[:])
-			_ = binary.WriteU32Big(w, uint32(offset))
-			_ = binary.WriteU32Big(w, uint32(len(tagData)))
+			_ = binary.Write(w, binary.BigEndian, uint32(offset))
+			_ = binary.Write(w, binary.BigEndian, uint32(len(tagData)))
 			offset += len(tagData)
 
 			_, _ = tagTableData.Write(tagData)
@@ -102,8 +102,8 @@ func TestProfileReader(t *testing.T) {
 			err := pr.readHeader(&header)
 			if err == nil {
 				t.Errorf("Expected an error but succeeded")
-			} else if expected, actual := "invalid profile file signature 'bad!'", err.Error(); expected != actual {
-				t.Errorf("Expected error '%s' but got '%s'", expected, actual)
+			} else if actual := err.Error(); !strings.Contains(actual, "'bad!'") {
+				t.Errorf("Expected error bad signature error but got '%s'", actual)
 			}
 		})
 	})
@@ -122,8 +122,8 @@ func TestProfileReader(t *testing.T) {
 
 			if err == nil {
 				t.Errorf("Expected error but operation succeeded")
-			} else if expected, actual := "invalid profile file signature 'bad!'", err.Error(); expected != actual {
-				t.Errorf("Expected error '%s' but got '%s'", expected, actual)
+			} else if actual := err.Error(); !strings.Contains(actual, "'bad!'") {
+				t.Errorf("Expected error bad signature but got '%s'", actual)
 			}
 		})
 
@@ -140,8 +140,8 @@ func TestProfileReader(t *testing.T) {
 
 			if err == nil {
 				t.Errorf("Expected error but operation succeeded")
-			} else if expected, actual := "EOF", err.Error(); expected != actual {
-				t.Errorf("Expected error '%s' but got '%s'", expected, actual)
+			} else if actual := err.Error(); !strings.Contains(actual, "EOF") {
+				t.Errorf("Expected error EOF but got '%s'", actual)
 			}
 		})
 
@@ -168,6 +168,21 @@ func TestProfileReader(t *testing.T) {
 
 				if desc != c.ExpectedDescription {
 					t.Errorf("Expected description '%s' for profile '%s' but got '%s'", c.ExpectedDescription, c.ProfileFileName, desc)
+				}
+			}
+		})
+
+		t.Run("recognises well known profiles", func(t *testing.T) {
+			for fname, expected := range map[string]WellKnownProfile{
+				"sRGB2014.icc": SRGBProfile,
+			} {
+				p, err := loadTestProfile(fname)
+				if err != nil {
+					t.Fatalf("failed reading profile: %s with error: %s", fname, err)
+				}
+				d, err := p.Description()
+				if actual := p.WellKnownProfile(); actual != expected {
+					t.Fatalf("Incorrect profile for img: %s, expected %s, got %s\nHeader: %s\nDescription: %s", fname, expected, actual, p.Header, d)
 				}
 			}
 		})

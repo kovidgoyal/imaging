@@ -1,9 +1,8 @@
 package icc
 
 import (
-	"bytes"
+	"encoding/binary"
 	"fmt"
-	"github.com/kovidgoyal/imaging/prism/meta/binary"
 )
 
 type TagTable struct {
@@ -15,10 +14,13 @@ func (t *TagTable) add(sig Signature, data []byte) {
 }
 
 func (t *TagTable) getProfileDescription() (string, error) {
-	data := t.entries[DescSignature]
+	data, ok := t.entries[DescSignature]
+	if !ok {
+		return "", fmt.Errorf("no description tag in ICC profile")
+	}
+	var sig uint32
 
-	sig, err := binary.ReadU32Big(bytes.NewReader(data))
-	if err != nil {
+	if _, err := binary.Decode(data, binary.BigEndian, &sig); err != nil {
 		return "", err
 	}
 

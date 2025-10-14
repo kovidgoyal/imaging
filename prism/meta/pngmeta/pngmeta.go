@@ -1,15 +1,15 @@
 package pngmeta
 
 import (
-	"bufio"
 	"bytes"
 	"compress/zlib"
+	"encoding/binary"
 	"errors"
 	"fmt"
-	"github.com/kovidgoyal/imaging/prism/meta"
-	"github.com/kovidgoyal/imaging/prism/meta/binary"
 	"io"
-	"strings"
+
+	"github.com/kovidgoyal/imaging/prism/meta"
+	"github.com/kovidgoyal/imaging/streams"
 )
 
 // Format specifies the image format handled by this package
@@ -28,14 +28,26 @@ var pngSignature = [8]byte{0x89, 'P', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x0A}
 // An error is returned if basic metadata could not be extracted. The returned
 // stream still provides the full image data.
 func Load(r io.Reader) (md *meta.Data, imgStream io.Reader, err error) {
-	rewindBuffer := &bytes.Buffer{}
-	tee := io.TeeReader(r, rewindBuffer)
-	md, err = ExtractMetadata(bufio.NewReader(tee))
-	return md, io.MultiReader(rewindBuffer, r), err
+	imgStream, err = streams.CallbackWithSeekable(r, func(r io.Reader) (err error) {
+		md, err = ExtractMetadata(r)
+		return
+	})
+	return
+}
+
+func read_chunk(r io.Reader, length uint32) (ans []byte, err error) {
+	ans = make([]byte, length+4)
+	_, err = io.ReadFull(r, ans)
+	ans = ans[:len(ans)-4] // we dont care about the chunk CRC
+	return
+}
+
+func skip_chunk(r io.Reader, length uint32) (err error) {
+	return streams.Skip(r, int64(length)+4)
 }
 
 // Same as Load() except that no new stream is provided
-func ExtractMetadata(r binary.Reader) (md *meta.Data, err error) {
+func ExtractMetadata(r io.Reader) (md *meta.Data, err error) {
 	metadataExtracted := false
 	md = &meta.Data{Format: Format}
 
@@ -54,15 +66,21 @@ func ExtractMetadata(r binary.Reader) (md *meta.Data, err error) {
 	}
 
 	pngSig := [8]byte{}
-	bytesRead, err := r.Read(pngSig[:])
-	if err != nil {
+	if _, err := io.ReadFull(r, pngSig[:]); err != nil {
 		return nil, err
-	}
-	if bytesRead != len(pngSig) {
-		return nil, fmt.Errorf("unexpected EOF reading PNG header")
 	}
 	if pngSig != pngSignature {
 		return nil, fmt.Errorf("invalid PNG signature")
+	}
+	var chunk []byte
+
+	decode := func(target any) error {
+		if n, err := binary.Decode(chunk, binary.BigEndian, target); err == nil {
+			chunk = chunk[n:]
+			return nil
+		} else {
+			return err
+		}
 	}
 
 parseChunks:
@@ -78,99 +96,48 @@ parseChunks:
 		switch ch.ChunkType {
 
 		case chunkTypeIHDR:
-			md.PixelWidth, err = binary.ReadU32Big(r)
-			if err != nil {
+			if chunk, err = read_chunk(r, ch.Length); err != nil {
 				return nil, err
 			}
-
-			md.PixelHeight, err = binary.ReadU32Big(r)
-			if err != nil {
+			if err = decode(&md.PixelWidth); err != nil {
 				return nil, err
 			}
-
-			bitDepth, err := r.ReadByte()
-			if err != nil {
+			if err = decode(&md.PixelHeight); err != nil {
 				return nil, err
 			}
-			md.BitsPerComponent = uint32(bitDepth)
-
-			// Skip remainder of header
-			for i := uint32(0); i < ch.Length-9; i++ {
-				_, err := r.ReadByte()
-				if err != nil {
-					return nil, err
-				}
-			}
-
-			// Skip chunk CRC
-			_, err = binary.ReadU32Big(r)
-			if err != nil {
-				return nil, err
-			}
-
+			md.BitsPerComponent = uint32(chunk[0])
 			metadataExtracted = true
-
 			if allMetadataExtracted() {
 				break parseChunks
 			}
 
 		case chunkTypeiCCP:
-
-			profileName := strings.Builder{}
-			for i := 0; i < 80; i++ {
-				b, err := r.ReadByte()
-				if err != nil {
-					return nil, err
-				}
-				if b == 0x00 {
-					break
-				}
-				profileName.WriteByte(b)
+			if chunk, err = read_chunk(r, ch.Length); err != nil {
+				return nil, err
 			}
-			if profileName.Len() > 79 {
+			idx := bytes.IndexByte(chunk, 0)
+			if idx < 0 || idx > 80 {
 				return nil, fmt.Errorf("null terminator not found reading ICC profile name")
 			}
-
-			compressionMethod, err := r.ReadByte()
-			if err != nil {
-				return nil, err
+			chunk = chunk[idx+1:]
+			if len(chunk) < 1 {
+				return nil, fmt.Errorf("incomplete ICCP chunk in PNG file")
 			}
-			if compressionMethod != 0x00 {
+			if compressionMethod := chunk[0]; compressionMethod != 0x00 {
 				return nil, fmt.Errorf("unknown compression method (%d)", compressionMethod)
 			}
-
-			offset := uint32(profileName.Len() + 2)
-			if offset >= ch.Length {
-				return nil, fmt.Errorf("invalid ICC profile chunk length")
-			}
-
-			chunkData := make([]byte, ch.Length-offset)
-			bytesRead, err := r.Read(chunkData)
-			if err != nil {
-				return nil, err
-			}
-			if bytesRead != len(chunkData) {
-				return nil, fmt.Errorf("unexpected EOF reading ICC profile chunk")
-			}
-
-			// Skip chunk CRC
-			_, err = binary.ReadU32Big(r)
-			if err != nil {
-				return nil, err
-			}
-
+			chunk = chunk[1:]
 			// Decompress ICC profile data
-			zReader, err := zlib.NewReader(bytes.NewReader(chunkData))
+			zReader, err := zlib.NewReader(bytes.NewReader(chunk))
 			if err != nil {
 				md.SetICCProfileError(err)
 				break
 			}
+			defer zReader.Close()
 			profileData := &bytes.Buffer{}
 			_, err = io.Copy(profileData, zReader)
-			_ = zReader.Close()
 			if err == nil {
 				md.SetICCProfileData(profileData.Bytes())
-
 				if allMetadataExtracted() {
 					break parseChunks
 				}
@@ -182,17 +149,7 @@ parseChunks:
 			break parseChunks
 
 		default:
-			// Skip chunk data bytes
-			for i := uint32(0); i < ch.Length; i++ {
-				_, err := r.ReadByte()
-				if err != nil {
-					return nil, err
-				}
-			}
-
-			// Skip chunk CRC
-			_, err := binary.ReadU32Big(r)
-			if err != nil {
+			if err = skip_chunk(r, ch.Length); err != nil {
 				return nil, err
 			}
 		}

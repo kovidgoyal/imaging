@@ -3,8 +3,9 @@ package icc
 import "fmt"
 
 type Version struct {
-	Major       byte
-	MinorAndRev byte
+	Major                byte
+	MinorAndRev          byte
+	Reserved1, Reserved2 byte
 }
 
 func (pv Version) String() string {

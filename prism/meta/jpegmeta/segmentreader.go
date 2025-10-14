@@ -1,26 +1,26 @@
 package jpegmeta
 
 import (
-	"github.com/kovidgoyal/imaging/prism/meta/binary"
+	"io"
+
+	"github.com/kovidgoyal/imaging/streams"
 )
 
 type segmentReader struct {
-	reader             binary.Reader
+	reader             io.Reader
 	inEntropyCodedData bool
 }
 
 func (sr *segmentReader) ReadSegment() (segment, error) {
-
 	if sr.inEntropyCodedData {
 		for {
-			b, err := sr.reader.ReadByte()
+			b, err := streams.ReadByte(sr.reader)
 			if err != nil {
 				return segment{}, err
 			}
 
 			if b == 0xFF {
-				b, err = sr.reader.ReadByte()
-				if err != nil {
+				if b, err = streams.ReadByte(sr.reader); err != nil {
 					return segment{}, err
 				}
 
@@ -49,7 +49,7 @@ func (sr *segmentReader) ReadSegment() (segment, error) {
 	return seg, nil
 }
 
-func NewSegmentReader(r binary.Reader) *segmentReader {
+func NewSegmentReader(r io.Reader) *segmentReader {
 	return &segmentReader{
 		reader: r,
 	}

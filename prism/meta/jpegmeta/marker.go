@@ -1,9 +1,11 @@
 package jpegmeta
 
 import (
+	"encoding/binary"
 	"fmt"
-	"github.com/kovidgoyal/imaging/prism/meta/binary"
 	"io"
+
+	"github.com/kovidgoyal/imaging/streams"
 )
 
 var invalidMarker = marker{Type: markerTypeInvalid}
@@ -13,7 +15,7 @@ type marker struct {
 	DataLength int
 }
 
-func makeMarker(mType byte, r io.ByteReader) (marker, error) {
+func makeMarker(mType byte, r io.Reader) (marker, error) {
 	var length uint16
 	switch mType {
 
@@ -56,8 +58,7 @@ func makeMarker(mType byte, r io.ByteReader) (marker, error) {
 		byte(markerTypeComment):
 
 		var err error
-		length, err = binary.ReadU16Big(r)
-		if err != nil {
+		if err = binary.Read(r, binary.BigEndian, &length); err != nil {
 			return invalidMarker, err
 		}
 
@@ -71,8 +72,8 @@ func makeMarker(mType byte, r io.ByteReader) (marker, error) {
 	}, nil
 }
 
-func readMarker(r io.ByteReader) (marker, error) {
-	b, err := r.ReadByte()
+func readMarker(r io.Reader) (marker, error) {
+	b, err := streams.ReadByte(r)
 	if err != nil {
 		return invalidMarker, err
 	}
@@ -80,9 +81,7 @@ func readMarker(r io.ByteReader) (marker, error) {
 	if b != 0xff {
 		return invalidMarker, fmt.Errorf("invalid marker identifier %0x", b)
 	}
-
-	b, err = r.ReadByte()
-	if err != nil {
+	if b, err = streams.ReadByte(r); err != nil {
 		return invalidMarker, err
 	}
 
