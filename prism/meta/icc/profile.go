@@ -10,9 +10,9 @@ const (
 	DisplayP3Profile
 )
 
-func WellKnownProfileFromDesription(x string) WellKnownProfile {
+func WellKnownProfileFromDescription(x string) WellKnownProfile {
 	switch x {
-	case "sRGB IEC61966-2.1", "sRGB2014":
+	case "sRGB IEC61966-2.1", "sRGB2014", "sRGB_ICC_v4_Appearance.icc":
 		return SRGBProfile
 	case "Adobe RGB (1998)":
 		return AdobeRGBProfile
@@ -52,7 +52,7 @@ func (p *Profile) Description() (string, error) {
 func (p *Profile) WellKnownProfile() WellKnownProfile {
 	d, err := p.Description()
 	if err == nil {
-		if ans := WellKnownProfileFromDesription(d); ans != UnknownProfile {
+		if ans := WellKnownProfileFromDescription(d); ans != UnknownProfile {
 			return ans
 		}
 	}

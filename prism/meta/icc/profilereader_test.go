@@ -174,7 +174,8 @@ func TestProfileReader(t *testing.T) {
 
 		t.Run("recognises well known profiles", func(t *testing.T) {
 			for fname, expected := range map[string]WellKnownProfile{
-				"sRGB2014.icc": SRGBProfile,
+				"sRGB2014.icc":               SRGBProfile,
+				"sRGB_ICC_v4_Appearance.icc": SRGBProfile,
 			} {
 				p, err := loadTestProfile(fname)
 				if err != nil {
