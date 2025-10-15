@@ -1,3 +1,5 @@
+//go:build lcms2cgo
+
 package prism
 
 import (
