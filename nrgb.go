@@ -156,7 +156,7 @@ type scanner_rgb struct {
 }
 
 func (s scanner_rgb) Bytes_per_channel() int  { return 1 }
-func (s scanner_rgb) Num_of_channels() int    { return 4 }
+func (s scanner_rgb) Num_of_channels() int    { return 3 }
 func (s scanner_rgb) Bounds() image.Rectangle { return s.image.Bounds() }
 
 func blend(dest []uint8, base []float64, r, g, b, a uint8) {
