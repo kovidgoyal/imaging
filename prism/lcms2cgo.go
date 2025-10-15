@@ -38,6 +38,8 @@ type CMSProfile struct {
 	ctx                             C.cmsContext
 	p                               C.cmsHPROFILE
 	error_messages                  []string
+	pcs_output_format               C.cmsUInt32Number
+	device8bit_format               C.cmsUInt32Number
 }
 
 func (c *CMSProfile) Close() {
@@ -69,6 +71,34 @@ func (p *CMSProfile) call_func_with_error_handling(f func() string) error {
 	return nil
 }
 
+func format_for_double(s icc.Signature) (ans C.cmsUInt32Number, err error) {
+	switch s {
+	case icc.XYZSignature:
+		ans = C.TYPE_XYZ_DBL
+	case icc.LabSignature:
+		ans = C.TYPE_Lab_DBL
+	case icc.GraySignature:
+		ans = C.TYPE_GRAY_DBL
+	case icc.RGBSignature:
+		ans = C.TYPE_RGB_DBL
+	default:
+		err = fmt.Errorf("unknown format: %s", s)
+	}
+	return
+}
+
+func format_for_8bit(s icc.Signature) (ans C.cmsUInt32Number, err error) {
+	switch s {
+	case icc.GraySignature:
+		ans = C.TYPE_GRAY_8
+	case icc.RGBSignature:
+		ans = C.TYPE_RGB_8
+	default:
+		err = fmt.Errorf("unknown format: %s", s)
+	}
+	return
+}
+
 func CreateCMSProfile(data []byte) (ans *CMSProfile, err error) {
 	if len(data) == 0 {
 		return nil, fmt.Errorf("empty data not allowed")
@@ -91,6 +121,56 @@ func CreateCMSProfile(data []byte) (ans *CMSProfile, err error) {
 	if ans.p != nil {
 		ans.DeviceColorSpace = icc.Signature(C.cmsGetColorSpace(ans.p))
 		ans.PCSColorSpace = icc.Signature(C.cmsGetPCS(ans.p))
+		if ans.pcs_output_format, err = format_for_double(ans.PCSColorSpace); err != nil {
+			return nil, err
+		}
+		if ans.device8bit_format, err = format_for_8bit(ans.DeviceColorSpace); err != nil {
+			return nil, err
+		}
 	}
+	return
+}
+
+func (p *CMSProfile) TransformRGB8(data []uint8, output_profile *CMSProfile, intent icc.RenderingIntent) (ans []uint8, err error) {
+	if len(data) == 0 {
+		return nil, nil
+	}
+	if len(data)%3 != 0 {
+		return nil, fmt.Errorf("pixel data must be a multiple of 3")
+	}
+	var t C.cmsHTRANSFORM
+	if err = p.call_func_with_error_handling(func() string {
+		if t = C.cmsCreateTransformTHR(p.ctx, p.p, C.TYPE_RGB_8, output_profile.p, output_profile.device8bit_format, C.cmsUInt32Number(intent), 0); t == nil {
+			return "failed to create transform"
+		}
+		return ""
+	}); err != nil {
+		return
+	}
+	defer C.cmsDeleteTransform(t)
+	ans = make([]uint8, len(data))
+	C.cmsDoTransform(t, unsafe.Pointer(&data[0]), unsafe.Pointer(&ans[0]), C.cmsUInt32Number(len(data)/3))
+	return
+}
+
+func (p *CMSProfile) TransformRGB8bitToPCS(data []uint8, intent icc.RenderingIntent) (ans []float64, err error) {
+	if len(data) == 0 {
+		return nil, nil
+	}
+	if len(data)%3 != 0 {
+		return nil, fmt.Errorf("pixel data must be a multiple of 3")
+	}
+	var t C.cmsHTRANSFORM
+	if err = p.call_func_with_error_handling(func() string {
+		if t = C.cmsCreateTransformTHR(p.ctx, p.p, C.TYPE_RGB_8, nil, p.pcs_output_format, C.cmsUInt32Number(intent), 0); t == nil {
+			return "failed to create transform"
+		}
+		return ""
+	}); err != nil {
+		return
+	}
+	defer C.cmsDeleteTransform(t)
+	ans = make([]float64, len(data))
+	C.cmsDoTransform(t, unsafe.Pointer(&data[0]), unsafe.Pointer(&ans[0]), C.cmsUInt32Number(len(data)/3))
 	return
 }
