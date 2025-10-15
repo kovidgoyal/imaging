@@ -83,7 +83,8 @@ func (brs *BufferedReadSeeker) fallbackSeek(offset int64, whence int) (int64, er
 // Read(). Return an io.Reader that represents all content from the original
 // io.Reader.
 func CallbackWithSeekable(r io.Reader, callback func(io.Reader) error) (stream io.Reader, err error) {
-	if s, ok := r.(io.ReadSeeker); ok {
+	switch s := r.(type) {
+	case io.ReadSeeker:
 		pos, err := s.Seek(0, io.SeekCurrent)
 		if err == nil {
 			defer func() {
@@ -92,15 +93,19 @@ func CallbackWithSeekable(r io.Reader, callback func(io.Reader) error) (stream i
 					err = serr
 				}
 			}()
+			// Add bufferring to s for efficiency
 			bs := s
 			switch r.(type) {
-			case *BufferedReadSeeker:
+			case *BufferedReadSeeker, *bytes.Reader:
 			default:
 				bs = NewBufferedReadSeeker(s)
 			}
 			err = callback(bs)
 			return s, err
 		}
+	case *bytes.Buffer:
+		err = callback(bytes.NewReader(s.Bytes()))
+		return s, err
 	}
 	rewindBuffer := &bytes.Buffer{}
 	tee := io.TeeReader(r, rewindBuffer)
