@@ -88,6 +88,9 @@ func read_ppm_header(br *bufio.Reader, magic string) (ans header, err error) {
 	ans.width = fields[0]
 	ans.height = fields[1]
 	if required_num_fields > 2 {
+		if fields[2] > 65535 {
+			return ans, fmt.Errorf("header specifies a maximum value %d larger than 65535", ans.maxval)
+		}
 		ans.maxval = uint32(fields[2])
 	}
 	if ans.maxval > 65535 {
