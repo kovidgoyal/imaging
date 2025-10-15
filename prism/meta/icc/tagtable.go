@@ -36,6 +36,8 @@ func parse_tag(sig Signature, data []byte) (result any, err error) {
 		return curveDecoder(data)
 	case ParametricCurveTypeSignature:
 		return parametricCurveDecoder(data)
+	case MatrixElemTypeSignature:
+		return matrixDecoder(data)
 	}
 }
 
