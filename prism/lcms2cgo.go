@@ -19,16 +19,6 @@ static void lcms2_error_handler(cmsContext ctx, cmsUInt32Number code, const char
 static void set_lcms2_error_handler(cmsContext ctx) {
     cmsSetLogErrorHandlerTHR(ctx, lcms2_error_handler);
 }
-
-static cmsUInt32Number get_pcs_type(cmsHPROFILE hProfile) {
-    cmsColorSpaceSignature pcs = cmsGetPCS(hProfile);
-    return (pcs == cmsSigLabData) ? TYPE_Lab_DBL : TYPE_XYZ_DBL;
-}
-
-static cmsColorSpaceSignature get_input_space(cmsHPROFILE hProfile) {
-    return cmsGetColorSpace(hProfile);
-}
-
 */
 import "C"
 
@@ -37,14 +27,17 @@ import (
 	"runtime"
 	"strings"
 	"unsafe"
+
+	"github.com/kovidgoyal/imaging/prism/meta/icc"
 )
 
 var _ = fmt.Print
 
 type CMSProfile struct {
-	ctx            C.cmsContext
-	p              C.cmsHPROFILE
-	error_messages []string
+	DeviceColorSpace, PCSColorSpace icc.Signature
+	ctx                             C.cmsContext
+	p                               C.cmsHPROFILE
+	error_messages                  []string
 }
 
 func (c *CMSProfile) Close() {
@@ -95,5 +88,9 @@ func CreateCMSProfile(data []byte) (ans *CMSProfile, err error) {
 		ans := obj.(*CMSProfile)
 		ans.Close()
 	})
+	if ans.p != nil {
+		ans.DeviceColorSpace = icc.Signature(C.cmsGetColorSpace(ans.p))
+		ans.PCSColorSpace = icc.Signature(C.cmsGetPCS(ans.p))
+	}
 	return
 }
