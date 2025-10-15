@@ -1,5 +1,7 @@
 package icc
 
+import _ "embed"
+
 type WellKnownProfile int
 
 const (
@@ -9,6 +11,12 @@ const (
 	PhotoProProfile
 	DisplayP3Profile
 )
+
+//go:embed test-profiles/sRGB2014.icc
+var Srgb_xyz_profile_data []byte
+
+//go:embed test-profiles/sRGB_ICC_v4_Appearance.icc
+var Srgb_lab_profile_data []byte
 
 func WellKnownProfileFromDescription(x string) WellKnownProfile {
 	switch x {

@@ -15,8 +15,11 @@ jobs:
       with:
         go-version-file: go.mod
 
+    - name: Install liblcsm2
+      run: sudo apt-get update && sudo apt-get install -y liblcms2-dev
+
     - name: Build
-      run: go build -v ./...
+      run: go build -tags lcms2cgo -v ./...
 
     - name: Test
-      run: go test -v -race -cover ./...
+      run: go test -tags lcms2cgo -v -race -cover ./...

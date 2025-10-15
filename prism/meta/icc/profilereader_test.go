@@ -19,7 +19,7 @@ func TestProfileReader(t *testing.T) {
 	var reservedBytes [28]byte
 
 	loadTestProfile := func(profileFileName string) (*Profile, error) {
-		profileFile, err := os.Open(path.Join("../../test-profiles", profileFileName))
+		profileFile, err := os.Open(path.Join("test-profiles", profileFileName))
 		if err != nil {
 			return nil, fmt.Errorf("error opening '%s': %w", profileFileName, err)
 		}
@@ -174,8 +174,9 @@ func TestProfileReader(t *testing.T) {
 
 		t.Run("recognises well known profiles", func(t *testing.T) {
 			for fname, expected := range map[string]WellKnownProfile{
-				"sRGB2014.icc":               SRGBProfile,
-				"sRGB_ICC_v4_Appearance.icc": SRGBProfile,
+				"sRGB2014.icc":                   SRGBProfile,
+				"sRGB_ICC_v4_Appearance.icc":     SRGBProfile,
+				"display-p3-v4-with-v2-desc.icc": DisplayP3Profile,
 			} {
 				p, err := loadTestProfile(fname)
 				if err != nil {
