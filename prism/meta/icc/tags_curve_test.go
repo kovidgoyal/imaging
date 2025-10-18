@@ -9,33 +9,70 @@ import (
 	"testing"
 )
 
+func floatToFixed88(f float64) uint16 {
+	// Clamp the value to fit in 8.8 range
+	if f < 0 {
+		f = 0
+	}
+	if f > 255.99609375 { // 255 + 255/256
+		f = 255.99609375
+	}
+	v := uint16(math.Round(f * 256))
+	return v
+}
+
+func curv_bytes(params ...float64) []byte {
+	b := bytes.NewBuffer([]byte("curv\x00\x00\x00\x00"))
+	binary.Write(b, binary.BigEndian, uint32(len(params)))
+	if len(params) == 1 {
+		binary.Write(b, binary.BigEndian, floatToFixed88(params[0]))
+	} else {
+		for _, p := range params {
+			u := uint16(p * 65535)
+			binary.Write(b, binary.BigEndian, u)
+		}
+	}
+	if extra := b.Len() % 4; extra != 0 {
+		b.Write(bytes.Repeat([]byte{0}, 4-extra))
+	}
+	return b.Bytes()
+}
+
+func para_bytes(q uint16, params ...float64) []byte {
+	b := bytes.NewBuffer([]byte("para\x00\x00\x00\x00"))
+	_ = binary.Write(b, binary.BigEndian, q)
+	b.WriteString("\x00\x00")
+	for _, p := range params {
+		b.Write(encodeS15Fixed16BE(p))
+	}
+	if extra := b.Len() % 4; extra != 0 {
+		b.Write(bytes.Repeat([]byte{0}, 4-extra))
+	}
+	return b.Bytes()
+}
+
 func TestCurveDecoder(t *testing.T) {
 	t.Run("IdentityCurve", func(t *testing.T) {
-		raw := []byte("curv\x00\x00\x00\x00" + // sig + reserved
-			"\x00\x00\x00\x00") // count = 0
+		raw := curv_bytes()
 		val, err := curveDecoder(raw)
 		require.NoError(t, err)
 		q := IdentityCurve(0)
 		require.IsType(t, q, val)
 	})
 	t.Run("GammaCurve", func(t *testing.T) {
-		raw := []byte("curv\x00\x00\x00\x00" + // sig + reserved
-			"\x00\x00\x00\x01" + // count = 1
-			"\x01\x00") // gamma = 1.0
+		raw := curv_bytes(1.0)
 		val, err := curveDecoder(raw)
 		require.NoError(t, err)
 		c := val.(GammaCurve)
 		assert.InDelta(t, 1.0, float64(c), 0.001)
 	})
 	t.Run("PointsCurve", func(t *testing.T) {
-		raw := []byte("curv\x00\x00\x00\x00" + // sig + reserved
-			"\x00\x00\x00\x03" + // count = 3
-			"\x00\x10\x00\x20\x00\x30") // 3 x uint16
+		raw := curv_bytes(0.1, 0.2, 0.3)
 		val, err := curveDecoder(raw)
 		require.NoError(t, err)
 		require.IsType(t, &PointsCurve{}, val)
 		c := val.(*PointsCurve)
-		assert.Equal(t, []float64{float64(0x10) / 65535, float64(0x20) / 65535, float64(0x30) / 65535}, c.points)
+		assert.InDeltaSlice(t, []float64{0.1, 0.2, 0.3}, c.points, 0.0001)
 	})
 	t.Run("TooShort", func(t *testing.T) {
 		_, err := curveDecoder(make([]byte, 11))
@@ -57,14 +94,8 @@ func TestCurveDecoder(t *testing.T) {
 }
 
 func TestParametricCurveDecoder(t *testing.T) {
-	w := func(q uint16, expect_error bool, params ...float64) any {
-		var buf bytes.Buffer
-		buf.WriteString("para\x00\x00\x00\x00")
-		_ = binary.Write(&buf, binary.BigEndian, q)
-		for _, p := range params {
-			buf.Write(encodeS15Fixed16BE(p))
-		}
-		val, err := parametricCurveDecoder(buf.Bytes())
+	w := func(t *testing.T, q uint16, expect_error bool, params ...float64) any {
+		val, err := parametricCurveDecoder(para_bytes(q, params...))
 		if expect_error {
 			require.Error(t, err)
 		} else {
@@ -73,15 +104,15 @@ func TestParametricCurveDecoder(t *testing.T) {
 		return val
 	}
 	t.Run("GammaCurve", func(t *testing.T) {
-		val := w(0, false, 1.0)
+		val := w(t, 0, false, 1.0)
 		q := GammaCurve(0)
 		require.IsType(t, q, val)
 		p := val.(GammaCurve)
 		assert.InDelta(t, 1.0, float64(p), 0.0001)
 	})
 	t.Run("ConditionalZeroCurve", func(t *testing.T) {
-		w(1, true, 3, 0, 7)
-		val := w(1, false, 0, 1, 2)
+		w(t, 1, true, 3, 0, 7)
+		val := w(t, 1, false, 0, 1, 2)
 		require.IsType(t, &ConditionalZeroCurve{}, val)
 		p := val.(*ConditionalZeroCurve)
 		assert.InDelta(t, 0.0, p.g, 0.0001)
@@ -89,8 +120,8 @@ func TestParametricCurveDecoder(t *testing.T) {
 		assert.InDelta(t, 2.0, p.b, 0.0001)
 	})
 	t.Run("ConditionalCCurve", func(t *testing.T) {
-		w(2, true, 3, 0, 1, 2, 3)
-		val := w(2, false, 0, 1, 2, 3, 4)
+		w(t, 2, true, 3, 0, 1, 2, 3)
+		val := w(t, 2, false, 0, 1, 2, 3, 4)
 		require.IsType(t, &ConditionalCCurve{}, val)
 		p := val.(*ConditionalCCurve)
 		assert.InDelta(t, 0.0, p.g, 0.0001)
@@ -99,7 +130,7 @@ func TestParametricCurveDecoder(t *testing.T) {
 		assert.InDelta(t, 3.0, p.c, 0.0001)
 	})
 	t.Run("SplitCurve", func(t *testing.T) {
-		val := w(3, false, 0, 1, 2, 3, 4, 5)
+		val := w(t, 3, false, 0, 1, 2, 3, 4, 5)
 		require.IsType(t, &SplitCurve{}, val)
 		p := val.(*SplitCurve)
 		assert.InDelta(t, 0.0, p.g, 0.0001)
@@ -109,7 +140,7 @@ func TestParametricCurveDecoder(t *testing.T) {
 		assert.InDelta(t, 4.0, p.d, 0.0001)
 	})
 	t.Run("ComplexCurve", func(t *testing.T) {
-		val := w(4, false, 0, 1, 2, 3, 4, 5, 6)
+		val := w(t, 4, false, 0, 1, 2, 3, 4, 5, 6)
 		require.IsType(t, &ComplexCurve{}, val)
 		p := val.(*ComplexCurve)
 		assert.InDelta(t, 0.0, p.g, 0.0001)
@@ -145,15 +176,13 @@ func TestParametricCurveDecoder(t *testing.T) {
 	})
 }
 
-func rt(t *testing.T, c ChannelTransformer, x, y float64) {
-	o := []float64{0}
-	err := c.Transform(o, nil, x)
-	require.NoError(t, err)
-	assert.InDelta(t, y, o[0], 0.0001)
+func rt(t *testing.T, c Curve1D, x, y float64) {
+	ans := c.Transform(x)
+	assert.InDelta(t, y, ans, 0.0001)
 }
 
 func TestCurveTag_Transform(t *testing.T) {
-	f := func(c ChannelTransformer, x, y float64) {
+	f := func(c Curve1D, x, y float64) {
 		rt(t, c, x, y)
 	}
 	t.Run("IdentityCurve", func(t *testing.T) {

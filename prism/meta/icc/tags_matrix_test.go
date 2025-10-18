@@ -7,6 +7,24 @@ import (
 	"testing"
 )
 
+func encode_matrix_vals(values ...float64) string {
+	var buf bytes.Buffer
+	for _, v := range values {
+		buf.Write(encodeS15Fixed16BE(v))
+	}
+	return buf.String()
+}
+
+func identity_matrix(offset1, offset2, offset3 float64) []float64 {
+	return []float64{
+		1.0, 0.0, 0.0,
+		0.0, 1.0, 0.0,
+		0.0, 0.0, 1.0,
+		offset1, offset2, offset3,
+	}
+
+}
+
 func TestMtxDecoder(t *testing.T) {
 	t.Run("SuccessWithOffsets", func(t *testing.T) {
 		var buf bytes.Buffer

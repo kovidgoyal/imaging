@@ -18,27 +18,28 @@ func (c *MatrixTag) IsSuitableFor(num_input_channels, num_output_channels int) b
 
 var _ ChannelTransformer = (*MatrixTag)(nil)
 
-func matrixDecoder(raw []byte) (any, error) {
-	const (
-		minLength     = 8 + (9 * 4) // 8 bytes for type/reserved + 9 * 4-byte matrix numbers
-		offsetsLength = 12 * 4      // 4 * matrix numbers (4-byte) + 3 * offset numbers
-	)
-	if len(raw) < minLength {
-		return nil, errors.New("mtx tag too short")
-	}
+func embeddedMatrixDecoder(body []byte) (any, error) {
 	result := &MatrixTag{}
-	body := raw[8:]
 	for i := range 9 {
 		result.Matrix[i/3][i%3] = readS15Fixed16BE(body[i*4 : (i+1)*4])
 	}
-	if len(body) >= offsetsLength {
+	body = body[36:]
+	if len(body) >= 3*4 {
 		offset := [3]float64{}
 		for i := range 3 {
-			offset[i] = readS15Fixed16BE(body[36+i*4 : 36+(i+1)*4])
+			offset[i] = readS15Fixed16BE(body[i*4 : (i+1)*4])
 		}
 		result.Offset = &offset
 	}
 	return result, nil
+
+}
+
+func matrixDecoder(raw []byte) (any, error) {
+	if len(raw) < 8+(9*4) {
+		return nil, errors.New("mtx tag too short")
+	}
+	return embeddedMatrixDecoder(raw[8:])
 }
 
 func (m *MatrixTag) Transform(output, workspace []float64, inputs ...float64) error {
