@@ -10,6 +10,10 @@ type MatrixTag struct {
 	Offset *[3]float64 // offset is not always present
 }
 
+func is_identity_matrix(m [3][3]float64) bool {
+	return m[0][0] == 1 && m[0][1] == 0 && m[0][2] == 0 && m[1][0] == 0 && m[1][1] == 1 && m[1][2] == 0 && m[2][0] == 0 && m[2][1] == 0 && m[2][2] == 1
+}
+
 func (c *MatrixTag) WorkspaceSize() int { return 0 }
 
 func (c *MatrixTag) IsSuitableFor(num_input_channels, num_output_channels int) bool {

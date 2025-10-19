@@ -37,7 +37,7 @@ func TestCLUTDecoder(t *testing.T) {
 		clut := val.(*CLUTTag)
 		assert.Equal(t, (3), clut.InputChannels)
 		assert.Equal(t, (3), clut.OutputChannels)
-		assert.Equal(t, []uint8{2, 2, 2}, clut.GridPoints)
+		assert.Equal(t, []int{2, 2, 2}, clut.GridPoints)
 		assert.Len(t, clut.Values, 8*3)
 		assert.InDelta(t, 0.0, clut.Values[0], 0.001)
 		assert.InDelta(t, 1.0, clut.Values[len(clut.Values)-1], 0.001) // <-- Now will pass!
@@ -58,7 +58,7 @@ func TestCLUTDecoder(t *testing.T) {
 		clut := val.(*CLUTTag)
 		assert.Equal(t, (3), clut.InputChannels)
 		assert.Equal(t, (3), clut.OutputChannels)
-		assert.Equal(t, []uint8{2, 2, 2}, clut.GridPoints)
+		assert.Equal(t, []int{2, 2, 2}, clut.GridPoints)
 		assert.Len(t, clut.Values, 8*3)
 		assert.InDelta(t, 0.0, clut.Values[0], 0.001)
 		assert.InDelta(t, 1.0, clut.Values[len(clut.Values)-1], 1e-6)
@@ -89,7 +89,7 @@ func TestCLUTTransform(t *testing.T) {
 		clut := &CLUTTag{
 			InputChannels:  1,
 			OutputChannels: 1,
-			GridPoints:     []uint8{2},
+			GridPoints:     []int{2},
 			Values:         []float64{0.0, 1.0}, // 2 values: for 1D input, 1 output channel
 		}
 		// Test input 0.0 → should return 0.0
@@ -109,7 +109,7 @@ func TestCLUTTransform(t *testing.T) {
 		clut := &CLUTTag{
 			InputChannels:  3,
 			OutputChannels: 1,
-			GridPoints:     []uint8{2, 2, 2},
+			GridPoints:     []int{2, 2, 2},
 			Values: []float64{
 				0.0, 0.1, 0.2, 0.3,
 				0.4, 0.5, 0.6, 1.0,
@@ -121,16 +121,6 @@ func TestCLUTTransform(t *testing.T) {
 		err = clut.Transform(out, work, 1.0, 1.0, 1.0) // Should hit [1.0]
 		require.NoError(t, err)
 		assert.InDelta(t, 1.0, out[0], 1e-6)
-	})
-	t.Run("EmptyCLUTValues", func(t *testing.T) {
-		clut := &CLUTTag{
-			InputChannels:  1,
-			OutputChannels: 1,
-			GridPoints:     []uint8{2},
-			Values:         []float64{}, // empty
-		}
-		err := clut.Transform(out, work, 0.0)
-		assert.ErrorContains(t, err, "CLUT value index out of bounds")
 	})
 }
 

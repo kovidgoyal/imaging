@@ -36,6 +36,10 @@ func parse_tag(sig Signature, data []byte) (result any, err error) {
 		return matrixDecoder(data)
 	case LutAtoBTypeSignature, LutBtoATypeSignature:
 		return modularDecoder(data)
+	case Lut16TypeSignature:
+		return decode_mft16(data)
+	case Lut8TypeSignature:
+		return decode_mft8(data)
 	}
 }
 

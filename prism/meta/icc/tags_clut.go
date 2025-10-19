@@ -8,7 +8,7 @@ import (
 
 // CLUTTag represents a color lookup table tag (TagColorLookupTable)
 type CLUTTag struct {
-	GridPoints     []uint8 // e.g., [17,17,17] for 3D CLUT
+	GridPoints     []int // e.g., [17,17,17] for 3D CLUT
 	InputChannels  int
 	OutputChannels int
 	Values         []float64 // flattened [in1, in2, ..., out1, out2, ...]
@@ -21,8 +21,15 @@ func embeddedClutDecoder(raw []byte, InputChannels, OutputChannels int) (any, er
 	if len(raw) < 20 {
 		return nil, errors.New("clut tag too short")
 	}
-	gridPoints := make([]uint8, InputChannels)
-	copy(gridPoints, raw[:InputChannels])
+	gridPoints := make([]int, InputChannels)
+	for i, b := range raw[:InputChannels] {
+		gridPoints[i] = int(b)
+	}
+	for i, nPoints := range gridPoints {
+		if nPoints < 2 {
+			return nil, fmt.Errorf("CLUT input channel %d has invalid grid points: %d", i, nPoints)
+		}
+	}
 	bytes_per_channel := raw[16]
 	raw = raw[20:]
 	// expected size: (product of grid points) * output channels * bytes_per_channel
@@ -54,7 +61,7 @@ func embeddedClutDecoder(raw []byte, InputChannels, OutputChannels int) (any, er
 	return ans, nil
 }
 
-func expectedValues(gridPoints []uint8, outputChannels int) int {
+func expectedValues(gridPoints []int, outputChannels int) int {
 	expectedPoints := 1
 	for _, g := range gridPoints {
 		expectedPoints *= int(g)
@@ -62,32 +69,44 @@ func expectedValues(gridPoints []uint8, outputChannels int) int {
 	return expectedPoints * outputChannels
 }
 
-func (c *CLUTTag) WorkspaceSize() int { return 16 }
+func (c *CLUTTag) WorkspaceSize() int { return c.InputChannels }
 
 func (c *CLUTTag) IsSuitableFor(num_input_channels, num_output_channels int) bool {
-	return num_input_channels == int(c.InputChannels) && num_output_channels == c.OutputChannels
+	return num_input_channels == int(c.InputChannels) && num_output_channels == c.OutputChannels && num_input_channels <= 6
 }
 
-func (c *CLUTTag) Transform(output, workspace []float64, inputs ...float64) error {
-	return c.Lookup(output, workspace, inputs)
-}
-
-func (c *CLUTTag) Lookup(output, workspace, inputs []float64) error {
-	// clamp input values to 0-1...
-	clamped := workspace[:len(inputs)]
-	for i, v := range inputs {
-		clamped[i] = clamp01(v)
-	}
-	// find the grid positions and interpolation factors...
-	gridFrac := workspace[len(clamped) : 2*len(clamped)]
-	var buf [4]int
-	gridPos := buf[:]
-	for i, v := range clamped {
-		nPoints := int(c.GridPoints[i])
-		if nPoints < 2 {
-			return fmt.Errorf("CLUT input channel %d has invalid grid points: %d", i, nPoints)
+func clut_trilinear_interpolate(input_channels int, grid_points []int, values []float64, out []float64, gridPos []int, gridFrac []float64) {
+	numCorners := 1 << input_channels // 2^inputs
+	// walk all corners of the hypercube
+	for corner := range numCorners {
+		weight := 1.0
+		idx := 0
+		stride := 1
+		for dim := input_channels - 1; dim >= 0; dim-- {
+			bit := (corner >> dim) & 1
+			pos := gridPos[dim] + bit
+			idx += pos * stride
+			stride *= grid_points[dim]
+			if bit == 0 {
+				weight *= 1 - gridFrac[dim]
+			} else {
+				weight *= gridFrac[dim]
+			}
 		}
-		pos := v * float64(nPoints-1)
+		base := idx * len(out)
+		for o := range len(out) {
+			out[o] += weight * values[base+o]
+		}
+	}
+}
+
+func clut_transform(input_channels, output_channels int, grid_points []int, values []float64, output, workspace []float64, inputs []float64) {
+	gridFrac := workspace[0:input_channels]
+	var buf [6]int
+	gridPos := buf[:]
+	for i, v := range inputs {
+		nPoints := grid_points[i]
+		pos := clamp01(v) * float64(nPoints-1)
 		gridPos[i] = int(pos)
 		if gridPos[i] >= nPoints-1 {
 			gridPos[i] = nPoints - 2 // clamp
@@ -96,42 +115,14 @@ func (c *CLUTTag) Lookup(output, workspace, inputs []float64) error {
 			gridFrac[i] = pos - float64(gridPos[i])
 		}
 	}
-	// perform multi-dimensional interpolation (recursive)...
-	return c.triLinearInterpolate(output[:c.OutputChannels], gridPos, gridFrac)
+	for i := range output_channels {
+		output[i] = 0
+	}
+	clut_trilinear_interpolate(input_channels, grid_points, values, output[:output_channels], gridPos, gridFrac)
 }
 
-func (c *CLUTTag) triLinearInterpolate(out []float64, gridPos []int, gridFrac []float64) error {
-	numCorners := 1 << c.InputChannels // 2^inputs
-	for o := range c.OutputChannels {
-		out[o] = 0
-	}
-	// walk all corners of the hypercube
-	for corner := range numCorners {
-		weight := 1.0
-		idx := 0
-		stride := 1
-		for dim := c.InputChannels - 1; dim >= 0; dim-- {
-			bit := (corner >> dim) & 1
-			pos := gridPos[dim] + bit
-			if pos >= int(c.GridPoints[dim]) {
-				return fmt.Errorf("CLUT corner position out of bounds at dimension %d", dim)
-			}
-			idx += pos * stride
-			stride *= int(c.GridPoints[dim])
-			if bit == 0 {
-				weight *= 1 - gridFrac[dim]
-			} else {
-				weight *= gridFrac[dim]
-			}
-		}
-		base := idx * c.OutputChannels
-		if base+c.OutputChannels > len(c.Values) {
-			return errors.New("CLUT value index out of bounds")
-		}
-		for o := range c.OutputChannels {
-			out[o] += weight * c.Values[base+o]
-		}
-	}
+func (c *CLUTTag) Transform(output, workspace []float64, inputs ...float64) error {
+	clut_transform(c.InputChannels, c.OutputChannels, c.GridPoints, c.Values, output, workspace, inputs)
 	return nil
 }
 
