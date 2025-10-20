@@ -16,6 +16,7 @@ type MFT struct {
 	clut                        []float64
 	matrix                      [3][3]float64
 	matrix_is_identity          bool
+	is8bit                      bool
 }
 
 func (c *MFT) WorkspaceSize() int { return c.in_channels * 2 }
@@ -113,7 +114,7 @@ func load_mft_header(raw []byte) (ans *MFT, leftover []byte, err error) {
 		a.grid_points[i] = grid_points
 	}
 	ma, _ := embeddedMatrixDecoder(raw[12:48])
-	a.matrix = ma.(MatrixTag).Matrix
+	a.matrix = ma.(*MatrixTag).Matrix
 	a.matrix_is_identity = is_identity_matrix(a.matrix)
 	return &a, raw[48:], nil
 }
@@ -144,7 +145,8 @@ func decode_mft8(raw []byte) (ans any, err error) {
 		return nil, err
 	}
 	err = load_mft_body(a, raw, load_8bit_table, 256, 256)
-	return &a, err
+	a.is8bit = true
+	return a, err
 }
 
 func decode_mft16(raw []byte) (ans any, err error) {
@@ -154,5 +156,5 @@ func decode_mft16(raw []byte) (ans any, err error) {
 	}
 	input_table_entries, output_table_entries := binary.BigEndian.Uint16(raw[:2]), binary.BigEndian.Uint16(raw[2:4])
 	err = load_mft_body(a, raw[4:], load_16bit_table, int(input_table_entries), int(output_table_entries))
-	return &a, err
+	return a, err
 }
