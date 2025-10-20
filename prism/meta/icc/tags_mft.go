@@ -74,15 +74,39 @@ func (mft *MFT) Transform(output, workspace []float64, inputs ...float64) error 
 	return nil
 }
 
-func decode_mft8(raw []byte) (ans any, err error) {
+func load_8bit_table(raw []byte, n int) (output []float64, leftover []byte, err error) {
+	if len(raw) < n {
+		return nil, raw, fmt.Errorf("mft2 tag too short")
+	}
+	output = make([]float64, n)
+	for i := range n {
+		output[i] = float64(raw[0]) / 255
+		raw = raw[1:]
+	}
+	return output, raw, nil
+}
+
+func load_16bit_table(raw []byte, n int) (output []float64, leftover []byte, err error) {
+	if len(raw) < 2*n {
+		return nil, raw, fmt.Errorf("mft2 tag too short")
+	}
+	output = make([]float64, n)
+	for i := range n {
+		output[i] = float64(binary.BigEndian.Uint16(raw[:2])) / 65535
+		raw = raw[2:]
+	}
+	return output, raw, nil
+}
+
+func load_mft_header(raw []byte) (ans *MFT, leftover []byte, err error) {
 	if len(raw) < 48 {
-		return nil, errors.New("mft tag too short")
+		return nil, raw, errors.New("mft tag too short")
 	}
 	a := MFT{}
 	var grid_points int
 	a.in_channels, a.out_channels, grid_points = int(raw[8]), int(raw[9]), int(raw[10])
 	if grid_points < 2 {
-		return nil, fmt.Errorf("mft tag has invalid number of CLUT grid points: %d", a.grid_points)
+		return nil, raw, fmt.Errorf("mft tag has invalid number of CLUT grid points: %d", a.grid_points)
 	}
 	a.grid_points = make([]int, a.in_channels)
 	for i := range a.in_channels {
@@ -91,98 +115,44 @@ func decode_mft8(raw []byte) (ans any, err error) {
 	ma, _ := embeddedMatrixDecoder(raw[12:48])
 	a.matrix = ma.(MatrixTag).Matrix
 	a.matrix_is_identity = is_identity_matrix(a.matrix)
-	raw = raw[48:]
+	return &a, raw[48:], nil
+}
+
+func load_mft_body(a *MFT, raw []byte, load_table func([]byte, int) ([]float64, []byte, error), input_table_entries, output_table_entries int) (err error) {
 	a.input_curves = make([][]float64, a.in_channels)
-	t := make([]uint8, 256)
-	for i := range a.in_channels {
-		n, err := binary.Decode(raw, binary.BigEndian, t)
-		if err != nil {
-			return nil, err
-		}
-		raw = raw[n:]
-		a.input_curves[i] = make([]float64, len(t))
-		for e, x := range t {
-			a.input_curves[i][e] = float64(x) / 255
-		}
-	}
-	num_clut := grid_points * a.in_channels * a.out_channels
-	a.clut = make([]float64, num_clut)
-	if len(raw) < num_clut {
-		return nil, errors.New("mft tag too short")
-	}
-	for i := range num_clut {
-		a.clut[i] = float64(raw[i]) / 255
-	}
-	raw = raw[num_clut:]
 	a.output_curves = make([][]float64, a.out_channels)
-	for i := range a.out_channels {
-		n, err := binary.Decode(raw, binary.BigEndian, t)
-		if err != nil {
-			return nil, err
-		}
-		raw = raw[n:]
-		a.output_curves[i] = make([]float64, len(t))
-		for e, x := range t {
-			a.output_curves[i][e] = float64(x) / 255
+	for i := range a.in_channels {
+		if a.input_curves[i], raw, err = load_table(raw, input_table_entries); err != nil {
+			return err
 		}
 	}
-	return &a, nil
+	num_clut := expectedValues(a.grid_points, a.out_channels)
+	if a.clut, raw, err = load_table(raw, num_clut); err != nil {
+		return err
+	}
+	for i := range a.out_channels {
+		if a.output_curves[i], raw, err = load_table(raw, output_table_entries); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func decode_mft8(raw []byte) (ans any, err error) {
+	var a *MFT
+	if a, raw, err = load_mft_header(raw); err != nil {
+		return nil, err
+	}
+	err = load_mft_body(a, raw, load_8bit_table, 256, 256)
+	return &a, err
 }
 
 func decode_mft16(raw []byte) (ans any, err error) {
-	if len(raw) < 52 {
-		return nil, errors.New("mft2 tag too short")
+	var a *MFT
+	if a, raw, err = load_mft_header(raw); err != nil {
+		return nil, err
 	}
-	a := MFT{}
-	var grid_points int
-	a.in_channels, a.out_channels, grid_points = int(raw[8]), int(raw[9]), int(raw[10])
-	if grid_points < 2 {
-		return nil, fmt.Errorf("mft2 tag has invalid number of CLUT grid points: %d", a.grid_points)
-	}
-	a.grid_points = make([]int, a.in_channels)
-	for i := range a.in_channels {
-		a.grid_points[i] = grid_points
-	}
-	ma, _ := embeddedMatrixDecoder(raw[12:48])
-	a.matrix = ma.(MatrixTag).Matrix
-	a.matrix_is_identity = is_identity_matrix(a.matrix)
-	input_table_entries, output_table_entries := binary.BigEndian.Uint16(raw[48:50]), binary.BigEndian.Uint16(raw[50:52])
-	raw = raw[52:]
-	a.input_curves = make([][]float64, a.in_channels)
-	table := make([]uint16, input_table_entries)
-	for i := range a.in_channels {
-		n, err := binary.Decode(raw, binary.BigEndian, table)
-		if err != nil {
-			return nil, err
-		}
-		raw = raw[n:]
-		a.input_curves[i] = make([]float64, len(table))
-		for e, cval := range table {
-			a.input_curves[i][e] = float64(cval) / 65535
-		}
-	}
-
-	num_clut := int(math.Pow(float64(grid_points), float64(a.in_channels))) * a.out_channels
-	if len(raw) < 2*num_clut {
-		return nil, errors.New("mft2 tag too short")
-	}
-	a.clut = make([]float64, num_clut)
-	for i := range num_clut {
-		a.clut[i] = float64(binary.BigEndian.Uint16(raw[:2])) / 65535
-		raw = raw[2:]
-	}
-	a.output_curves = make([][]float64, a.out_channels)
-	table = make([]uint16, output_table_entries)
-	for i := range a.in_channels {
-		n, err := binary.Decode(raw, binary.BigEndian, table)
-		if err != nil {
-			return nil, err
-		}
-		raw = raw[n:]
-		a.input_curves[i] = make([]float64, len(table))
-		for e, cval := range table {
-			a.output_curves[i][e] = float64(cval) / 65535
-		}
-	}
-	return &a, nil
+	input_table_entries, output_table_entries := binary.BigEndian.Uint16(raw[:2]), binary.BigEndian.Uint16(raw[2:4])
+	err = load_mft_body(a, raw[4:], load_16bit_table, int(input_table_entries), int(output_table_entries))
+	return &a, err
 }
