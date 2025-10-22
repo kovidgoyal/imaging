@@ -57,14 +57,14 @@ func TestCurveDecoder(t *testing.T) {
 		val, err := curveDecoder(raw)
 		require.NoError(t, err)
 		q := IdentityCurve(0)
-		require.IsType(t, q, val)
+		require.IsType(t, &q, val)
 	})
 	t.Run("GammaCurve", func(t *testing.T) {
 		raw := curv_bytes(1.0)
 		val, err := curveDecoder(raw)
 		require.NoError(t, err)
-		c := val.(GammaCurve)
-		assert.InDelta(t, 1.0, float64(c), 0.001)
+		c := val.(*GammaCurve)
+		assert.InDelta(t, 1.0, float64(c.gamma), 0.001)
 	})
 	t.Run("PointsCurve", func(t *testing.T) {
 		raw := curv_bytes(0.1, 0.2, 0.3)
@@ -105,45 +105,45 @@ func TestParametricCurveDecoder(t *testing.T) {
 	}
 	t.Run("GammaCurve", func(t *testing.T) {
 		val := w(t, 0, false, 1.0)
-		q := GammaCurve(0)
+		q := &GammaCurve{}
 		require.IsType(t, q, val)
-		p := val.(GammaCurve)
-		assert.InDelta(t, 1.0, float64(p), 0.0001)
+		p := val.(*GammaCurve)
+		assert.InDelta(t, 1.0, p.gamma, 0.0001)
 	})
 	t.Run("ConditionalZeroCurve", func(t *testing.T) {
 		w(t, 1, true, 3, 0, 7)
-		val := w(t, 1, false, 0, 1, 2)
+		val := w(t, 1, false, 3, 1, 2)
 		require.IsType(t, &ConditionalZeroCurve{}, val)
 		p := val.(*ConditionalZeroCurve)
-		assert.InDelta(t, 0.0, p.g, 0.0001)
+		assert.InDelta(t, 3.0, p.g, 0.0001)
 		assert.InDelta(t, 1.0, p.a, 0.0001)
 		assert.InDelta(t, 2.0, p.b, 0.0001)
 	})
 	t.Run("ConditionalCCurve", func(t *testing.T) {
 		w(t, 2, true, 3, 0, 1, 2, 3)
-		val := w(t, 2, false, 0, 1, 2, 3, 4)
+		val := w(t, 2, false, 7, 1, 2, 3, 4)
 		require.IsType(t, &ConditionalCCurve{}, val)
 		p := val.(*ConditionalCCurve)
-		assert.InDelta(t, 0.0, p.g, 0.0001)
+		assert.InDelta(t, 7.0, p.g, 0.0001)
 		assert.InDelta(t, 1.0, p.a, 0.0001)
 		assert.InDelta(t, 2.0, p.b, 0.0001)
 		assert.InDelta(t, 3.0, p.c, 0.0001)
 	})
 	t.Run("SplitCurve", func(t *testing.T) {
-		val := w(t, 3, false, 0, 1, 2, 3, 4, 5)
+		val := w(t, 3, false, 9, 1, 2, 3, 4, 5)
 		require.IsType(t, &SplitCurve{}, val)
 		p := val.(*SplitCurve)
-		assert.InDelta(t, 0.0, p.g, 0.0001)
+		assert.InDelta(t, 9.0, p.g, 0.0001)
 		assert.InDelta(t, 1.0, p.a, 0.0001)
 		assert.InDelta(t, 2.0, p.b, 0.0001)
 		assert.InDelta(t, 3.0, p.c, 0.0001)
 		assert.InDelta(t, 4.0, p.d, 0.0001)
 	})
 	t.Run("ComplexCurve", func(t *testing.T) {
-		val := w(t, 4, false, 0, 1, 2, 3, 4, 5, 6)
+		val := w(t, 4, false, 11, 1, 2, 3, 4, 5, 6)
 		require.IsType(t, &ComplexCurve{}, val)
 		p := val.(*ComplexCurve)
-		assert.InDelta(t, 0.0, p.g, 0.0001)
+		assert.InDelta(t, 11.0, p.g, 0.0001)
 		assert.InDelta(t, 1.0, p.a, 0.0001)
 		assert.InDelta(t, 2.0, p.b, 0.0001)
 		assert.InDelta(t, 3.0, p.c, 0.0001)
@@ -177,6 +177,8 @@ func TestParametricCurveDecoder(t *testing.T) {
 }
 
 func rt(t *testing.T, c Curve1D, x, y float64) {
+	t.Helper()
+	require.NoError(t, c.Prepare())
 	ans := c.Transform(x)
 	assert.InDelta(t, y, ans, 0.0001)
 }
@@ -186,27 +188,28 @@ func TestCurveTag_Transform(t *testing.T) {
 		rt(t, c, x, y)
 	}
 	t.Run("IdentityCurve", func(t *testing.T) {
-		f(IdentityCurve(0), 0.5, 0.5)
+		c := IdentityCurve(0)
+		f(&c, 0.5, 0.5)
 	})
 	t.Run("GammaCurve", func(t *testing.T) {
-		f(GammaCurve(2.0), 0.5, 0.25)
+		f(&GammaCurve{2.0, 0.5, false}, 0.5, 0.25)
 	})
 	t.Run("PointsCurve_ExactIndex", func(t *testing.T) {
-		c := &PointsCurve{points: []float64{0, 32768. / 65535, 1.}}
+		c := &PointsCurve{points: []float64{0, 0.5, 1.}}
 		f(c, 0.5, 0.5)
 	})
 	t.Run("PointsCurve_Interpolation", func(t *testing.T) {
-		c := &PointsCurve{points: []float64{0, 32768. / 65535, 1.}}
+		c := &PointsCurve{points: []float64{0, 0.5, 1.}}
 		f(c, 0.25, 0.25)
 	})
 }
 
 func TestParametricCurveTag_Transform(t *testing.T) {
 	t.Run("ConditionalZeroFunction", func(t *testing.T) {
-		rt(t, &ConditionalZeroCurve{2, 0, 0}, -0.5, 0)
+		rt(t, &ConditionalZeroCurve{g: 2, a: 1, b: 0}, -0.5, 0)
 	})
 	t.Run("ConditionalZeroFunction_PositiveBranch", func(t *testing.T) {
-		rt(t, &ConditionalZeroCurve{2, 1, 0}, 0.5, 0.25)
+		rt(t, &ConditionalZeroCurve{g: 2, a: 1, b: 0}, 0.5, 0.25)
 	})
 	t.Run("ConditionalCFunction", func(t *testing.T) {
 		rt(t, &ConditionalCCurve{a: 1, b: 0, c: 0.1, g: 2}, -0.5, 0.1)
