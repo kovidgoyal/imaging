@@ -20,7 +20,7 @@ type Header struct {
 	DeviceModel            Signature
 	DeviceAttributes       uint64
 	RenderingIntent        RenderingIntent
-	PCSIlluminant          [3]uint32
+	PCSIlluminant          [12]uint8
 	ProfileCreator         Signature
 	ProfileID              [16]byte
 	Reserved               [28]byte
@@ -39,6 +39,10 @@ func (h Header) DependsOnEmbeddedData() bool {
 	return (h.Flags>>30)&1 != 0
 }
 
+func (h Header) ParsedPCSIlluminant() XYZType {
+	return xyz_type(h.PCSIlluminant[:])
+}
+
 func (h Header) String() string {
-	return fmt.Sprintf("Header{PreferredCMM: %s, Version: %s, DeviceManufacturer: %s, DeviceModel: %s, ProfileCreator: %s, RenderingIntent: %s, CreatedAt: %v}", h.PreferredCMM, h.Version, h.DeviceManufacturer, h.DeviceModel, h.ProfileCreator, h.RenderingIntent, h.CreatedAt())
+	return fmt.Sprintf("Header{PreferredCMM: %s, Version: %s, DeviceManufacturer: %s, DeviceModel: %s, ProfileCreator: %s, RenderingIntent: %s, CreatedAt: %v PCSIlluminant: %v}", h.PreferredCMM, h.Version, h.DeviceManufacturer, h.DeviceModel, h.ProfileCreator, h.RenderingIntent, h.CreatedAt(), h.ParsedPCSIlluminant())
 }

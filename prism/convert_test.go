@@ -3,6 +3,7 @@
 package prism
 
 import (
+	"bytes"
 	"fmt"
 	"testing"
 
@@ -41,4 +42,19 @@ func TestCGOConversion(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, inp, out)
 	}
+}
+
+func TestAgainstLCMS2(t *testing.T) {
+	p, err := icc.NewProfileReader(bytes.NewReader(icc.Srgb_xyz_profile_data)).ReadProfile()
+	if err != nil {
+		t.Fatal(err)
+	}
+	println(p.Header.String())
+	p.CreateTransformerToPCS(icc.PerceptualRenderingIntent)
+	println(p.Header.String())
+	p, err = icc.NewProfileReader(bytes.NewReader(icc.Srgb_lab_profile_data)).ReadProfile()
+	if err != nil {
+		t.Fatal(err)
+	}
+	p.CreateTransformerToPCS(icc.PerceptualRenderingIntent)
 }

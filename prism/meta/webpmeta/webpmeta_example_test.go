@@ -141,7 +141,7 @@ func ExampleLoad_embeddedICCv4() {
 	// DeviceModel: '    '
 	// DeviceAttributes: 0000000000000000000000000000000000000000000000000000000000000000
 	// RenderingIntent: Perceptual
-	// PCSIlluminant: [63190 65536 54061]
+	// PCSIlluminant: [0 0 246 214 0 1 0 0 0 0 211 45]
 	// ProfileCreator: 'lcms'
 	// ProfileID: ca1a9582257f104d389913d5d1ea1582
 	// Description: Display P3

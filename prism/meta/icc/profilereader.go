@@ -30,6 +30,7 @@ func (pr *ProfileReader) ReadProfile() (p *Profile, err error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to reader header from ICC profile: %w", err)
 	}
+	profile.PCSIlluminant = profile.Header.ParsedPCSIlluminant()
 
 	err = pr.readTagTable(&profile.TagTable)
 	if err != nil {

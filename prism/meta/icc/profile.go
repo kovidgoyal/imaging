@@ -1,6 +1,11 @@
 package icc
 
-import _ "embed"
+import (
+	_ "embed"
+	"fmt"
+)
+
+var _ = fmt.Println
 
 type WellKnownProfile int
 
@@ -49,8 +54,9 @@ func (p WellKnownProfile) String() string {
 }
 
 type Profile struct {
-	Header   Header
-	TagTable TagTable
+	Header        Header
+	TagTable      TagTable
+	PCSIlluminant XYZType
 }
 
 func (p *Profile) Description() (string, error) {
@@ -99,6 +105,45 @@ func (p *Profile) WellKnownProfile() WellKnownProfile {
 		}
 	}
 	return UnknownProfile
+}
+
+func (p *Profile) CreateTransformerToPCS(rendering_intent RenderingIntent) (ans ChannelTransformer, err error) {
+	a2b := UnknownSignature
+	switch rendering_intent {
+	case PerceptualRenderingIntent:
+		a2b = AToB0TagSignature
+	case RelativeColorimetricRenderingIntent:
+		a2b = AToB1TagSignature
+	case SaturationRenderingIntent:
+		a2b = AToB2TagSignature
+	case AbsoluteColorimetricRenderingIntent:
+		a2b = AToB3TagSignature
+	}
+	found := p.TagTable.Has(a2b)
+	if !found && a2b == AToB3TagSignature && p.TagTable.Has(AToB0TagSignature) {
+		a2b = AToB0TagSignature
+		found = true
+	}
+	fmt.Println(22222222222, found)
+	if found {
+		fmt.Println(11111111, string(p.TagTable.entries[a2b][:8]), len(p.TagTable.entries[a2b]))
+	} else {
+		var rc, gc, bc Curve1D
+		if rc, err = p.TagTable.load_curve_tag(RedTRCTagSignature); err != nil {
+			return nil, err
+		}
+		if gc, err = p.TagTable.load_curve_tag(GreenTRCTagSignature); err != nil {
+			return nil, err
+		}
+		if bc, err = p.TagTable.load_curve_tag(BlueTRCTagSignature); err != nil {
+			return nil, err
+		}
+		_, _, _ = rc, gc, bc
+	}
+	for sig := range p.TagTable.entries {
+		fmt.Println(11111111, sig.String())
+	}
+	return nil, nil
 }
 
 func newProfile() *Profile {

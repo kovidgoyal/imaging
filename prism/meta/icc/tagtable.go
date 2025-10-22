@@ -18,17 +18,34 @@ type unsupported struct {
 }
 
 func (e *unsupported) Error() string {
-	return fmt.Sprintf("the tag: %s is not supported", e.sig)
+	return fmt.Sprintf("the tag: %s (0x%x) is not supported", e.sig, uint32(e.sig))
+}
+
+type XYZType struct{ x, y, z float64 }
+
+func xyz_type(data []byte) XYZType {
+	return XYZType{readS15Fixed16BE(data[:4]), readS15Fixed16BE(data[4:8]), readS15Fixed16BE(data[8:12])}
+}
+
+func decode_xyz(data []byte) (ans any, err error) {
+	if len(data) < 20 {
+		return nil, fmt.Errorf("xyz tag too short")
+	}
+	a := xyz_type(data[8:])
+	return &a, nil
 }
 
 func parse_tag(sig Signature, data []byte) (result any, err error) {
 	if len(data) == 0 {
 		return nil, &not_found{sig}
 	}
-	switch sig {
+	if len(data) < 4 {
+		return nil, &unsupported{sig}
+	}
+	switch signature(data) {
 	default:
 		return nil, &unsupported{sig}
-	case DescSignature, DeviceManufacturerDescriptionSignature, DeviceModelDescriptionSignature:
+	case DescSignature, DeviceManufacturerDescriptionSignature, DeviceModelDescriptionSignature, MultiLocalisedUnicodeSignature, TextTagSignature:
 		return parse_text_tag(data)
 	case SignateTagSignature:
 		return sigDecoder(data)
@@ -40,6 +57,8 @@ func parse_tag(sig Signature, data []byte) (result any, err error) {
 		return decode_mft16(data)
 	case Lut8TypeSignature:
 		return decode_mft8(data)
+	case XYZTypeSignature:
+		return decode_xyz(data)
 	}
 }
 
@@ -52,6 +71,10 @@ type TagTable struct {
 	entries map[Signature][]byte
 	lock    sync.Mutex
 	parsed  map[Signature]parsed_tag
+}
+
+func (t *TagTable) Has(sig Signature) bool {
+	return t.entries[sig] != nil
 }
 
 func (t *TagTable) add(sig Signature, data []byte) {
@@ -96,6 +119,18 @@ func (t *TagTable) getDeviceManufacturerDescription() (string, error) {
 
 func (t *TagTable) getDeviceModelDescription() (string, error) {
 	return t.getDescription(DeviceModelDescriptionSignature)
+}
+
+func (t *TagTable) load_curve_tag(s Signature) (Curve1D, error) {
+	r, err := t.get_parsed(s)
+	if err != nil {
+		return nil, fmt.Errorf("could not load %s tag form profile with error: %w", s, err)
+	}
+	if ans, ok := r.(Curve1D); !ok {
+		return nil, fmt.Errorf("could not load %s tag form profile as it is of unsupported type: %T", s, r)
+	} else {
+		return ans, nil
+	}
 }
 
 func emptyTagTable() TagTable {

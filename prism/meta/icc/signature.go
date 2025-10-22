@@ -3,6 +3,7 @@ package icc
 type Signature uint32
 
 const (
+	UnknownSignature     Signature = 0
 	ProfileFileSignature Signature = 0x61637370 // 'acsp'
 	TextTagSignature     Signature = 0x74657874 // 'text'
 	SignateTagSignature  Signature = 0x73696720 // 'sig '
@@ -105,6 +106,7 @@ const (
 	AToB0TagSignature                          Signature = 0x41324230 /* 'A2B0' */
 	AToB1TagSignature                          Signature = 0x41324231 /* 'A2B1' */
 	AToB2TagSignature                          Signature = 0x41324232 /* 'A2B2' */
+	AToB3TagSignature                          Signature = 0x41324233 /* 'A2B3' */
 	BlueColorantTagSignature                   Signature = 0x6258595A /* 'bXYZ' */
 	BlueMatrixColumnTagSignature               Signature = 0x6258595A /* 'bXYZ' */
 	BlueTRCTagSignature                        Signature = 0x62545243 /* 'bTRC' */
