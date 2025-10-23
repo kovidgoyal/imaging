@@ -20,10 +20,28 @@ func (m *MFT) as_bytes() []byte {
 	buf.WriteByte(uint8(m.out_channels))
 	buf.WriteByte(uint8(m.grid_points[0]))
 	buf.WriteByte(0)
-	for _, row := range m.matrix {
-		for _, x := range row {
+	switch m := m.matrix.(type) {
+	case *Matrix3:
+		for _, row := range m {
+			for _, x := range row {
+				buf.Write(encodeS15Fixed16BE(x))
+			}
+		}
+	case *IdentityMatrix:
+		for _, x := range []float64{1, 0, 0, 0, 1, 0, 0, 0, 1} {
 			buf.Write(encodeS15Fixed16BE(x))
 		}
+	case *MatrixWithOffset:
+		for _, row := range m.m.(*Matrix3) {
+			for _, x := range row {
+				buf.Write(encodeS15Fixed16BE(x))
+			}
+		}
+		buf.Write(encodeS15Fixed16BE(m.offset1))
+		buf.Write(encodeS15Fixed16BE(m.offset2))
+		buf.Write(encodeS15Fixed16BE(m.offset3))
+	default:
+		panic(fmt.Sprintf("unknown type of matrix: %T", m))
 	}
 	var writeval func(float64)
 	if m.is8bit {
@@ -63,7 +81,6 @@ func (a *MFT) require_equal(t *testing.T, b *MFT) {
 	require.Equal(t, a.out_channels, b.out_channels)
 	require.Equal(t, a.grid_points, b.grid_points)
 	require.Equal(t, len(a.input_curves), len(b.input_curves))
-	require.Equal(t, a.matrix_is_identity, b.matrix_is_identity)
 	require.Equal(t, a.matrix, b.matrix)
 	require.Equal(t, a.is8bit, b.is8bit)
 	tolerance := IfElse(a.is8bit, 0.01, 0.0001)
@@ -87,10 +104,11 @@ func make_curve(l int) []float64 {
 func TestMFTTag(t *testing.T) {
 	c := make_curve(13)
 	gp := []int{2, 2, 2}
+	im := IdentityMatrix(0)
 	m := MFT{
 		in_channels: 3, out_channels: 3, grid_points: gp,
 		input_curves: [][]float64{c, c, c}, output_curves: [][]float64{c, c, c},
-		clut: make_curve(expectedValues(gp, 3)),
+		clut: make_curve(expectedValues(gp, 3)), matrix: &im,
 	}
 
 	roundtrip := func() {
@@ -101,11 +119,6 @@ func TestMFTTag(t *testing.T) {
 		}
 		m.require_equal(t, r.(*MFT))
 	}
-	roundtrip()
-	m.matrix[0][0] = 1
-	m.matrix[1][1] = 1
-	m.matrix[2][2] = 1
-	m.matrix_is_identity = true
 	roundtrip()
 	m.is8bit = true
 	c = make_curve(256)

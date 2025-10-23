@@ -46,20 +46,15 @@ func TestMtxDecoder(t *testing.T) {
 		}
 		val, err := matrixDecoder(buf.Bytes())
 		require.NoError(t, err)
-		require.IsType(t, &MatrixTag{}, val)
-		mtx := val.(*MatrixTag)
+		require.IsType(t, &MatrixWithOffset{}, val)
+		mtx := val.(*MatrixWithOffset)
 		// Check matrix values
-		expectedMatrix := [3][3]float64{
-			{1.0, 0.0, 0.0},
-			{0.0, 1.0, 0.0},
-			{0.0, 0.0, 1.0},
-		}
-		assert.Equal(t, expectedMatrix, mtx.Matrix)
+		expectedMatrix := IdentityMatrix(0)
+		assert.Equal(t, &expectedMatrix, mtx.m)
 		// Check offset values
-		require.NotNil(t, mtx.Offset)
-		assert.InDelta(t, 0.1, (*mtx.Offset)[0], 0.0001)
-		assert.InDelta(t, 0.2, (*mtx.Offset)[1], 0.0001)
-		assert.InDelta(t, 0.3, (*mtx.Offset)[2], 0.0001)
+		assert.InDelta(t, 0.1, mtx.offset1, 0.0001)
+		assert.InDelta(t, 0.2, mtx.offset2, 0.0001)
+		assert.InDelta(t, 0.3, mtx.offset3, 0.0001)
 	})
 	t.Run("SuccessWithoutOffsets", func(t *testing.T) {
 		var buf bytes.Buffer
@@ -76,15 +71,14 @@ func TestMtxDecoder(t *testing.T) {
 		}
 		val, err := matrixDecoder(buf.Bytes())
 		require.NoError(t, err)
-		require.IsType(t, &MatrixTag{}, val)
-		mtx := val.(*MatrixTag)
-		expectedMatrix := [3][3]float64{
+		require.IsType(t, &Matrix3{}, val)
+		mtx := val.(*Matrix3)
+		expectedMatrix := Matrix3{
 			{1.0, 2.0, 3.0},
 			{4.0, 5.0, 6.0},
 			{7.0, 8.0, 9.0},
 		}
-		assert.Equal(t, expectedMatrix, mtx.Matrix)
-		assert.Nil(t, mtx.Offset)
+		assert.Equal(t, &expectedMatrix, mtx)
 	})
 	t.Run("TooShort", func(t *testing.T) {
 		data := make([]byte, 20)
@@ -96,13 +90,10 @@ func TestMtxDecoder(t *testing.T) {
 func TestMatrixTag_Transform(t *testing.T) {
 	output := make([]float64, 3)
 	t.Run("SuccessWithoutOffset", func(t *testing.T) {
-		matrix := &MatrixTag{
-			Matrix: [3][3]float64{
-				{1, 0, 0},
-				{0, 1, 0},
-				{0, 0, 1},
-			},
-			Offset: nil,
+		matrix := &Matrix3{
+			{1, 0, 0},
+			{0, 1, 0},
+			{0, 0, 1},
 		}
 		input := []float64{0.5, 0.25, 0.75}
 		err := matrix.Transform(output, nil, input...)
@@ -110,13 +101,13 @@ func TestMatrixTag_Transform(t *testing.T) {
 		assert.InDeltaSlice(t, input, output, 0.0001)
 	})
 	t.Run("SuccessWithOffset", func(t *testing.T) {
-		matrix := &MatrixTag{
-			Matrix: [3][3]float64{
+		matrix := &MatrixWithOffset{
+			m: &Matrix3{
 				{1, 0, 0},
 				{0, 1, 0},
 				{0, 0, 1},
 			},
-			Offset: &[3]float64{0.1, 0.2, 0.3},
+			offset1: 0.1, offset2: 0.2, offset3: 0.3,
 		}
 		input := []float64{0.5, 0.25, 0.75}
 		expected := []float64{0.6, 0.45, 1.05} // input + offset
@@ -125,13 +116,10 @@ func TestMatrixTag_Transform(t *testing.T) {
 		assert.InDeltaSlice(t, expected, output, 0.0001)
 	})
 	t.Run("MatrixApplied", func(t *testing.T) {
-		matrix := &MatrixTag{
-			Matrix: [3][3]float64{
-				{2, 0, 0},
-				{0, 3, 0},
-				{0, 0, 4},
-			},
-			Offset: nil,
+		matrix := &Matrix3{
+			{2, 0, 0},
+			{0, 3, 0},
+			{0, 0, 4},
 		}
 		input := []float64{1, 1, 1}
 		expected := []float64{2, 3, 4}

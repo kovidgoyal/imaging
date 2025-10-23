@@ -116,7 +116,7 @@ func modularDecoder(raw []byte) (ans any, err error) {
 		if temp, err = embeddedMatrixDecoder(raw[clut:]); err != nil {
 			return nil, err
 		}
-		if !is_identity_matrix(temp.(*MatrixTag).Matrix) {
+		if _, is_identity_matrix := temp.(*IdentityMatrix); !is_identity_matrix {
 			mt.matrix = temp.(ChannelTransformer)
 			mt.workspace_size = max(mt.workspace_size, mt.matrix.WorkspaceSize())
 		}

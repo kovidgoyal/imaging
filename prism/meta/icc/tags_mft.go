@@ -14,8 +14,7 @@ type MFT struct {
 	grid_points                 []int
 	input_curves, output_curves [][]float64
 	clut                        []float64
-	matrix                      [3][3]float64
-	matrix_is_identity          bool
+	matrix                      ChannelTransformer
 	is8bit                      bool
 }
 
@@ -41,19 +40,6 @@ func linear_interpolate_1d(val float64, table []float64) float64 {
 	return vlo + frac*(vhi-vlo)
 }
 
-func apply_matrix(m *[3][3]float64, output, input []float64, is_identity_matrix bool) {
-	if is_identity_matrix {
-		copy(output, input)
-	} else {
-		for i := range 3 {
-			output[i] = 0
-			for j := range 3 {
-				output[i] += m[i][j] * input[j]
-			}
-		}
-	}
-}
-
 func (mft *MFT) Transform(output, workspace []float64, inputs ...float64) error {
 	mapped := workspace[0:mft.in_channels]
 	workspace = workspace[mft.in_channels:]
@@ -61,7 +47,7 @@ func (mft *MFT) Transform(output, workspace []float64, inputs ...float64) error 
 		output[o] = 0
 	}
 	// Apply matrix
-	apply_matrix(&mft.matrix, output, mapped, mft.matrix_is_identity)
+	mft.matrix.Transform(mapped, nil, inputs...)
 	// Apply input curves with linear interpolation
 	for i := range mft.in_channels {
 		mapped[i] = linear_interpolate_1d(mapped[i], mft.input_curves[i])
@@ -113,9 +99,11 @@ func load_mft_header(raw []byte) (ans *MFT, leftover []byte, err error) {
 	for i := range a.in_channels {
 		a.grid_points[i] = grid_points
 	}
-	ma, _ := embeddedMatrixDecoder(raw[12:48])
-	a.matrix = ma.(*MatrixTag).Matrix
-	a.matrix_is_identity = is_identity_matrix(a.matrix)
+	ma, err := embeddedMatrixDecoder(raw[12:48])
+	if err != nil {
+		return nil, nil, err
+	}
+	a.matrix = ma.(ChannelTransformer)
 	return &a, raw[48:], nil
 }
 
