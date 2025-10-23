@@ -97,13 +97,13 @@ func (t *TagTable) add(sig Signature, offset int, data []byte) {
 func (t *TagTable) get_parsed(sig Signature) (ans any, err error) {
 	t.lock.Lock()
 	defer t.lock.Unlock()
-	existing, found := t.parsed[sig]
-	if found {
-		return existing.tag, existing.err
-	}
 	if t.parsed == nil {
 		t.parsed = make(map[Signature]parsed_tag)
 		t.parse_cache = make(map[parse_cache_key]parsed_tag)
+	}
+	existing, found := t.parsed[sig]
+	if found {
+		return existing.tag, existing.err
 	}
 	var key parse_cache_key
 	defer func() {
@@ -114,7 +114,7 @@ func (t *TagTable) get_parsed(sig Signature) (ans any, err error) {
 	if re.data == nil {
 		return nil, &not_found{sig}
 	}
-	key.offset, key.size = re.offset, len(re.data)
+	key = parse_cache_key{re.offset, len(re.data)}
 	if cached, ok := t.parse_cache[key]; ok {
 		return cached.tag, cached.err
 	}
