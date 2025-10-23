@@ -195,6 +195,30 @@ func (t *TagTable) load_rgb_matrix() (ChannelTransformer, ChannelTransformer, er
 	return &m, &im, err
 }
 
+func array_to_matrix(a []unit_float) *Matrix3 {
+	_ = a[8]
+	m := Matrix3{}
+	copy(m[0][:], a[:3])
+	copy(m[1][:], a[3:6])
+	copy(m[2][:], a[6:9])
+	if is_identity_matrix(&m) {
+		return nil
+	}
+	return &m
+}
+
+func (p *TagTable) get_chromatic_adaption() (*Matrix3, error) {
+	x, err := p.get_parsed(ChromaticAdaptationTagSignature)
+	if err != nil {
+		return nil, err
+	}
+	a, ok := x.([]unit_float)
+	if !ok {
+		return nil, fmt.Errorf("chad tag is not an ArrayType")
+	}
+	return array_to_matrix(a), nil
+}
+
 func emptyTagTable() TagTable {
 	return TagTable{
 		entries: make(map[Signature]raw_tag_entry),
@@ -205,4 +229,100 @@ type ChannelTransformer interface {
 	Transform(workspace []unit_float, r, g, b unit_float) (unit_float, unit_float, unit_float)
 	IsSuitableFor(num_input_channels int, num_output_channels int) bool
 	WorkspaceSize() int
+}
+
+type TwoTransformers struct {
+	a, b         func(ws []unit_float, r, g, b unit_float) (unit_float, unit_float, unit_float)
+	ws           int
+	transformers []ChannelTransformer
+}
+
+func (t *TwoTransformers) WorkspaceSize() int {
+	return t.ws
+}
+
+func (t *TwoTransformers) IsSuitableFor(i, o int) bool {
+	for _, x := range t.transformers {
+		if !x.IsSuitableFor(i, o) {
+			return false
+		}
+	}
+	return true
+}
+
+func (t *TwoTransformers) Transform(ws []unit_float, r, g, b unit_float) (unit_float, unit_float, unit_float) {
+	r, g, b = t.a(ws, r, g, b)
+	r, g, b = t.b(ws, r, g, b)
+	return r, g, b
+}
+
+type ThreeTransformers struct {
+	a, b, c      func(ws []unit_float, r, g, b unit_float) (unit_float, unit_float, unit_float)
+	ws           int
+	transformers []ChannelTransformer
+}
+
+func (t *ThreeTransformers) WorkspaceSize() int {
+	return t.ws
+}
+
+func (t *ThreeTransformers) IsSuitableFor(i, o int) bool {
+	for _, x := range t.transformers {
+		if !x.IsSuitableFor(i, o) {
+			return false
+		}
+	}
+	return true
+}
+
+func (t *ThreeTransformers) Transform(ws []unit_float, r, g, b unit_float) (unit_float, unit_float, unit_float) {
+	r, g, b = t.a(ws, r, g, b)
+	r, g, b = t.b(ws, r, g, b)
+	r, g, b = t.c(ws, r, g, b)
+	return r, g, b
+}
+
+type MultipleTransformers struct {
+	ws           int
+	transformers []ChannelTransformer
+}
+
+func (t *MultipleTransformers) WorkspaceSize() int {
+	return t.ws
+}
+
+func (t *MultipleTransformers) IsSuitableFor(i, o int) bool {
+	for _, x := range t.transformers {
+		if !x.IsSuitableFor(i, o) {
+			return false
+		}
+	}
+	return true
+}
+
+func (t *MultipleTransformers) Transform(ws []unit_float, r, g, b unit_float) (unit_float, unit_float, unit_float) {
+	for _, x := range t.transformers {
+		r, g, b = x.Transform(ws, r, g, b)
+	}
+	return r, g, b
+}
+
+func NewCombinedTransformer(t ...ChannelTransformer) ChannelTransformer {
+	ws := 0
+	for _, x := range t {
+		ws = max(ws, x.WorkspaceSize())
+	}
+	switch len(t) {
+	case 0:
+		m := IdentityMatrix(0)
+		return &m
+	case 1:
+		return t[0]
+	case 2:
+		return &TwoTransformers{t[0].Transform, t[1].Transform, ws, t}
+	case 3:
+		return &ThreeTransformers{t[0].Transform, t[1].Transform, t[2].Transform, ws, t}
+	default:
+		return &MultipleTransformers{ws, t}
+	}
 }

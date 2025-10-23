@@ -26,6 +26,24 @@ func identity_matrix(offset1, offset2, offset3 unit_float) []unit_float {
 }
 
 func TestMtxDecoder(t *testing.T) {
+	t.Run("Chad_matrix", func(t *testing.T) {
+		var buf bytes.Buffer
+		buf.WriteString("sf32")       // Name
+		buf.Write([]byte{0, 0, 0, 0}) // Reserved
+		// Write 9 matrix values
+		values := []unit_float{
+			1.0, 0.0, 0.0,
+			0.0, 1.0, 0.0,
+			0.0, 0.0, 1.0,
+		}
+		for _, v := range values {
+			buf.Write(encodeS15Fixed16BE(v))
+		}
+		x, err := decode_array(buf.Bytes())
+		require.NoError(t, err)
+		m := array_to_matrix(x.([]unit_float))
+		require.Nil(t, m)
+	})
 	t.Run("SuccessWithOffsets", func(t *testing.T) {
 		var buf bytes.Buffer
 		buf.WriteString("mtx ")       // Name

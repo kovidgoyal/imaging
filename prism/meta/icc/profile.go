@@ -119,23 +119,20 @@ func (p *Profile) WellKnownProfile() WellKnownProfile {
 	return UnknownProfile
 }
 
-func (p *Profile) get_chromatic_adaption() (*Matrix3, error) {
-	x, err := p.TagTable.get_parsed(ChromaticAdaptationTagSignature)
+func (p *Profile) get_effective_chromatic_adaption() (*Matrix3, error) {
+	pcs_whitepoint := p.Header.ParsedPCSIlluminant()
+	x, err := p.TagTable.get_parsed(MediaWhitePointTagSignature)
 	if err != nil {
 		return nil, err
 	}
-	a, ok := x.([]unit_float)
+	wtpt, ok := x.(*XYZType)
 	if !ok {
-		return nil, fmt.Errorf("chad tag is not an ArrayType")
+		return nil, fmt.Errorf("wtpt tag is not of XYZType")
 	}
-	m := Matrix3{}
-	copy(m[0][:], a[:3])
-	copy(m[1][:], a[3:6])
-	copy(m[2][:], a[3:6])
-	if is_identity_matrix(&m) {
+	if pcs_whitepoint == *wtpt {
 		return nil, nil
 	}
-	return &m, nil
+	return p.TagTable.get_chromatic_adaption()
 }
 
 // See section 8.10.2 of ICC.1-2202-05.pdf for tag selection algorithm
@@ -157,8 +154,15 @@ func (p *Profile) CreateTransformerToPCS(rendering_intent RenderingIntent) (ans 
 		a2b = fallback
 		found_a2b = true
 	}
+	chromatic_adaptation, err := p.get_effective_chromatic_adaption()
+	if err != nil {
+		return nil, err
+	}
 	if found_a2b {
 		fmt.Println(3333333333, string(p.TagTable.entries[a2b].data[:8]), len(p.TagTable.entries[a2b].data))
+		for sig := range p.TagTable.entries {
+			fmt.Println(11111111, sig.String())
+		}
 	} else {
 		var rc, gc, bc Curve1D
 		if rc, err = p.TagTable.load_curve_tag(RedTRCTagSignature); err != nil {
@@ -175,15 +179,10 @@ func (p *Profile) CreateTransformerToPCS(rendering_intent RenderingIntent) (ans 
 		if err != nil {
 			return nil, err
 		}
-		chromatic_adaptation, err := p.get_chromatic_adaption()
-		if err != nil {
-			return nil, err
+		if chromatic_adaptation == nil {
+			return NewCombinedTransformer(ct, m), nil
 		}
-		_, _, _ = ct, m, chromatic_adaptation
-		fmt.Println("chad:", chromatic_adaptation)
-	}
-	for sig := range p.TagTable.entries {
-		fmt.Println(11111111, sig.String())
+		return NewCombinedTransformer(ct, m, chromatic_adaptation), nil
 	}
 	return nil, nil
 }
