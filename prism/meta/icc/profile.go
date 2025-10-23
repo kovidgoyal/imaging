@@ -119,6 +119,25 @@ func (p *Profile) WellKnownProfile() WellKnownProfile {
 	return UnknownProfile
 }
 
+func (p *Profile) get_chromatic_adaption() (*Matrix3, error) {
+	x, err := p.TagTable.get_parsed(ChromaticAdaptationTagSignature)
+	if err != nil {
+		return nil, err
+	}
+	a, ok := x.([]unit_float)
+	if !ok {
+		return nil, fmt.Errorf("chad tag is not an ArrayType")
+	}
+	m := Matrix3{}
+	copy(m[0][:], a[:3])
+	copy(m[1][:], a[3:6])
+	copy(m[2][:], a[3:6])
+	if is_identity_matrix(&m) {
+		return nil, nil
+	}
+	return &m, nil
+}
+
 // See section 8.10.2 of ICC.1-2202-05.pdf for tag selection algorithm
 func (p *Profile) CreateTransformerToPCS(rendering_intent RenderingIntent) (ans ChannelTransformer, err error) {
 	a2b := UnknownSignature
@@ -156,7 +175,12 @@ func (p *Profile) CreateTransformerToPCS(rendering_intent RenderingIntent) (ans 
 		if err != nil {
 			return nil, err
 		}
-		_, _ = ct, m
+		chromatic_adaptation, err := p.get_chromatic_adaption()
+		if err != nil {
+			return nil, err
+		}
+		_, _, _ = ct, m, chromatic_adaptation
+		fmt.Println("chad:", chromatic_adaptation)
 	}
 	for sig := range p.TagTable.entries {
 		fmt.Println(11111111, sig.String())

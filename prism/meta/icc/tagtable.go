@@ -35,6 +35,16 @@ func decode_xyz(data []byte) (ans any, err error) {
 	return &a, nil
 }
 
+func decode_array(data []byte) (ans any, err error) {
+	data = data[8:]
+	a := make([]unit_float, len(data)/4)
+	for i := range a {
+		a[i] = readS15Fixed16BE(data[:4:4])
+		data = data[4:]
+	}
+	return a, nil
+}
+
 func parse_tag(sig Signature, data []byte) (result any, err error) {
 	if len(data) == 0 {
 		return nil, &not_found{sig}
@@ -60,6 +70,8 @@ func parse_tag(sig Signature, data []byte) (result any, err error) {
 		return decode_mft8(data)
 	case XYZTypeSignature:
 		return decode_xyz(data)
+	case S15Fixed16ArrayTypeSignature:
+		return decode_array(data)
 	case CurveTypeSignature, ParametricCurveTypeSignature:
 		return curveDecoder(data)
 	}
