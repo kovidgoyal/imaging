@@ -27,6 +27,7 @@ type Curve1D interface {
 	Transform(x float64) float64
 	InverseTransform(x float64) float64
 	Prepare() error
+	String() string
 }
 
 var _ Curve1D = (*IdentityCurve)(nil)
@@ -213,6 +214,7 @@ func (c IdentityCurve) InverseTransform(x float64) float64 {
 }
 
 func (c IdentityCurve) Prepare() error { return nil }
+func (c IdentityCurve) String() string { return "IdentityCurve{}" }
 
 func (c GammaCurve) Transform(x float64) float64 {
 	if x < 0 {
@@ -242,6 +244,7 @@ func (c *GammaCurve) Prepare() error {
 	c.is_one = math.Abs(c.gamma-1) < MATRIX_DET_TOLERANCE
 	return nil
 }
+func (c GammaCurve) String() string { return fmt.Sprintf("GammaCurve{%f}", c.gamma) }
 
 func sampled_value(samples []float64, max_idx float64, x float64) float64 {
 	idx := x * max_idx
@@ -265,11 +268,13 @@ func (c *PointsCurve) Prepare() error {
 		if idx < 0 {
 			reverse_lookup[i] = 0
 		} else {
-			x1, x2 := c.points[idx], c.points[idx+1]
-			if x2 < x1 {
-				x1, x2 = x2, x1
+			y1, y2 := c.points[idx], c.points[idx+1]
+			if y2 < y1 {
+				y1, y2 = y2, y1
 			}
-			reverse_lookup[i] = (x1 + x2) / 2
+			x1, x2 := float64(idx)/c.max_idx, float64(idx+1)/c.max_idx
+			frac := (y - y1) / (y2 - y1)
+			reverse_lookup[i] = x1 + frac*(x2-x1)
 		}
 	}
 	c.reverse_lookup = reverse_lookup
@@ -283,6 +288,7 @@ func (c PointsCurve) Transform(v float64) float64 {
 func (c PointsCurve) InverseTransform(v float64) float64 {
 	return sampled_value(c.reverse_lookup, c.max_idx, v)
 }
+func (c PointsCurve) String() string { return fmt.Sprintf("PointsCurve{%d}", len(c.points)) }
 
 func get_interval(lookup []float64, y float64) int {
 	if len(lookup) < 2 {
@@ -308,6 +314,10 @@ func (c *ConditionalZeroCurve) Prepare() error {
 	return nil
 }
 
+func (c *ConditionalZeroCurve) String() string {
+	return fmt.Sprintf("ConditionalZeroCurve{a: %v b: %v g: %v}", c.a, c.b, c.g)
+}
+
 func (c *ConditionalZeroCurve) Transform(x float64) float64 {
 	// Y = (aX+b)^g if X ≥ -b/a else 0
 	if x >= c.threshold {
@@ -330,6 +340,10 @@ func (c *ConditionalCCurve) Prepare() error {
 	}
 	c.threshold, c.inv_gamma, c.inv_a = -c.b/c.a, 1/c.g, 1/c.a
 	return nil
+}
+
+func (c *ConditionalCCurve) String() string {
+	return fmt.Sprintf("ConditionalCCurve{a: %v b: %v c: %v g: %v}", c.a, c.b, c.c, c.g)
 }
 
 func (c *ConditionalCCurve) Transform(x float64) float64 {
@@ -362,6 +376,10 @@ func (c *SplitCurve) Prepare() error {
 	return nil
 }
 
+func (c *SplitCurve) String() string {
+	return fmt.Sprintf("SplitCurve{a: %v b: %v c: %v d: %v g: %v}", c.a, c.b, c.c, c.d, c.g)
+}
+
 func (c *SplitCurve) Transform(x float64) float64 {
 	// Y = (aX+b)^g if X ≥ d else cX
 	if x >= c.d {
@@ -388,6 +406,10 @@ func (c *ComplexCurve) Prepare() error {
 	}
 	c.threshold, c.inv_g, c.inv_a, c.inv_c = math.Pow(c.a*c.d+c.b, c.g)+c.e, 1/c.g, 1/c.a, 1/c.c
 	return nil
+}
+
+func (c *ComplexCurve) String() string {
+	return fmt.Sprintf("ComplexCurve{a: %v b: %v c: %v d: %v e: %v f: %v g: %v}", c.a, c.b, c.c, c.d, c.e, c.f, c.g)
 }
 
 func (c *ComplexCurve) Transform(x float64) float64 {

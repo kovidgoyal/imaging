@@ -3,10 +3,12 @@ package icc
 import (
 	"bytes"
 	"encoding/binary"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+	"fmt"
 	"math"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func floatToFixed88(f float64) uint16 {
@@ -202,6 +204,40 @@ func TestCurveTag_Transform(t *testing.T) {
 		c := &PointsCurve{points: []float64{0, 0.5, 1.}}
 		f(c, 0.25, 0.25)
 	})
+}
+
+func curve_inverse(t *testing.T, c Curve1D, delta float64) {
+	const num = 256
+	t.Run(c.String(), func(t *testing.T) {
+		t.Parallel()
+		require.NoError(t, c.Prepare(), fmt.Sprintf("failed to prepare %s", c))
+		for i := range num {
+			x := float64(i) / float64(num-1)
+			y := c.Transform(x)
+			nx := c.InverseTransform(y)
+			require.InDelta(t, x, nx, delta, fmt.Sprintf("inversion of x=%f in curve %s failed: y=%f inv(y)=%f", x, c, y, nx))
+		}
+	})
+}
+
+func generate_sampled_curve(c Curve1D) Curve1D {
+	const num = 256 * 16
+	points := make([]float64, num)
+	for i := range num {
+		x := float64(i) / float64(num-1)
+		points[i] = c.Transform(x)
+	}
+	return &PointsCurve{points: points}
+}
+
+func TestCurveInverse(t *testing.T) {
+	curve_inverse(t, IdentityCurve(0), 1e-8)
+	curve_inverse(t, &GammaCurve{gamma: 2}, 1e-8)
+	curve_inverse(t, &ConditionalZeroCurve{a: 2, b: 1, g: 0.5}, 1e-8)
+	curve_inverse(t, &ConditionalCCurve{a: 1, b: 2, c: 3, g: 2}, 1e-8)
+	curve_inverse(t, &SplitCurve{a: 1, b: 2, c: 3, d: 4, g: 2}, 1e-8)
+	curve_inverse(t, &ComplexCurve{a: 1, b: 2, c: 3, d: 4, e: 5, f: 6, g: 2}, 1e-8)
+	curve_inverse(t, generate_sampled_curve(&GammaCurve{gamma: 2}), 5e-3)
 }
 
 func TestParametricCurveTag_Transform(t *testing.T) {
