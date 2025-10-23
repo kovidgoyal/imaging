@@ -119,6 +119,7 @@ func (p *Profile) WellKnownProfile() WellKnownProfile {
 	return UnknownProfile
 }
 
+// See section 8.10.2 of ICC.1-2202-05.pdf for tag selection algorithm
 func (p *Profile) CreateTransformerToPCS(rendering_intent RenderingIntent) (ans ChannelTransformer, err error) {
 	a2b := UnknownSignature
 	switch rendering_intent {
@@ -131,12 +132,13 @@ func (p *Profile) CreateTransformerToPCS(rendering_intent RenderingIntent) (ans 
 	case AbsoluteColorimetricRenderingIntent:
 		a2b = AToB3TagSignature
 	}
-	found := p.TagTable.Has(a2b)
-	if !found && a2b == AToB3TagSignature && p.TagTable.Has(AToB0TagSignature) {
-		a2b = AToB0TagSignature
-		found = true
+	found_a2b := p.TagTable.Has(a2b)
+	const fallback = AToB0TagSignature
+	if !found_a2b && p.TagTable.Has(fallback) {
+		a2b = fallback
+		found_a2b = true
 	}
-	if found {
+	if found_a2b {
 		fmt.Println(3333333333, string(p.TagTable.entries[a2b].data[:8]), len(p.TagTable.entries[a2b].data))
 	} else {
 		var rc, gc, bc Curve1D
