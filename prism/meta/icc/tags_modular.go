@@ -12,7 +12,7 @@ type ModularTag struct {
 	num_input_channels, num_output_channels int
 	a_curves, m_curves, b_curves            []Curve1D
 	clut, matrix                            ChannelTransformer
-	transforms                              []ChannelTransformer
+	transforms                              []func(workspace []unit_float, r, g, b unit_float) (unit_float, unit_float, unit_float)
 	workspace_size                          int
 	is_a_to_b                               bool
 }
@@ -25,7 +25,7 @@ func (m *ModularTag) IsSuitableFor(num_input_channels, num_output_channels int) 
 }
 func (m *ModularTag) Transform(workspace []unit_float, r, g, b unit_float) (unit_float, unit_float, unit_float) {
 	for _, t := range m.transforms {
-		r, g, b = t.Transform(workspace, r, g, b)
+		r, g, b = t(workspace, r, g, b)
 	}
 	return r, g, b
 }
@@ -121,19 +121,19 @@ func modularDecoder(raw []byte) (ans any, err error) {
 	}
 	ans = mt
 	if mt.a_curves != nil {
-		mt.transforms = append(mt.transforms, NewCurveTransformer(mt.a_curves...))
+		mt.transforms = append(mt.transforms, NewCurveTransformer(mt.a_curves...).Transform)
 	}
 	if mt.clut != nil {
-		mt.transforms = append(mt.transforms, mt.clut)
+		mt.transforms = append(mt.transforms, mt.clut.Transform)
 	}
 	if mt.m_curves != nil {
-		mt.transforms = append(mt.transforms, NewCurveTransformer(mt.m_curves...))
+		mt.transforms = append(mt.transforms, NewCurveTransformer(mt.m_curves...).Transform)
 	}
 	if mt.matrix != nil {
-		mt.transforms = append(mt.transforms, mt.matrix)
+		mt.transforms = append(mt.transforms, mt.matrix.Transform)
 	}
 	if mt.b_curves != nil {
-		mt.transforms = append(mt.transforms, NewCurveTransformer(mt.b_curves...))
+		mt.transforms = append(mt.transforms, NewCurveTransformer(mt.b_curves...).Transform)
 	}
 	if !is_a_to_b {
 		slices.Reverse(mt.transforms)
