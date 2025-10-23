@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-func encode_matrix_vals(values ...float32) string {
+func encode_matrix_vals(values ...unit_float) string {
 	var buf bytes.Buffer
 	for _, v := range values {
 		buf.Write(encodeS15Fixed16BE(v))
@@ -15,8 +15,8 @@ func encode_matrix_vals(values ...float32) string {
 	return buf.String()
 }
 
-func identity_matrix(offset1, offset2, offset3 float32) []float32 {
-	return []float32{
+func identity_matrix(offset1, offset2, offset3 unit_float) []unit_float {
+	return []unit_float{
 		1.0, 0.0, 0.0,
 		0.0, 1.0, 0.0,
 		0.0, 0.0, 1.0,
@@ -31,7 +31,7 @@ func TestMtxDecoder(t *testing.T) {
 		buf.WriteString("mtx ")       // Name
 		buf.Write([]byte{0, 0, 0, 0}) // Reserved
 		// Write 9 matrix values
-		values := []float32{
+		values := []unit_float{
 			1.0, 0.0, 0.0,
 			0.0, 1.0, 0.0,
 			0.0, 0.0, 1.0,
@@ -40,7 +40,7 @@ func TestMtxDecoder(t *testing.T) {
 			buf.Write(encodeS15Fixed16BE(v))
 		}
 		// Write 3 offset values
-		offsets := []float32{0.1, 0.2, 0.3}
+		offsets := []unit_float{0.1, 0.2, 0.3}
 		for _, v := range offsets {
 			buf.Write(encodeS15Fixed16BE(v))
 		}
@@ -52,16 +52,16 @@ func TestMtxDecoder(t *testing.T) {
 		expectedMatrix := IdentityMatrix(0)
 		assert.Equal(t, &expectedMatrix, mtx.m)
 		// Check offset values
-		assert.InDelta(t, 0.1, mtx.offset1, 0.0001)
-		assert.InDelta(t, 0.2, mtx.offset2, 0.0001)
-		assert.InDelta(t, 0.3, mtx.offset3, 0.0001)
+		in_delta(t, 0.1, mtx.offset1, 0.0001)
+		in_delta(t, 0.2, mtx.offset2, 0.0001)
+		in_delta(t, 0.3, mtx.offset3, 0.0001)
 	})
 	t.Run("SuccessWithoutOffsets", func(t *testing.T) {
 		var buf bytes.Buffer
 		buf.WriteString("mtx ")       // Name
 		buf.Write([]byte{0, 0, 0, 0}) // Reserved
 		// Write only the 9 matrix values (no offsets)
-		values := []float32{
+		values := []unit_float{
 			1.0, 2.0, 3.0,
 			4.0, 5.0, 6.0,
 			7.0, 8.0, 9.0,
@@ -88,16 +88,16 @@ func TestMtxDecoder(t *testing.T) {
 }
 
 func TestMatrixTag_Transform(t *testing.T) {
-	output := make([]float32, 3)
+	output := make([]unit_float, 3)
 	t.Run("SuccessWithoutOffset", func(t *testing.T) {
 		matrix := &Matrix3{
 			{1, 0, 0},
 			{0, 1, 0},
 			{0, 0, 1},
 		}
-		input := []float32{0.5, 0.25, 0.75}
+		input := []unit_float{0.5, 0.25, 0.75}
 		matrix.Transform(output, nil, input...)
-		assert.InDeltaSlice(t, input, output, 0.0001)
+		in_delta_slice(t, input, output, 0.0001)
 	})
 	t.Run("SuccessWithOffset", func(t *testing.T) {
 		matrix := &MatrixWithOffset{
@@ -108,10 +108,10 @@ func TestMatrixTag_Transform(t *testing.T) {
 			},
 			offset1: 0.1, offset2: 0.2, offset3: 0.3,
 		}
-		input := []float32{0.5, 0.25, 0.75}
-		expected := []float32{0.6, 0.45, 1.05} // input + offset
+		input := []unit_float{0.5, 0.25, 0.75}
+		expected := []unit_float{0.6, 0.45, 1.05} // input + offset
 		matrix.Transform(output, nil, input...)
-		assert.InDeltaSlice(t, expected, output, 0.0001)
+		in_delta_slice(t, expected, output, 0.0001)
 	})
 	t.Run("MatrixApplied", func(t *testing.T) {
 		matrix := &Matrix3{
@@ -119,9 +119,9 @@ func TestMatrixTag_Transform(t *testing.T) {
 			{0, 3, 0},
 			{0, 0, 4},
 		}
-		input := []float32{1, 1, 1}
-		expected := []float32{2, 3, 4}
+		input := []unit_float{1, 1, 1}
+		expected := []unit_float{2, 3, 4}
 		matrix.Transform(output, nil, input...)
-		assert.InDeltaSlice(t, expected, output, 0.0001)
+		in_delta_slice(t, expected, output, 0.0001)
 	})
 }

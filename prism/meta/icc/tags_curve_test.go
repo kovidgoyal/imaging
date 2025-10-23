@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func floatToFixed88(f float32) uint16 {
+func floatToFixed88(f unit_float) uint16 {
 	// Clamp the value to fit in 8.8 range
 	if f < 0 {
 		f = 0
@@ -23,7 +23,7 @@ func floatToFixed88(f float32) uint16 {
 	return v
 }
 
-func curv_bytes(params ...float32) []byte {
+func curv_bytes(params ...unit_float) []byte {
 	b := bytes.NewBuffer([]byte("curv\x00\x00\x00\x00"))
 	binary.Write(b, binary.BigEndian, uint32(len(params)))
 	if len(params) == 1 {
@@ -40,7 +40,7 @@ func curv_bytes(params ...float32) []byte {
 	return b.Bytes()
 }
 
-func para_bytes(q uint16, params ...float32) []byte {
+func para_bytes(q uint16, params ...unit_float) []byte {
 	b := bytes.NewBuffer([]byte("para\x00\x00\x00\x00"))
 	_ = binary.Write(b, binary.BigEndian, q)
 	b.WriteString("\x00\x00")
@@ -66,7 +66,7 @@ func TestCurveDecoder(t *testing.T) {
 		val, err := curveDecoder(raw)
 		require.NoError(t, err)
 		c := val.(*GammaCurve)
-		assert.InDelta(t, 1.0, float32(c.gamma), 0.001)
+		in_delta(t, 1.0, unit_float(c.gamma), 0.001)
 	})
 	t.Run("PointsCurve", func(t *testing.T) {
 		raw := curv_bytes(0.1, 0.2, 0.3)
@@ -74,7 +74,7 @@ func TestCurveDecoder(t *testing.T) {
 		require.NoError(t, err)
 		require.IsType(t, &PointsCurve{}, val)
 		c := val.(*PointsCurve)
-		assert.InDeltaSlice(t, []float32{0.1, 0.2, 0.3}, c.points, 0.0001)
+		in_delta_slice(t, []unit_float{0.1, 0.2, 0.3}, c.points, 0.0001)
 	})
 	t.Run("TooShort", func(t *testing.T) {
 		_, err := curveDecoder(make([]byte, 11))
@@ -96,7 +96,7 @@ func TestCurveDecoder(t *testing.T) {
 }
 
 func TestParametricCurveDecoder(t *testing.T) {
-	w := func(t *testing.T, q uint16, expect_error bool, params ...float32) any {
+	w := func(t *testing.T, q uint16, expect_error bool, params ...unit_float) any {
 		val, err := parametricCurveDecoder(para_bytes(q, params...))
 		if expect_error {
 			require.Error(t, err)
@@ -110,48 +110,48 @@ func TestParametricCurveDecoder(t *testing.T) {
 		q := &GammaCurve{}
 		require.IsType(t, q, val)
 		p := val.(*GammaCurve)
-		assert.InDelta(t, 1.0, p.gamma, 0.0001)
+		in_delta(t, 1.0, p.gamma, 0.0001)
 	})
 	t.Run("ConditionalZeroCurve", func(t *testing.T) {
 		w(t, 1, true, 3, 0, 7)
 		val := w(t, 1, false, 3, 1, 2)
 		require.IsType(t, &ConditionalZeroCurve{}, val)
 		p := val.(*ConditionalZeroCurve)
-		assert.InDelta(t, 3.0, p.g, 0.0001)
-		assert.InDelta(t, 1.0, p.a, 0.0001)
-		assert.InDelta(t, 2.0, p.b, 0.0001)
+		in_delta(t, 3.0, p.g, 0.0001)
+		in_delta(t, 1.0, p.a, 0.0001)
+		in_delta(t, 2.0, p.b, 0.0001)
 	})
 	t.Run("ConditionalCCurve", func(t *testing.T) {
 		w(t, 2, true, 3, 0, 1, 2, 3)
 		val := w(t, 2, false, 7, 1, 2, 3, 4)
 		require.IsType(t, &ConditionalCCurve{}, val)
 		p := val.(*ConditionalCCurve)
-		assert.InDelta(t, 7.0, p.g, 0.0001)
-		assert.InDelta(t, 1.0, p.a, 0.0001)
-		assert.InDelta(t, 2.0, p.b, 0.0001)
-		assert.InDelta(t, 3.0, p.c, 0.0001)
+		in_delta(t, 7.0, p.g, 0.0001)
+		in_delta(t, 1.0, p.a, 0.0001)
+		in_delta(t, 2.0, p.b, 0.0001)
+		in_delta(t, 3.0, p.c, 0.0001)
 	})
 	t.Run("SplitCurve", func(t *testing.T) {
 		val := w(t, 3, false, 9, 1, 2, 3, 4, 5)
 		require.IsType(t, &SplitCurve{}, val)
 		p := val.(*SplitCurve)
-		assert.InDelta(t, 9.0, p.g, 0.0001)
-		assert.InDelta(t, 1.0, p.a, 0.0001)
-		assert.InDelta(t, 2.0, p.b, 0.0001)
-		assert.InDelta(t, 3.0, p.c, 0.0001)
-		assert.InDelta(t, 4.0, p.d, 0.0001)
+		in_delta(t, 9.0, p.g, 0.0001)
+		in_delta(t, 1.0, p.a, 0.0001)
+		in_delta(t, 2.0, p.b, 0.0001)
+		in_delta(t, 3.0, p.c, 0.0001)
+		in_delta(t, 4.0, p.d, 0.0001)
 	})
 	t.Run("ComplexCurve", func(t *testing.T) {
 		val := w(t, 4, false, 11, 1, 2, 3, 4, 5, 6)
 		require.IsType(t, &ComplexCurve{}, val)
 		p := val.(*ComplexCurve)
-		assert.InDelta(t, 11.0, p.g, 0.0001)
-		assert.InDelta(t, 1.0, p.a, 0.0001)
-		assert.InDelta(t, 2.0, p.b, 0.0001)
-		assert.InDelta(t, 3.0, p.c, 0.0001)
-		assert.InDelta(t, 4.0, p.d, 0.0001)
-		assert.InDelta(t, 5.0, p.e, 0.0001)
-		assert.InDelta(t, 6.0, p.f, 0.0001)
+		in_delta(t, 11.0, p.g, 0.0001)
+		in_delta(t, 1.0, p.a, 0.0001)
+		in_delta(t, 2.0, p.b, 0.0001)
+		in_delta(t, 3.0, p.c, 0.0001)
+		in_delta(t, 4.0, p.d, 0.0001)
+		in_delta(t, 5.0, p.e, 0.0001)
+		in_delta(t, 6.0, p.f, 0.0001)
 	})
 	t.Run("TooShort", func(t *testing.T) {
 		_, err := parametricCurveDecoder(make([]byte, 11))
@@ -178,15 +178,15 @@ func TestParametricCurveDecoder(t *testing.T) {
 	})
 }
 
-func rt(t *testing.T, c Curve1D, x, y float32) {
+func rt(t *testing.T, c Curve1D, x, y unit_float) {
 	t.Helper()
 	require.NoError(t, c.Prepare())
 	ans := c.Transform(x)
-	assert.InDelta(t, y, ans, 0.0001)
+	in_delta(t, y, ans, 0.0001)
 }
 
 func TestCurveTag_Transform(t *testing.T) {
-	f := func(c Curve1D, x, y float32) {
+	f := func(c Curve1D, x, y unit_float) {
 		rt(t, c, x, y)
 	}
 	t.Run("IdentityCurve", func(t *testing.T) {
@@ -197,11 +197,11 @@ func TestCurveTag_Transform(t *testing.T) {
 		f(&GammaCurve{2.0, 0.5, false}, 0.5, 0.25)
 	})
 	t.Run("PointsCurve_ExactIndex", func(t *testing.T) {
-		c := &PointsCurve{points: []float32{0, 0.5, 1.}}
+		c := &PointsCurve{points: []unit_float{0, 0.5, 1.}}
 		f(c, 0.5, 0.5)
 	})
 	t.Run("PointsCurve_Interpolation", func(t *testing.T) {
-		c := &PointsCurve{points: []float32{0, 0.5, 1.}}
+		c := &PointsCurve{points: []unit_float{0, 0.5, 1.}}
 		f(c, 0.25, 0.25)
 	})
 }
@@ -212,19 +212,19 @@ func curve_inverse(t *testing.T, c Curve1D, delta float64) {
 		t.Parallel()
 		require.NoError(t, c.Prepare(), fmt.Sprintf("failed to prepare %s", c))
 		for i := range num {
-			x := float32(i) / float32(num-1)
+			x := unit_float(i) / unit_float(num-1)
 			y := c.Transform(x)
 			nx := c.InverseTransform(y)
-			require.InDelta(t, x, nx, delta, fmt.Sprintf("inversion of x=%f in curve %s failed: y=%f inv(y)=%f", x, c, y, nx))
+			in_delta(t, x, nx, delta, fmt.Sprintf("inversion of x=%f in curve %s failed: y=%f inv(y)=%f", x, c, y, nx))
 		}
 	})
 }
 
 func generate_sampled_curve(c Curve1D) Curve1D {
 	const num = 256 * 16
-	points := make([]float32, num)
+	points := make([]unit_float, num)
 	for i := range num {
-		x := float32(i) / float32(num-1)
+		x := unit_float(i) / unit_float(num-1)
 		points[i] = c.Transform(x)
 	}
 	return &PointsCurve{points: points}
@@ -237,9 +237,9 @@ func srgb_sampled_curve() *PointsCurve {
 	count := int(binary.BigEndian.Uint32(raw[8:12]))
 	points := make([]uint16, count)
 	binary.Decode(raw[12:], binary.BigEndian, points)
-	fp := make([]float32, len(points))
+	fp := make([]unit_float, len(points))
 	for i, p := range points {
-		fp[i] = float32(p) / math.MaxUint16
+		fp[i] = unit_float(p) / math.MaxUint16
 	}
 	c := &PointsCurve{points: fp}
 	c.Prepare()
@@ -258,14 +258,14 @@ func TestCurveInverse(t *testing.T) {
 	curve_inverse(t, srgb_sampled_curve(), 1e-3)
 }
 
-func srgb_to_linear(v float32) float32 {
+func srgb_to_linear(v unit_float) unit_float {
 	if v <= 0.0031308 {
 		return v * 12.92
 	}
-	return 1.055*pow32(float32(v), 1/2.4) - 0.055
+	return 1.055*pow32(unit_float(v), 1/2.4) - 0.055
 }
 
-func linear_to_srgb(v float32) float32 {
+func linear_to_srgb(v unit_float) unit_float {
 	if v <= 0.0031308*12.92 {
 		return v / 12.92
 	}
@@ -301,11 +301,11 @@ func TestParametricCurveTag_Transform(t *testing.T) {
 	sc := srgb_sampled_curve()
 	num := 4 * len(sc.points)
 	for i := range num {
-		x := float32(i) / float32(num-1)
-		require.InDelta(t, rc.Transform(x), linear_to_srgb(x), 1e-6, fmt.Sprintf("failed for analytic curve i=%d x=%f", i, x))
-		require.InDelta(t, rc.Transform(x), sc.Transform(x), 1e-5, fmt.Sprintf("failed for sampled curve i=%d x=%f", i, x))
+		x := unit_float(i) / unit_float(num-1)
+		in_delta(t, rc.Transform(x), linear_to_srgb(x), 1e-6, fmt.Sprintf("failed for analytic curve i=%d x=%f", i, x))
+		in_delta(t, rc.Transform(x), sc.Transform(x), 1e-5, fmt.Sprintf("failed for sampled curve i=%d x=%f", i, x))
 		// now test inverse transforms
-		require.InDelta(t, rc.InverseTransform(x), srgb_to_linear(x), 1e-6, fmt.Sprintf("failed for analytic inverse curve i=%d x=%f", i, x))
-		require.InDelta(t, rc.InverseTransform(x), sc.InverseTransform(x), 0.002, fmt.Sprintf("failed for sampled curve inverse i=%d x=%f", i, x))
+		in_delta(t, rc.InverseTransform(x), srgb_to_linear(x), 1e-6, fmt.Sprintf("failed for analytic inverse curve i=%d x=%f", i, x))
+		in_delta(t, rc.InverseTransform(x), sc.InverseTransform(x), 0.002, fmt.Sprintf("failed for sampled curve inverse i=%d x=%f", i, x))
 	}
 }

@@ -21,7 +21,7 @@ func (e *unsupported) Error() string {
 	return fmt.Sprintf("the tag: %s (0x%x) is not supported", e.sig, uint32(e.sig))
 }
 
-type XYZType struct{ x, y, z float32 }
+type XYZType struct{ x, y, z unit_float }
 
 func xyz_type(data []byte) XYZType {
 	return XYZType{readS15Fixed16BE(data[:4]), readS15Fixed16BE(data[4:8]), readS15Fixed16BE(data[8:12])}
@@ -190,7 +190,7 @@ func emptyTagTable() TagTable {
 }
 
 type ChannelTransformer interface {
-	Transform(output, workspace []float32, input ...float32)
+	Transform(output, workspace []unit_float, input ...unit_float)
 	IsSuitableFor(num_input_channels int, num_output_channels int) bool
 	WorkspaceSize() int
 }

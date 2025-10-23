@@ -23,7 +23,7 @@ func (m *ModularTag) WorkspaceSize() int { return m.workspace_size }
 func (m *ModularTag) IsSuitableFor(num_input_channels, num_output_channels int) bool {
 	return m.num_input_channels == num_input_channels && m.num_output_channels == num_output_channels
 }
-func (m *ModularTag) Transform(output, workspace []float32, inputs ...float32) {
+func (m *ModularTag) Transform(output, workspace []unit_float, inputs ...unit_float) {
 	for _, t := range m.transforms {
 		t.Transform(output, workspace, inputs...)
 	}

@@ -11,25 +11,25 @@ import (
 // Determinant lower than that are assumed zero (used on matrix invert)
 const MATRIX_DET_TOLERANCE = 0.0001
 
-func pow32(a, b float32) float32 { return float32(math.Pow(float64(a), float64(b))) }
-func abs32(a float32) float32    { return float32(math.Abs(float64(a))) }
+func pow32(a, b unit_float) unit_float { return unit_float(math.Pow(float64(a), float64(b))) }
+func abs32(a unit_float) unit_float    { return unit_float(math.Abs(float64(a))) }
 
 type IdentityCurve int
 type GammaCurve struct {
-	gamma, inv_gamma float32
+	gamma, inv_gamma unit_float
 	is_one           bool
 }
 type PointsCurve struct {
-	points, reverse_lookup   []float32
-	max_idx, reverse_max_idx float32
+	points, reverse_lookup   []unit_float
+	max_idx, reverse_max_idx unit_float
 }
-type ConditionalZeroCurve struct{ g, a, b, threshold, inv_gamma, inv_a float32 }
-type ConditionalCCurve struct{ g, a, b, c, threshold, inv_gamma, inv_a float32 }
-type SplitCurve struct{ g, a, b, c, d, inv_g, inv_a, inv_c, threshold float32 }
-type ComplexCurve struct{ g, a, b, c, d, e, f, inv_g, inv_a, inv_c, threshold float32 }
+type ConditionalZeroCurve struct{ g, a, b, threshold, inv_gamma, inv_a unit_float }
+type ConditionalCCurve struct{ g, a, b, c, threshold, inv_gamma, inv_a unit_float }
+type SplitCurve struct{ g, a, b, c, d, inv_g, inv_a, inv_c, threshold unit_float }
+type ComplexCurve struct{ g, a, b, c, d, e, f, inv_g, inv_a, inv_c, threshold unit_float }
 type Curve1D interface {
-	Transform(x float32) float32
-	InverseTransform(x float32) float32
+	Transform(x unit_float) unit_float
+	InverseTransform(x unit_float) unit_float
 	Prepare() error
 	String() string
 }
@@ -51,7 +51,7 @@ func (c CurveTransformer) IsSuitableFor(num_input_channels, num_output_channels 
 	return len(c.curves) == num_input_channels && len(c.curves) == num_output_channels
 }
 func (c CurveTransformer) WorkspaceSize() int { return 0 }
-func (c CurveTransformer) Transform(output, workspace []float32, inputs ...float32) {
+func (c CurveTransformer) Transform(output, workspace []unit_float, inputs ...unit_float) {
 	for i, x := range inputs {
 		output[i] = c.curves[i].Transform(x)
 	}
@@ -61,7 +61,7 @@ func (c InverseCurveTransformer) IsSuitableFor(num_input_channels, num_output_ch
 	return len(c.curves) == num_input_channels && len(c.curves) == num_output_channels
 }
 func (c InverseCurveTransformer) WorkspaceSize() int { return 0 }
-func (c InverseCurveTransformer) Transform(output, workspace []float32, inputs ...float32) {
+func (c InverseCurveTransformer) Transform(output, workspace []unit_float, inputs ...unit_float) {
 	for i, x := range inputs {
 		output[i] = c.curves[i].InverseTransform(x)
 	}
@@ -75,7 +75,7 @@ func (c CurveTransformer3) IsSuitableFor(num_input_channels, num_output_channels
 	return 3 == num_input_channels && 3 == num_output_channels
 }
 func (c CurveTransformer3) WorkspaceSize() int { return 0 }
-func (c CurveTransformer3) Transform(output, workspace []float32, inputs ...float32) {
+func (c CurveTransformer3) Transform(output, workspace []unit_float, inputs ...unit_float) {
 	output[0] = c.r.Transform(inputs[0])
 	output[1] = c.g.Transform(inputs[1])
 	output[2] = c.b.Transform(inputs[2])
@@ -92,7 +92,7 @@ func (c InverseCurveTransformer3) IsSuitableFor(num_input_channels, num_output_c
 	return 3 == num_input_channels && 3 == num_output_channels
 }
 func (c InverseCurveTransformer3) WorkspaceSize() int { return 0 }
-func (c InverseCurveTransformer3) Transform(output, workspace []float32, inputs ...float32) {
+func (c InverseCurveTransformer3) Transform(output, workspace []unit_float, inputs ...unit_float) {
 	output[0] = c.r.InverseTransform(inputs[0])
 	output[1] = c.g.InverseTransform(inputs[1])
 	output[2] = c.b.InverseTransform(inputs[2])
@@ -142,18 +142,18 @@ func align_to_4(x int) int {
 	return x
 }
 
-func fixed88ToFloat(raw []byte) float32 {
-	return float32(uint16(raw[0])<<8|uint16(raw[1])) / 256
+func fixed88ToFloat(raw []byte) unit_float {
+	return unit_float(uint16(raw[0])<<8|uint16(raw[1])) / 256
 }
 
-func samples_to_analytic(points []float32) Curve1D {
+func samples_to_analytic(points []unit_float) Curve1D {
 	if len(points) < 64 {
 		return nil
 	}
-	n := 1 / float32(len(points)-1)
+	n := 1 / unit_float(len(points)-1)
 	srgb := SRGBCurve().Transform
 	for i, y := range points {
-		x := float32(i) * n
+		x := unit_float(i) * n
 		if math.Abs(float64(y-srgb(x))) > 1e-3 {
 			return nil
 		}
@@ -186,9 +186,9 @@ func embeddedCurveDecoder(raw []byte) (any, int, error) {
 		if err != nil {
 			return nil, 0, errors.New("curv tag truncated")
 		}
-		fp := make([]float32, len(points))
+		fp := make([]unit_float, len(points))
 		for i, p := range points {
-			fp[i] = float32(p) / math.MaxUint16
+			fp[i] = unit_float(p) / math.MaxUint16
 		}
 		analytic := samples_to_analytic(fp)
 		if analytic != nil {
@@ -207,10 +207,10 @@ func curveDecoder(raw []byte) (any, error) {
 	return ans, err
 }
 
-func readS15Fixed16BE(raw []byte) float32 {
+func readS15Fixed16BE(raw []byte) unit_float {
 	msb := int16(raw[0])<<8 | int16(raw[1])
 	lsb := uint16(raw[2])<<8 | uint16(raw[3])
-	return float32(msb) + float32(lsb)/65536
+	return unit_float(msb) + unit_float(lsb)/65536
 }
 
 func embeddedParametricCurveDecoder(raw []byte) (ans any, consumed int, err error) {
@@ -221,7 +221,7 @@ func embeddedParametricCurveDecoder(raw []byte) (ans any, consumed int, err erro
 	funcType := ParametricCurveFunction(binary.BigEndian.Uint16(raw[8:10]))
 	const header_len = 12
 	raw = raw[header_len:]
-	p := func() float32 {
+	p := func() unit_float {
 		ans := readS15Fixed16BE(raw[:4])
 		raw = raw[4:]
 		return ans
@@ -270,18 +270,18 @@ func parametricCurveDecoder(raw []byte) (any, error) {
 	return ans, err
 }
 
-func (c IdentityCurve) Transform(x float32) float32 {
+func (c IdentityCurve) Transform(x unit_float) unit_float {
 	return x
 }
 
-func (c IdentityCurve) InverseTransform(x float32) float32 {
+func (c IdentityCurve) InverseTransform(x unit_float) unit_float {
 	return x
 }
 
 func (c IdentityCurve) Prepare() error { return nil }
 func (c IdentityCurve) String() string { return "IdentityCurve{}" }
 
-func (c GammaCurve) Transform(x float32) float32 {
+func (c GammaCurve) Transform(x unit_float) unit_float {
 	if x < 0 {
 		if c.is_one {
 			return x
@@ -291,7 +291,7 @@ func (c GammaCurve) Transform(x float32) float32 {
 	return pow32(x, c.gamma)
 }
 
-func (c GammaCurve) InverseTransform(x float32) float32 {
+func (c GammaCurve) InverseTransform(x unit_float) unit_float {
 	if x < 0 {
 		if c.is_one {
 			return x
@@ -311,26 +311,26 @@ func (c *GammaCurve) Prepare() error {
 }
 func (c GammaCurve) String() string { return fmt.Sprintf("GammaCurve{%f}", c.gamma) }
 
-func sampled_value(samples []float32, max_idx float32, x float32) float32 {
+func sampled_value(samples []unit_float, max_idx unit_float, x unit_float) unit_float {
 	idx := x * max_idx
-	lof := float32(math.Trunc(float64(idx)))
+	lof := unit_float(math.Trunc(float64(idx)))
 	lo := int(lof)
 	if lof == idx {
 		return samples[lo]
 	}
-	p := idx - float32(lo)
-	vhi := float32(samples[lo+1])
-	vlo := float32(samples[lo])
+	p := idx - unit_float(lo)
+	vhi := unit_float(samples[lo+1])
+	vlo := unit_float(samples[lo])
 	return vlo + p*(vhi-vlo)
 }
 
-func calculate_reverse_for_well_behaved_sampled_curve(points []float32) []float32 {
+func calculate_reverse_for_well_behaved_sampled_curve(points []unit_float) []unit_float {
 	n := len(points) - 1
 	if n < 1 {
 		return nil
 	}
-	var prev, maxy float32
-	var miny float32 = math.MaxFloat32
+	var prev, maxy unit_float
+	var miny unit_float = math.MaxFloat32
 	for _, y := range points {
 		if y < prev || y < 0 || y > 1 {
 			return nil // not monotonic or range not in [0, 1]
@@ -339,20 +339,20 @@ func calculate_reverse_for_well_behaved_sampled_curve(points []float32) []float3
 		miny = min(y, miny)
 		maxy = max(y, maxy)
 	}
-	y_to_x := make([]float32, n+1)
+	y_to_x := make([]unit_float, n+1)
 	points_y_idx := 0
-	n_inv := 1.0 / float32(n)
+	n_inv := 1.0 / unit_float(n)
 	for i := range y_to_x {
 		if points_y_idx > n {
 			// we are between maxy and 1
 			y_to_x[i] = 1
 			continue
 		}
-		if int(points[points_y_idx]*float32(n)) == i {
-			y_to_x[i] = float32(points_y_idx) * n_inv
+		if int(points[points_y_idx]*unit_float(n)) == i {
+			y_to_x[i] = unit_float(points_y_idx) * n_inv
 			for {
 				points_y_idx++
-				if points_y_idx > n || int(points[points_y_idx]*float32(n)) != i {
+				if points_y_idx > n || int(points[points_y_idx]*unit_float(n)) != i {
 					break
 				}
 			}
@@ -375,9 +375,9 @@ func calculate_reverse_for_well_behaved_sampled_curve(points []float32) []float3
 					y2 = points[points_y_idx]
 				}
 			}
-			y := float32(i) * n_inv
+			y := unit_float(i) * n_inv
 			frac := (y - y1) / (y2 - y1)
-			x1 := float32(points_y_idx-1) * n_inv
+			x1 := unit_float(points_y_idx-1) * n_inv
 			// x = x1 + frac * (x2 - x1)
 			y_to_x[i] = x1 + frac*n_inv
 		}
@@ -386,12 +386,12 @@ func calculate_reverse_for_well_behaved_sampled_curve(points []float32) []float3
 }
 
 func (c *PointsCurve) Prepare() error {
-	c.max_idx = float32(len(c.points) - 1)
+	c.max_idx = unit_float(len(c.points) - 1)
 	reverse_lookup := calculate_reverse_for_well_behaved_sampled_curve(c.points)
 	if reverse_lookup == nil {
-		reverse_lookup = make([]float32, len(c.points))
+		reverse_lookup = make([]unit_float, len(c.points))
 		for i := range len(reverse_lookup) {
-			y := float32(i) / float32(len(reverse_lookup)-1)
+			y := unit_float(i) / unit_float(len(reverse_lookup)-1)
 			idx := get_interval(c.points, y)
 			if idx < 0 {
 				reverse_lookup[i] = 0
@@ -400,27 +400,27 @@ func (c *PointsCurve) Prepare() error {
 				if y2 < y1 {
 					y1, y2 = y2, y1
 				}
-				x1, x2 := float32(idx)/c.max_idx, float32(idx+1)/c.max_idx
+				x1, x2 := unit_float(idx)/c.max_idx, unit_float(idx+1)/c.max_idx
 				frac := (y - y1) / (y2 - y1)
 				reverse_lookup[i] = x1 + frac*(x2-x1)
 			}
 		}
 	}
 	c.reverse_lookup = reverse_lookup
-	c.reverse_max_idx = float32(len(reverse_lookup) - 1)
+	c.reverse_max_idx = unit_float(len(reverse_lookup) - 1)
 	return nil
 }
 
-func (c PointsCurve) Transform(v float32) float32 {
+func (c PointsCurve) Transform(v unit_float) unit_float {
 	return sampled_value(c.points, c.max_idx, v)
 }
 
-func (c PointsCurve) InverseTransform(v float32) float32 {
+func (c PointsCurve) InverseTransform(v unit_float) unit_float {
 	return sampled_value(c.reverse_lookup, c.reverse_max_idx, v)
 }
 func (c PointsCurve) String() string { return fmt.Sprintf("PointsCurve{%d}", len(c.points)) }
 
-func get_interval(lookup []float32, y float32) int {
+func get_interval(lookup []unit_float, y unit_float) int {
 	if len(lookup) < 2 {
 		return -1
 	}
@@ -448,7 +448,7 @@ func (c *ConditionalZeroCurve) String() string {
 	return fmt.Sprintf("ConditionalZeroCurve{a: %v b: %v g: %v}", c.a, c.b, c.g)
 }
 
-func (c *ConditionalZeroCurve) Transform(x float32) float32 {
+func (c *ConditionalZeroCurve) Transform(x unit_float) unit_float {
 	// Y = (aX+b)^g if X ≥ -b/a else 0
 	if x >= c.threshold {
 		if e := c.a*x + c.b; e > 0 {
@@ -458,7 +458,7 @@ func (c *ConditionalZeroCurve) Transform(x float32) float32 {
 	return 0
 }
 
-func (c *ConditionalZeroCurve) InverseTransform(y float32) float32 {
+func (c *ConditionalZeroCurve) InverseTransform(y unit_float) unit_float {
 	// X = (Y^(1/g) - b) / a if Y >= 0 else X = -b/a
 	// the below doesnt match the actual spec but matches lcms2 implementation
 	return max(0, (pow32(y, c.inv_gamma)-c.b)*c.inv_a)
@@ -476,7 +476,7 @@ func (c *ConditionalCCurve) String() string {
 	return fmt.Sprintf("ConditionalCCurve{a: %v b: %v c: %v g: %v}", c.a, c.b, c.c, c.g)
 }
 
-func (c *ConditionalCCurve) Transform(x float32) float32 {
+func (c *ConditionalCCurve) Transform(x unit_float) unit_float {
 	// Y = (aX+b)^g + c if X ≥ -b/a else c
 	if x >= c.threshold {
 		if e := c.a*x + c.b; e > 0 {
@@ -487,7 +487,7 @@ func (c *ConditionalCCurve) Transform(x float32) float32 {
 	return c.c
 }
 
-func (c *ConditionalCCurve) InverseTransform(y float32) float32 {
+func (c *ConditionalCCurve) InverseTransform(y unit_float) unit_float {
 	// X = ((Y-c)^(1/g) - b) / a if Y >= c else X = -b/a
 	if e := y - c.c; e >= 0 {
 		if e == 0 {
@@ -510,7 +510,7 @@ func (c *SplitCurve) String() string {
 	return fmt.Sprintf("SplitCurve{a: %v b: %v c: %v d: %v g: %v}", c.a, c.b, c.c, c.d, c.g)
 }
 
-func (c *SplitCurve) Transform(x float32) float32 {
+func (c *SplitCurve) Transform(x unit_float) unit_float {
 	// Y = (aX+b)^g if X ≥ d else cX
 	if x >= c.d {
 		if e := c.a*x + c.b; e > 0 {
@@ -521,7 +521,7 @@ func (c *SplitCurve) Transform(x float32) float32 {
 	return c.c * x
 }
 
-func (c *SplitCurve) InverseTransform(y float32) float32 {
+func (c *SplitCurve) InverseTransform(y unit_float) unit_float {
 	// X=((Y^1/g-b)/a)    | Y >= (ad+b)^g
 	// X=Y/c              | Y< (ad+b)^g
 	if y < c.threshold {
@@ -542,7 +542,7 @@ func (c *ComplexCurve) String() string {
 	return fmt.Sprintf("ComplexCurve{a: %v b: %v c: %v d: %v e: %v f: %v g: %v}", c.a, c.b, c.c, c.d, c.e, c.f, c.g)
 }
 
-func (c *ComplexCurve) Transform(x float32) float32 {
+func (c *ComplexCurve) Transform(x unit_float) unit_float {
 	// Y = (aX+b)^g + e if X ≥ d else cX+f
 	if x >= c.d {
 		if e := c.a*x + c.b; e > 0 {
@@ -553,7 +553,7 @@ func (c *ComplexCurve) Transform(x float32) float32 {
 	return c.c*x + c.f
 }
 
-func (c *ComplexCurve) InverseTransform(y float32) float32 {
+func (c *ComplexCurve) InverseTransform(y unit_float) unit_float {
 	// X=((Y-e)1/g-b)/a   | Y >=(ad+b)^g+e), cd+f
 	// X=(Y-f)/c          | else
 	if y < c.threshold {

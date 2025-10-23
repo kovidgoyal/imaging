@@ -5,6 +5,8 @@ import (
 	"time"
 )
 
+type unit_float float32
+
 type Header struct {
 	ProfileSize            uint32
 	PreferredCMM           Signature
