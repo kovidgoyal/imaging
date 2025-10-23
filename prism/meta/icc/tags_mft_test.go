@@ -28,7 +28,7 @@ func (m *MFT) as_bytes() []byte {
 			}
 		}
 	case *IdentityMatrix:
-		for _, x := range []float64{1, 0, 0, 0, 1, 0, 0, 0, 1} {
+		for _, x := range []float32{1, 0, 0, 0, 1, 0, 0, 0, 1} {
 			buf.Write(encodeS15Fixed16BE(x))
 		}
 	case *MatrixWithOffset:
@@ -43,9 +43,9 @@ func (m *MFT) as_bytes() []byte {
 	default:
 		panic(fmt.Sprintf("unknown type of matrix: %T", m))
 	}
-	var writeval func(float64)
+	var writeval func(float32)
 	if m.is8bit {
-		writeval = func(x float64) { buf.WriteByte(uint8(x * 255)) }
+		writeval = func(x float32) { buf.WriteByte(uint8(x * 255)) }
 		for _, c := range m.input_curves {
 			if len(c) != 256 {
 				panic("mft1 must have curves of length 256")
@@ -58,7 +58,7 @@ func (m *MFT) as_bytes() []byte {
 		}
 	} else {
 		binary.Write(&buf, binary.BigEndian, []uint16{uint16(len(m.input_curves[0])), uint16(len(m.output_curves[0]))})
-		writeval = func(x float64) { binary.Write(&buf, binary.BigEndian, uint16(x*65535)) }
+		writeval = func(x float32) { binary.Write(&buf, binary.BigEndian, uint16(x*65535)) }
 	}
 	for _, curve := range m.input_curves {
 		for _, x := range curve {
@@ -93,10 +93,10 @@ func (a *MFT) require_equal(t *testing.T, b *MFT) {
 	}
 }
 
-func make_curve(l int) []float64 {
-	curve := make([]float64, l)
+func make_curve(l int) []float32 {
+	curve := make([]float32, l)
 	for i := range len(curve) {
-		curve[i] = float64(i) / float64(l)
+		curve[i] = float32(i) / float32(l)
 	}
 	return curve
 }
@@ -107,7 +107,7 @@ func TestMFTTag(t *testing.T) {
 	im := IdentityMatrix(0)
 	m := MFT{
 		in_channels: 3, out_channels: 3, grid_points: gp,
-		input_curves: [][]float64{c, c, c}, output_curves: [][]float64{c, c, c},
+		input_curves: [][]float32{c, c, c}, output_curves: [][]float32{c, c, c},
 		clut: make_curve(expectedValues(gp, 3)), matrix: &im,
 	}
 
@@ -122,7 +122,7 @@ func TestMFTTag(t *testing.T) {
 	roundtrip()
 	m.is8bit = true
 	c = make_curve(256)
-	m.input_curves = [][]float64{c, c, c}
-	m.output_curves = [][]float64{c, c, c}
+	m.input_curves = [][]float32{c, c, c}
+	m.output_curves = [][]float32{c, c, c}
 	roundtrip()
 }

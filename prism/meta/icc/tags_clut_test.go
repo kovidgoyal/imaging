@@ -83,14 +83,14 @@ func TestCLUTDecoder(t *testing.T) {
 }
 
 func TestCLUTTransform(t *testing.T) {
-	var output, workspace [16]float64
+	var output, workspace [16]float32
 	out, work := output[:], workspace[:]
 	t.Run("HappyPath_1D", func(t *testing.T) {
 		clut := &CLUTTag{
 			InputChannels:  1,
 			OutputChannels: 1,
 			GridPoints:     []int{2},
-			Values:         []float64{0.0, 1.0}, // 2 values: for 1D input, 1 output channel
+			Values:         []float32{0.0, 1.0}, // 2 values: for 1D input, 1 output channel
 		}
 		// Test input 0.0 → should return 0.0
 		err := clut.Transform(out, work, 0.0)
@@ -110,7 +110,7 @@ func TestCLUTTransform(t *testing.T) {
 			InputChannels:  3,
 			OutputChannels: 1,
 			GridPoints:     []int{2, 2, 2},
-			Values: []float64{
+			Values: []float32{
 				0.0, 0.1, 0.2, 0.3,
 				0.4, 0.5, 0.6, 1.0,
 			}, // 8 points, 1 output each
@@ -125,7 +125,7 @@ func TestCLUTTransform(t *testing.T) {
 }
 
 func TestClamp01(t *testing.T) {
-	require.Equal(t, float64(1), clamp01(1.0001))
-	require.Equal(t, float64(0), clamp01(-1))
-	require.Equal(t, float64(0.5), clamp01(0.5))
+	require.Equal(t, float32(1), clamp01(1.0001))
+	require.Equal(t, float32(0), clamp01(-1))
+	require.Equal(t, float32(0.5), clamp01(0.5))
 }

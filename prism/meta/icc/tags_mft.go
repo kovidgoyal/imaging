@@ -12,8 +12,8 @@ var _ = fmt.Print
 type MFT struct {
 	in_channels, out_channels   int
 	grid_points                 []int
-	input_curves, output_curves [][]float64
-	clut                        []float64
+	input_curves, output_curves [][]float32
+	clut                        []float32
 	matrix                      ChannelTransformer
 	is8bit                      bool
 }
@@ -26,10 +26,10 @@ func (c *MFT) IsSuitableFor(num_input_channels, num_output_channels int) bool {
 
 var _ ChannelTransformer = (*MFT)(nil)
 
-func linear_interpolate_1d(val float64, table []float64) float64 {
+func linear_interpolate_1d(val float32, table []float32) float32 {
 	val = clamp01(val)
-	pos := val * float64(len(table)-1)
-	lof := math.Trunc(pos)
+	pos := val * float32(len(table)-1)
+	lof := float32(math.Trunc(float64(pos)))
 	lo := int(lof)
 	if lof == pos {
 		return table[lo]
@@ -40,7 +40,7 @@ func linear_interpolate_1d(val float64, table []float64) float64 {
 	return vlo + frac*(vhi-vlo)
 }
 
-func (mft *MFT) Transform(output, workspace []float64, inputs ...float64) error {
+func (mft *MFT) Transform(output, workspace []float32, inputs ...float32) error {
 	mapped := workspace[0:mft.in_channels]
 	workspace = workspace[mft.in_channels:]
 	for o := range mft.out_channels {
@@ -61,25 +61,25 @@ func (mft *MFT) Transform(output, workspace []float64, inputs ...float64) error 
 	return nil
 }
 
-func load_8bit_table(raw []byte, n int) (output []float64, leftover []byte, err error) {
+func load_8bit_table(raw []byte, n int) (output []float32, leftover []byte, err error) {
 	if len(raw) < n {
 		return nil, raw, fmt.Errorf("mft2 tag too short")
 	}
-	output = make([]float64, n)
+	output = make([]float32, n)
 	for i := range n {
-		output[i] = float64(raw[0]) / 255
+		output[i] = float32(raw[0]) / 255
 		raw = raw[1:]
 	}
 	return output, raw, nil
 }
 
-func load_16bit_table(raw []byte, n int) (output []float64, leftover []byte, err error) {
+func load_16bit_table(raw []byte, n int) (output []float32, leftover []byte, err error) {
 	if len(raw) < 2*n {
 		return nil, raw, fmt.Errorf("mft2 tag too short")
 	}
-	output = make([]float64, n)
+	output = make([]float32, n)
 	for i := range n {
-		output[i] = float64(binary.BigEndian.Uint16(raw[:2])) / 65535
+		output[i] = float32(binary.BigEndian.Uint16(raw[:2])) / 65535
 		raw = raw[2:]
 	}
 	return output, raw, nil
@@ -107,9 +107,9 @@ func load_mft_header(raw []byte) (ans *MFT, leftover []byte, err error) {
 	return &a, raw[48:], nil
 }
 
-func load_mft_body(a *MFT, raw []byte, load_table func([]byte, int) ([]float64, []byte, error), input_table_entries, output_table_entries int) (err error) {
-	a.input_curves = make([][]float64, a.in_channels)
-	a.output_curves = make([][]float64, a.out_channels)
+func load_mft_body(a *MFT, raw []byte, load_table func([]byte, int) ([]float32, []byte, error), input_table_entries, output_table_entries int) (err error) {
+	a.input_curves = make([][]float32, a.in_channels)
+	a.output_curves = make([][]float32, a.out_channels)
 	for i := range a.in_channels {
 		if a.input_curves[i], raw, err = load_table(raw, input_table_entries); err != nil {
 			return err

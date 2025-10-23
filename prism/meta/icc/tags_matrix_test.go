@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-func encode_matrix_vals(values ...float64) string {
+func encode_matrix_vals(values ...float32) string {
 	var buf bytes.Buffer
 	for _, v := range values {
 		buf.Write(encodeS15Fixed16BE(v))
@@ -15,8 +15,8 @@ func encode_matrix_vals(values ...float64) string {
 	return buf.String()
 }
 
-func identity_matrix(offset1, offset2, offset3 float64) []float64 {
-	return []float64{
+func identity_matrix(offset1, offset2, offset3 float32) []float32 {
+	return []float32{
 		1.0, 0.0, 0.0,
 		0.0, 1.0, 0.0,
 		0.0, 0.0, 1.0,
@@ -31,7 +31,7 @@ func TestMtxDecoder(t *testing.T) {
 		buf.WriteString("mtx ")       // Name
 		buf.Write([]byte{0, 0, 0, 0}) // Reserved
 		// Write 9 matrix values
-		values := []float64{
+		values := []float32{
 			1.0, 0.0, 0.0,
 			0.0, 1.0, 0.0,
 			0.0, 0.0, 1.0,
@@ -40,7 +40,7 @@ func TestMtxDecoder(t *testing.T) {
 			buf.Write(encodeS15Fixed16BE(v))
 		}
 		// Write 3 offset values
-		offsets := []float64{0.1, 0.2, 0.3}
+		offsets := []float32{0.1, 0.2, 0.3}
 		for _, v := range offsets {
 			buf.Write(encodeS15Fixed16BE(v))
 		}
@@ -61,7 +61,7 @@ func TestMtxDecoder(t *testing.T) {
 		buf.WriteString("mtx ")       // Name
 		buf.Write([]byte{0, 0, 0, 0}) // Reserved
 		// Write only the 9 matrix values (no offsets)
-		values := []float64{
+		values := []float32{
 			1.0, 2.0, 3.0,
 			4.0, 5.0, 6.0,
 			7.0, 8.0, 9.0,
@@ -88,14 +88,14 @@ func TestMtxDecoder(t *testing.T) {
 }
 
 func TestMatrixTag_Transform(t *testing.T) {
-	output := make([]float64, 3)
+	output := make([]float32, 3)
 	t.Run("SuccessWithoutOffset", func(t *testing.T) {
 		matrix := &Matrix3{
 			{1, 0, 0},
 			{0, 1, 0},
 			{0, 0, 1},
 		}
-		input := []float64{0.5, 0.25, 0.75}
+		input := []float32{0.5, 0.25, 0.75}
 		err := matrix.Transform(output, nil, input...)
 		require.NoError(t, err)
 		assert.InDeltaSlice(t, input, output, 0.0001)
@@ -109,8 +109,8 @@ func TestMatrixTag_Transform(t *testing.T) {
 			},
 			offset1: 0.1, offset2: 0.2, offset3: 0.3,
 		}
-		input := []float64{0.5, 0.25, 0.75}
-		expected := []float64{0.6, 0.45, 1.05} // input + offset
+		input := []float32{0.5, 0.25, 0.75}
+		expected := []float32{0.6, 0.45, 1.05} // input + offset
 		err := matrix.Transform(output, nil, input...)
 		require.NoError(t, err)
 		assert.InDeltaSlice(t, expected, output, 0.0001)
@@ -121,8 +121,8 @@ func TestMatrixTag_Transform(t *testing.T) {
 			{0, 3, 0},
 			{0, 0, 4},
 		}
-		input := []float64{1, 1, 1}
-		expected := []float64{2, 3, 4}
+		input := []float32{1, 1, 1}
+		expected := []float32{2, 3, 4}
 		err := matrix.Transform(output, nil, input...)
 		require.NoError(t, err)
 		assert.InDeltaSlice(t, expected, output, 0.0001)

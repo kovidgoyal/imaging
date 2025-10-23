@@ -6,14 +6,14 @@ import (
 	"testing"
 )
 
-func encodeS15Fixed16BE(value float64) []byte {
+func encodeS15Fixed16BE(value float32) []byte {
 	if value > 32767 {
 		value = 32767
 	} else if value < -32768 {
 		value = -32768
 	}
 	intPart := int16(value)
-	fracPart := uint16((value - float64(intPart)) * 65536.0)
+	fracPart := uint16((value - float32(intPart)) * 65536.0)
 	result := make([]byte, 4)
 	binary.BigEndian.PutUint16(result[0:2], uint16(intPart))
 	binary.BigEndian.PutUint16(result[2:4], fracPart)
@@ -39,6 +39,6 @@ func TestReadS15Fixed16BE(t *testing.T) {
 	})
 	t.Run("Zero", func(t *testing.T) {
 		val := readS15Fixed16BE([]byte{0x00, 0x00, 0x00, 0x00})
-		assert.Equal(t, 0.0, val)
+		assert.Equal(t, float32(0), val)
 	})
 }

@@ -11,7 +11,7 @@ type CLUTTag struct {
 	GridPoints     []int // e.g., [17,17,17] for 3D CLUT
 	InputChannels  int
 	OutputChannels int
-	Values         []float64 // flattened [in1, in2, ..., out1, out2, ...]
+	Values         []float32 // flattened [in1, in2, ..., out1, out2, ...]
 }
 
 var _ ChannelTransformer = (*CLUTTag)(nil)
@@ -34,7 +34,7 @@ func embeddedClutDecoder(raw []byte, InputChannels, OutputChannels int) (any, er
 	raw = raw[20:]
 	// expected size: (product of grid points) * output channels * bytes_per_channel
 	expected_num_of_values := expectedValues(gridPoints, OutputChannels)
-	values := make([]float64, expected_num_of_values)
+	values := make([]float32, expected_num_of_values)
 	if len(values)*int(bytes_per_channel) > len(raw) {
 		return nil, fmt.Errorf("CLUT unexpected body length: expected %d, got %d", expected_num_of_values*int(bytes_per_channel), len(raw))
 	}
@@ -42,11 +42,11 @@ func embeddedClutDecoder(raw []byte, InputChannels, OutputChannels int) (any, er
 	switch bytes_per_channel {
 	case 1:
 		for i, b := range raw[:len(values)] {
-			values[i] = float64(b) / 255
+			values[i] = float32(b) / 255
 		}
 	case 2:
 		for i := range len(values) {
-			values[i] = float64(binary.BigEndian.Uint16(raw[i*2:i*2+2])) / 65535
+			values[i] = float32(binary.BigEndian.Uint16(raw[i*2:i*2+2])) / 65535
 		}
 	}
 	ans := &CLUTTag{
@@ -75,11 +75,11 @@ func (c *CLUTTag) IsSuitableFor(num_input_channels, num_output_channels int) boo
 	return num_input_channels == int(c.InputChannels) && num_output_channels == c.OutputChannels && num_input_channels <= 6
 }
 
-func clut_trilinear_interpolate(input_channels int, grid_points []int, values []float64, out []float64, gridPos []int, gridFrac []float64) {
+func clut_trilinear_interpolate(input_channels int, grid_points []int, values []float32, out []float32, gridPos []int, gridFrac []float32) {
 	numCorners := 1 << input_channels // 2^inputs
 	// walk all corners of the hypercube
 	for corner := range numCorners {
-		weight := 1.0
+		weight := float32(1.0)
 		idx := 0
 		stride := 1
 		for dim := input_channels - 1; dim >= 0; dim-- {
@@ -100,19 +100,19 @@ func clut_trilinear_interpolate(input_channels int, grid_points []int, values []
 	}
 }
 
-func clut_transform(input_channels, output_channels int, grid_points []int, values []float64, output, workspace []float64, inputs []float64) {
+func clut_transform(input_channels, output_channels int, grid_points []int, values []float32, output, workspace []float32, inputs []float32) {
 	gridFrac := workspace[0:input_channels]
 	var buf [6]int
 	gridPos := buf[:]
 	for i, v := range inputs {
 		nPoints := grid_points[i]
-		pos := clamp01(v) * float64(nPoints-1)
+		pos := clamp01(v) * float32(nPoints-1)
 		gridPos[i] = int(pos)
 		if gridPos[i] >= nPoints-1 {
 			gridPos[i] = nPoints - 2 // clamp
 			gridFrac[i] = 1.0
 		} else {
-			gridFrac[i] = pos - float64(gridPos[i])
+			gridFrac[i] = pos - float32(gridPos[i])
 		}
 	}
 	for i := range output_channels {
@@ -121,11 +121,11 @@ func clut_transform(input_channels, output_channels int, grid_points []int, valu
 	clut_trilinear_interpolate(input_channels, grid_points, values, output[:output_channels], gridPos, gridFrac)
 }
 
-func (c *CLUTTag) Transform(output, workspace []float64, inputs ...float64) error {
+func (c *CLUTTag) Transform(output, workspace []float32, inputs ...float32) error {
 	clut_transform(c.InputChannels, c.OutputChannels, c.GridPoints, c.Values, output, workspace, inputs)
 	return nil
 }
 
-func clamp01(v float64) float64 {
+func clamp01(v float32) float32 {
 	return max(0, min(v, 1))
 }

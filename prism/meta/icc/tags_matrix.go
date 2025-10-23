@@ -5,12 +5,12 @@ import (
 	"fmt"
 )
 
-type Matrix3 [3][3]float64
+type Matrix3 [3][3]float32
 type IdentityMatrix int
 
 type MatrixWithOffset struct {
 	m                         ChannelTransformer
-	offset1, offset2, offset3 float64
+	offset1, offset2, offset3 float32
 }
 
 func is_identity_matrix(m *Matrix3) bool {
@@ -68,7 +68,7 @@ func matrixDecoder(raw []byte) (any, error) {
 	return embeddedMatrixDecoder(raw[8:])
 }
 
-func (m *Matrix3) Transform(output, workspace []float64, inputs ...float64) error {
+func (m *Matrix3) Transform(output, workspace []float32, inputs ...float32) error {
 	output[0] = m[0][0]*inputs[0] + m[0][1]*inputs[1] + m[0][2]*inputs[2]
 	output[1] = m[1][0]*inputs[0] + m[1][1]*inputs[1] + m[1][2]*inputs[2]
 	output[2] = m[2][0]*inputs[0] + m[2][1]*inputs[1] + m[2][2]*inputs[2]
@@ -109,12 +109,12 @@ func (mat *Matrix3) Inverted() (ans Matrix3, err error) {
 	return
 }
 
-func (m IdentityMatrix) Transform(output, workspace []float64, inputs ...float64) error {
+func (m IdentityMatrix) Transform(output, workspace []float32, inputs ...float32) error {
 	copy(output, inputs)
 	return nil
 }
 
-func (m *MatrixWithOffset) Transform(output, workspace []float64, inputs ...float64) error {
+func (m *MatrixWithOffset) Transform(output, workspace []float32, inputs ...float32) error {
 	m.m.Transform(output, nil, inputs...)
 	output[0] += m.offset1
 	output[1] += m.offset2
