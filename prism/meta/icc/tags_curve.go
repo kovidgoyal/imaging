@@ -16,8 +16,8 @@ type GammaCurve struct {
 	is_one           bool
 }
 type PointsCurve struct {
-	points, reverse_lookup []float64
-	max_idx                float64
+	points, reverse_lookup   []float64
+	max_idx, reverse_max_idx float64
 }
 type ConditionalZeroCurve struct{ g, a, b, threshold, inv_gamma, inv_a float64 }
 type ConditionalCCurve struct{ g, a, b, c, threshold, inv_gamma, inv_a float64 }
@@ -297,25 +297,101 @@ func sampled_value(samples []float64, max_idx float64, x float64) float64 {
 	return vlo + p*(vhi-vlo)
 }
 
+func calculate_reverse_for_well_behaved_sampled_curve(points []float64) []float64 {
+	n := len(points) - 1
+	if n < 1 {
+		return nil
+	}
+	var prev, maxy float64
+	var miny float64 = math.MaxFloat64
+	required_samples := n
+	for _, y := range points {
+		if y < prev || y < 0 || y > 1 {
+			return nil // not monotonic or range not in [0, 1]
+		}
+		if y != prev {
+			// make sure y and prev have distinct indices in an array of length required_samples
+			for {
+				iy := int(float64(required_samples) * y)
+				iprev := int(float64(required_samples) * prev)
+				if iy != iprev {
+					break
+				}
+				required_samples *= 2
+			}
+		}
+		prev = y
+		miny = min(y, miny)
+		maxy = max(y, maxy)
+	}
+	r := maxy - miny
+	if r != 1 {
+		return nil
+	}
+	y_to_x := make([]float64, required_samples+1)
+	points_y_idx := 0
+	n_inv := 1.0 / float64(n)
+	for i := range y_to_x {
+		if points_y_idx > n {
+			// we are between maxy and 1
+			y_to_x[i] = 1
+			continue
+		}
+		if int(points[points_y_idx]*float64(required_samples)) == i {
+			y_to_x[i] = float64(points_y_idx) * n_inv
+			points_y_idx++
+		} else {
+			if points_y_idx == 0 {
+				// we are between 0 and miny
+				y_to_x[i] = 0
+				continue
+			}
+			// we are between points_y_idx-1 and points_y_idx
+			y1, y2 := points[points_y_idx-1], points[points_y_idx]
+			if y1 == 1 {
+				y_to_x[i] = 1
+				continue
+			}
+			for y1 == y2 {
+				points_y_idx++
+				y2 = 1
+				if points_y_idx <= n {
+					y2 = points[points_y_idx]
+				}
+			}
+			y := float64(i) / float64(required_samples)
+			frac := (y - y1) / (y2 - y1)
+			x1 := float64(points_y_idx-1) * n_inv
+			// y is x1 + frac * (x2 - x1)
+			y_to_x[i] = x1 + frac*n_inv
+		}
+	}
+	return y_to_x
+}
+
 func (c *PointsCurve) Prepare() error {
 	c.max_idx = float64(len(c.points) - 1)
-	reverse_lookup := make([]float64, len(c.points))
-	for i := range len(reverse_lookup) {
-		y := float64(i) / float64(len(reverse_lookup)-1)
-		idx := get_interval(c.points, y)
-		if idx < 0 {
-			reverse_lookup[i] = 0
-		} else {
-			y1, y2 := c.points[idx], c.points[idx+1]
-			if y2 < y1 {
-				y1, y2 = y2, y1
+	reverse_lookup := calculate_reverse_for_well_behaved_sampled_curve(c.points)
+	if reverse_lookup == nil {
+		reverse_lookup = make([]float64, len(c.points))
+		for i := range len(reverse_lookup) {
+			y := float64(i) / float64(len(reverse_lookup)-1)
+			idx := get_interval(c.points, y)
+			if idx < 0 {
+				reverse_lookup[i] = 0
+			} else {
+				y1, y2 := c.points[idx], c.points[idx+1]
+				if y2 < y1 {
+					y1, y2 = y2, y1
+				}
+				x1, x2 := float64(idx)/c.max_idx, float64(idx+1)/c.max_idx
+				frac := (y - y1) / (y2 - y1)
+				reverse_lookup[i] = x1 + frac*(x2-x1)
 			}
-			x1, x2 := float64(idx)/c.max_idx, float64(idx+1)/c.max_idx
-			frac := (y - y1) / (y2 - y1)
-			reverse_lookup[i] = x1 + frac*(x2-x1)
 		}
 	}
 	c.reverse_lookup = reverse_lookup
+	c.reverse_max_idx = float64(len(reverse_lookup) - 1)
 	return nil
 }
 
@@ -324,7 +400,7 @@ func (c PointsCurve) Transform(v float64) float64 {
 }
 
 func (c PointsCurve) InverseTransform(v float64) float64 {
-	return sampled_value(c.reverse_lookup, c.max_idx, v)
+	return sampled_value(c.reverse_lookup, c.reverse_max_idx, v)
 }
 func (c PointsCurve) String() string { return fmt.Sprintf("PointsCurve{%d}", len(c.points)) }
 
