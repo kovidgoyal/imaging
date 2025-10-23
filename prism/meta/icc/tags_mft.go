@@ -40,7 +40,7 @@ func linear_interpolate_1d(val float32, table []float32) float32 {
 	return vlo + frac*(vhi-vlo)
 }
 
-func (mft *MFT) Transform(output, workspace []float32, inputs ...float32) error {
+func (mft *MFT) Transform(output, workspace []float32, inputs ...float32) {
 	mapped := workspace[0:mft.in_channels]
 	workspace = workspace[mft.in_channels:]
 	for o := range mft.out_channels {
@@ -58,7 +58,6 @@ func (mft *MFT) Transform(output, workspace []float32, inputs ...float32) error 
 	for i := range mft.out_channels {
 		output[i] = linear_interpolate_1d(output[i], mft.output_curves[i])
 	}
-	return nil
 }
 
 func load_8bit_table(raw []byte, n int) (output []float32, leftover []byte, err error) {

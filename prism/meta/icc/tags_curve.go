@@ -51,22 +51,20 @@ func (c CurveTransformer) IsSuitableFor(num_input_channels, num_output_channels 
 	return len(c.curves) == num_input_channels && len(c.curves) == num_output_channels
 }
 func (c CurveTransformer) WorkspaceSize() int { return 0 }
-func (c CurveTransformer) Transform(output, workspace []float32, inputs ...float32) error {
+func (c CurveTransformer) Transform(output, workspace []float32, inputs ...float32) {
 	for i, x := range inputs {
 		output[i] = c.curves[i].Transform(x)
 	}
-	return nil
 }
 
 func (c InverseCurveTransformer) IsSuitableFor(num_input_channels, num_output_channels int) bool {
 	return len(c.curves) == num_input_channels && len(c.curves) == num_output_channels
 }
 func (c InverseCurveTransformer) WorkspaceSize() int { return 0 }
-func (c InverseCurveTransformer) Transform(output, workspace []float32, inputs ...float32) error {
+func (c InverseCurveTransformer) Transform(output, workspace []float32, inputs ...float32) {
 	for i, x := range inputs {
 		output[i] = c.curves[i].InverseTransform(x)
 	}
-	return nil
 }
 
 type CurveTransformer3 struct {
@@ -77,11 +75,10 @@ func (c CurveTransformer3) IsSuitableFor(num_input_channels, num_output_channels
 	return 3 == num_input_channels && 3 == num_output_channels
 }
 func (c CurveTransformer3) WorkspaceSize() int { return 0 }
-func (c CurveTransformer3) Transform(output, workspace []float32, inputs ...float32) error {
+func (c CurveTransformer3) Transform(output, workspace []float32, inputs ...float32) {
 	output[0] = c.r.Transform(inputs[0])
 	output[1] = c.g.Transform(inputs[1])
 	output[2] = c.b.Transform(inputs[2])
-	return nil
 }
 
 type InverseCurveTransformer3 struct{ r, g, b Curve1D }
@@ -95,11 +92,10 @@ func (c InverseCurveTransformer3) IsSuitableFor(num_input_channels, num_output_c
 	return 3 == num_input_channels && 3 == num_output_channels
 }
 func (c InverseCurveTransformer3) WorkspaceSize() int { return 0 }
-func (c InverseCurveTransformer3) Transform(output, workspace []float32, inputs ...float32) error {
+func (c InverseCurveTransformer3) Transform(output, workspace []float32, inputs ...float32) {
 	output[0] = c.r.InverseTransform(inputs[0])
 	output[1] = c.g.InverseTransform(inputs[1])
 	output[2] = c.b.InverseTransform(inputs[2])
-	return nil
 }
 
 func NewCurveTransformer(curves ...Curve1D) ChannelTransformer {

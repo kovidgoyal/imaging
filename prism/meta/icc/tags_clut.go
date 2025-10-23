@@ -121,9 +121,8 @@ func clut_transform(input_channels, output_channels int, grid_points []int, valu
 	clut_trilinear_interpolate(input_channels, grid_points, values, output[:output_channels], gridPos, gridFrac)
 }
 
-func (c *CLUTTag) Transform(output, workspace []float32, inputs ...float32) error {
+func (c *CLUTTag) Transform(output, workspace []float32, inputs ...float32) {
 	clut_transform(c.InputChannels, c.OutputChannels, c.GridPoints, c.Values, output, workspace, inputs)
-	return nil
 }
 
 func clamp01(v float32) float32 {

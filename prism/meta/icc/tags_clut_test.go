@@ -93,16 +93,13 @@ func TestCLUTTransform(t *testing.T) {
 			Values:         []float32{0.0, 1.0}, // 2 values: for 1D input, 1 output channel
 		}
 		// Test input 0.0 → should return 0.0
-		err := clut.Transform(out, work, 0.0)
-		require.NoError(t, err)
+		clut.Transform(out, work, 0.0)
 		assert.InDelta(t, 0.0, out[0], 1e-6)
 		// Test input 1.0 → should return 1.0
-		err = clut.Transform(out, work, 1.0)
-		require.NoError(t, err)
+		clut.Transform(out, work, 1.0)
 		assert.InDelta(t, 1.0, out[0], 1e-6)
 		// Test input 0.5 → should return 0.5 via interpolation
-		err = clut.Transform(out, work, 0.5)
-		require.NoError(t, err)
+		clut.Transform(out, work, 0.5)
 		assert.InDelta(t, 0.5, out[0], 1e-6)
 	})
 	t.Run("HappyPath_3D", func(t *testing.T) {
@@ -115,11 +112,9 @@ func TestCLUTTransform(t *testing.T) {
 				0.4, 0.5, 0.6, 1.0,
 			}, // 8 points, 1 output each
 		}
-		err := clut.Transform(out, work, 0.0, 0.0, 0.0) // Should hit [0.0]
-		require.NoError(t, err)
+		clut.Transform(out, work, 0.0, 0.0, 0.0) // Should hit [0.0]
 		assert.InDelta(t, 0.0, out[0], 1e-6)
-		err = clut.Transform(out, work, 1.0, 1.0, 1.0) // Should hit [1.0]
-		require.NoError(t, err)
+		clut.Transform(out, work, 1.0, 1.0, 1.0) // Should hit [1.0]
 		assert.InDelta(t, 1.0, out[0], 1e-6)
 	})
 }

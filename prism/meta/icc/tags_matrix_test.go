@@ -96,8 +96,7 @@ func TestMatrixTag_Transform(t *testing.T) {
 			{0, 0, 1},
 		}
 		input := []float32{0.5, 0.25, 0.75}
-		err := matrix.Transform(output, nil, input...)
-		require.NoError(t, err)
+		matrix.Transform(output, nil, input...)
 		assert.InDeltaSlice(t, input, output, 0.0001)
 	})
 	t.Run("SuccessWithOffset", func(t *testing.T) {
@@ -111,8 +110,7 @@ func TestMatrixTag_Transform(t *testing.T) {
 		}
 		input := []float32{0.5, 0.25, 0.75}
 		expected := []float32{0.6, 0.45, 1.05} // input + offset
-		err := matrix.Transform(output, nil, input...)
-		require.NoError(t, err)
+		matrix.Transform(output, nil, input...)
 		assert.InDeltaSlice(t, expected, output, 0.0001)
 	})
 	t.Run("MatrixApplied", func(t *testing.T) {
@@ -123,8 +121,7 @@ func TestMatrixTag_Transform(t *testing.T) {
 		}
 		input := []float32{1, 1, 1}
 		expected := []float32{2, 3, 4}
-		err := matrix.Transform(output, nil, input...)
-		require.NoError(t, err)
+		matrix.Transform(output, nil, input...)
 		assert.InDeltaSlice(t, expected, output, 0.0001)
 	})
 }
