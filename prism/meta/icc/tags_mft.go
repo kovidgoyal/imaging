@@ -18,7 +18,7 @@ type MFT struct {
 	is8bit                      bool
 }
 
-func (c *MFT) WorkspaceSize() int { return c.in_channels * 2 }
+func (c *MFT) WorkspaceSize() int { return c.in_channels }
 
 func (c *MFT) IsSuitableFor(num_input_channels, num_output_channels int) bool {
 	return num_input_channels == int(c.in_channels) && num_output_channels == c.out_channels && num_input_channels <= 6
@@ -40,24 +40,20 @@ func linear_interpolate_1d(val unit_float, table []unit_float) unit_float {
 	return vlo + frac*(vhi-vlo)
 }
 
-func (mft *MFT) Transform(output, workspace []unit_float, inputs ...unit_float) {
-	mapped := workspace[0:mft.in_channels]
-	workspace = workspace[mft.in_channels:]
-	for o := range mft.out_channels {
-		output[o] = 0
-	}
+func (mft *MFT) Transform(workspace []unit_float, r, g, b unit_float) (unit_float, unit_float, unit_float) {
 	// Apply matrix
-	mft.matrix.Transform(mapped, nil, inputs...)
+	r, g, b = mft.matrix.Transform(nil, r, g, b)
 	// Apply input curves with linear interpolation
-	for i := range mft.in_channels {
-		mapped[i] = linear_interpolate_1d(mapped[i], mft.input_curves[i])
-	}
+	r = linear_interpolate_1d(r, mft.input_curves[0])
+	g = linear_interpolate_1d(g, mft.input_curves[1])
+	b = linear_interpolate_1d(b, mft.input_curves[2])
 	// Apply CLUT
-	clut_transform(mft.in_channels, mft.out_channels, mft.grid_points, mft.clut, output, workspace, mapped)
+	r, g, b = clut_transform3(mft.grid_points, mft.clut, workspace, r, g, b)
 	// Apply output curves with interpolation
-	for i := range mft.out_channels {
-		output[i] = linear_interpolate_1d(output[i], mft.output_curves[i])
-	}
+	r = linear_interpolate_1d(r, mft.output_curves[0])
+	g = linear_interpolate_1d(g, mft.output_curves[1])
+	b = linear_interpolate_1d(b, mft.output_curves[2])
+	return r, g, b
 }
 
 func load_8bit_table(raw []byte, n int) (output []unit_float, leftover []byte, err error) {

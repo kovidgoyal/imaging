@@ -68,10 +68,11 @@ func matrixDecoder(raw []byte) (any, error) {
 	return embeddedMatrixDecoder(raw[8:])
 }
 
-func (m *Matrix3) Transform(output, workspace []unit_float, inputs ...unit_float) {
-	output[0] = m[0][0]*inputs[0] + m[0][1]*inputs[1] + m[0][2]*inputs[2]
-	output[1] = m[1][0]*inputs[0] + m[1][1]*inputs[1] + m[1][2]*inputs[2]
-	output[2] = m[2][0]*inputs[0] + m[2][1]*inputs[1] + m[2][2]*inputs[2]
+func (m *Matrix3) Transform(workspace []unit_float, r, g, b unit_float) (unit_float, unit_float, unit_float) {
+	r = m[0][0]*r + m[0][1]*g + m[0][2]*b
+	g = m[1][0]*r + m[1][1]*g + m[1][2]*b
+	b = m[2][0]*r + m[2][1]*g + m[2][2]*b
+	return r, g, b
 }
 
 func (mat *Matrix3) Inverted() (ans Matrix3, err error) {
@@ -108,13 +109,14 @@ func (mat *Matrix3) Inverted() (ans Matrix3, err error) {
 	return
 }
 
-func (m IdentityMatrix) Transform(output, workspace []unit_float, inputs ...unit_float) {
-	copy(output, inputs)
+func (m IdentityMatrix) Transform(workspace []unit_float, r, g, b unit_float) (unit_float, unit_float, unit_float) {
+	return r, g, b
 }
 
-func (m *MatrixWithOffset) Transform(output, workspace []unit_float, inputs ...unit_float) {
-	m.m.Transform(output, nil, inputs...)
-	output[0] += m.offset1
-	output[1] += m.offset2
-	output[2] += m.offset3
+func (m *MatrixWithOffset) Transform(workspace []unit_float, r, g, b unit_float) (unit_float, unit_float, unit_float) {
+	r, g, b = m.m.Transform(workspace, r, g, b)
+	r += m.offset1
+	g += m.offset2
+	b += m.offset3
+	return r, g, b
 }

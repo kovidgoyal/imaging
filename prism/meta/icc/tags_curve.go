@@ -51,20 +51,16 @@ func (c CurveTransformer) IsSuitableFor(num_input_channels, num_output_channels 
 	return len(c.curves) == num_input_channels && len(c.curves) == num_output_channels
 }
 func (c CurveTransformer) WorkspaceSize() int { return 0 }
-func (c CurveTransformer) Transform(output, workspace []unit_float, inputs ...unit_float) {
-	for i, x := range inputs {
-		output[i] = c.curves[i].Transform(x)
-	}
+func (c CurveTransformer) Transform(workspace []unit_float, r, g, b unit_float) (unit_float, unit_float, unit_float) {
+	return c.curves[0].Transform(r), c.curves[1].Transform(g), c.curves[2].Transform(b)
 }
 
 func (c InverseCurveTransformer) IsSuitableFor(num_input_channels, num_output_channels int) bool {
 	return len(c.curves) == num_input_channels && len(c.curves) == num_output_channels
 }
 func (c InverseCurveTransformer) WorkspaceSize() int { return 0 }
-func (c InverseCurveTransformer) Transform(output, workspace []unit_float, inputs ...unit_float) {
-	for i, x := range inputs {
-		output[i] = c.curves[i].InverseTransform(x)
-	}
+func (c InverseCurveTransformer) Transform(workspace []unit_float, r, g, b unit_float) (unit_float, unit_float, unit_float) {
+	return c.curves[0].InverseTransform(r), c.curves[1].InverseTransform(g), c.curves[2].InverseTransform(b)
 }
 
 type CurveTransformer3 struct {
@@ -75,10 +71,8 @@ func (c CurveTransformer3) IsSuitableFor(num_input_channels, num_output_channels
 	return 3 == num_input_channels && 3 == num_output_channels
 }
 func (c CurveTransformer3) WorkspaceSize() int { return 0 }
-func (c CurveTransformer3) Transform(output, workspace []unit_float, inputs ...unit_float) {
-	output[0] = c.r.Transform(inputs[0])
-	output[1] = c.g.Transform(inputs[1])
-	output[2] = c.b.Transform(inputs[2])
+func (c CurveTransformer3) Transform(workspace []unit_float, r, g, b unit_float) (unit_float, unit_float, unit_float) {
+	return c.r.Transform(r), c.g.Transform(g), c.b.Transform(b)
 }
 
 type InverseCurveTransformer3 struct{ r, g, b Curve1D }
@@ -92,10 +86,8 @@ func (c InverseCurveTransformer3) IsSuitableFor(num_input_channels, num_output_c
 	return 3 == num_input_channels && 3 == num_output_channels
 }
 func (c InverseCurveTransformer3) WorkspaceSize() int { return 0 }
-func (c InverseCurveTransformer3) Transform(output, workspace []unit_float, inputs ...unit_float) {
-	output[0] = c.r.InverseTransform(inputs[0])
-	output[1] = c.g.InverseTransform(inputs[1])
-	output[2] = c.b.InverseTransform(inputs[2])
+func (c InverseCurveTransformer3) Transform(workspace []unit_float, r, g, b unit_float) (unit_float, unit_float, unit_float) {
+	return c.r.InverseTransform(r), c.g.InverseTransform(g), c.b.InverseTransform(b)
 }
 
 func NewCurveTransformer(curves ...Curve1D) ChannelTransformer {

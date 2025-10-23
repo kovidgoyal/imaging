@@ -100,6 +100,33 @@ func clut_trilinear_interpolate(input_channels int, grid_points []int, values []
 	}
 }
 
+func clut_trilinear_interpolate3(grid_points []int, values []unit_float, gridPos []int, gridFrac []unit_float) (or unit_float, og unit_float, ob unit_float) {
+	const input_channels = 3
+	numCorners := 1 << input_channels // 2^inputs
+	// walk all corners of the hypercube
+	for corner := range numCorners {
+		weight := unit_float(1.0)
+		idx := 0
+		stride := 1
+		for dim := input_channels - 1; dim >= 0; dim-- {
+			bit := (corner >> dim) & 1
+			pos := gridPos[dim] + bit
+			idx += pos * stride
+			stride *= grid_points[dim]
+			if bit == 0 {
+				weight *= 1 - gridFrac[dim]
+			} else {
+				weight *= gridFrac[dim]
+			}
+		}
+		base := idx * input_channels
+		or += weight * values[base]
+		og += weight * values[base+1]
+		ob += weight * values[base+2]
+	}
+	return
+}
+
 func clut_transform(input_channels, output_channels int, grid_points []int, values []unit_float, output, workspace []unit_float, inputs []unit_float) {
 	gridFrac := workspace[0:input_channels]
 	var buf [6]int
@@ -121,8 +148,28 @@ func clut_transform(input_channels, output_channels int, grid_points []int, valu
 	clut_trilinear_interpolate(input_channels, grid_points, values, output[:output_channels], gridPos, gridFrac)
 }
 
-func (c *CLUTTag) Transform(output, workspace []unit_float, inputs ...unit_float) {
-	clut_transform(c.InputChannels, c.OutputChannels, c.GridPoints, c.Values, output, workspace, inputs)
+func clut_transform3(grid_points []int, values []unit_float, workspace []unit_float, r, g, b unit_float) (unit_float, unit_float, unit_float) {
+	const input_channels = 3
+	gridFrac := workspace[0:input_channels]
+	var buf [6]int
+	var ibuf = [3]unit_float{r, g, b}
+	gridPos := buf[:]
+	for i, v := range ibuf {
+		nPoints := grid_points[i]
+		pos := clamp01(v) * unit_float(nPoints-1)
+		gridPos[i] = int(pos)
+		if gridPos[i] >= nPoints-1 {
+			gridPos[i] = nPoints - 2 // clamp
+			gridFrac[i] = 1.0
+		} else {
+			gridFrac[i] = pos - unit_float(gridPos[i])
+		}
+	}
+	return clut_trilinear_interpolate3(grid_points, values, gridPos, gridFrac)
+}
+
+func (c *CLUTTag) Transform(workspace []unit_float, r, g, b unit_float) (unit_float, unit_float, unit_float) {
+	return clut_transform3(c.GridPoints, c.Values, workspace, r, g, b)
 }
 
 func clamp01(v unit_float) unit_float {

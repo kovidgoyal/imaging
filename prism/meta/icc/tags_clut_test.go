@@ -115,36 +115,25 @@ func TestCLUTDecoder(t *testing.T) {
 func TestCLUTTransform(t *testing.T) {
 	var output, workspace [16]unit_float
 	out, work := output[:], workspace[:]
-	t.Run("HappyPath_1D", func(t *testing.T) {
-		clut := &CLUTTag{
-			InputChannels:  1,
-			OutputChannels: 1,
-			GridPoints:     []int{2},
-			Values:         []unit_float{0.0, 1.0}, // 2 values: for 1D input, 1 output channel
-		}
-		// Test input 0.0 → should return 0.0
-		clut.Transform(out, work, 0.0)
-		in_delta(t, 0.0, out[0], 1e-6)
-		// Test input 1.0 → should return 1.0
-		clut.Transform(out, work, 1.0)
-		in_delta(t, 1.0, out[0], 1e-6)
-		// Test input 0.5 → should return 0.5 via interpolation
-		clut.Transform(out, work, 0.5)
-		in_delta(t, 0.5, out[0], 1e-6)
-	})
 	t.Run("HappyPath_3D", func(t *testing.T) {
 		clut := &CLUTTag{
 			InputChannels:  3,
-			OutputChannels: 1,
+			OutputChannels: 3,
 			GridPoints:     []int{2, 2, 2},
 			Values: []unit_float{
-				0.0, 0.1, 0.2, 0.3,
-				0.4, 0.5, 0.6, 1.0,
-			}, // 8 points, 1 output each
+				0.0, 0.0, 0.0,
+				0.1, 0.1, 0.1,
+				0.2, 0.2, 0.2,
+				0.3, 0.3, 0.3,
+				0.4, 0.4, 0.4,
+				0.5, 0.5, 0.5,
+				0.6, 0.6, 0.6,
+				1, 1, 1,
+			}, // 8 points per output
 		}
-		clut.Transform(out, work, 0.0, 0.0, 0.0) // Should hit [0.0]
+		out[0], out[1], out[2] = clut.Transform(work, 0.0, 0.0, 0.0) // Should hit [0.0]
 		in_delta(t, 0.0, out[0], 1e-6)
-		clut.Transform(out, work, 1.0, 1.0, 1.0) // Should hit [1.0]
+		out[0], out[1], out[2] = clut.Transform(work, 1.0, 1.0, 1.0) // Should hit [1.0]
 		in_delta(t, 1.0, out[0], 1e-6)
 	})
 }

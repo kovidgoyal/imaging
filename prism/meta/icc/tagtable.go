@@ -190,7 +190,7 @@ func emptyTagTable() TagTable {
 }
 
 type ChannelTransformer interface {
-	Transform(output, workspace []unit_float, input ...unit_float)
+	Transform(workspace []unit_float, r, g, b unit_float) (unit_float, unit_float, unit_float)
 	IsSuitableFor(num_input_channels int, num_output_channels int) bool
 	WorkspaceSize() int
 }
