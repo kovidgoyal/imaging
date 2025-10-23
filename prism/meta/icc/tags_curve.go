@@ -320,10 +320,6 @@ func calculate_reverse_for_well_behaved_sampled_curve(points []float64) []float6
 		miny = min(y, miny)
 		maxy = max(y, maxy)
 	}
-	r := maxy - miny
-	if r != 1 {
-		return nil
-	}
 	y_to_x := make([]float64, n+1)
 	points_y_idx := 0
 	n_inv := 1.0 / float64(n)
