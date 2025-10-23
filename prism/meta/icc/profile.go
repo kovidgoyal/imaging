@@ -1,8 +1,10 @@
 package icc
 
 import (
+	"bytes"
 	_ "embed"
 	"fmt"
+	"sync"
 )
 
 var _ = fmt.Println
@@ -22,6 +24,16 @@ var Srgb_xyz_profile_data []byte
 
 //go:embed test-profiles/sRGB_ICC_v4_Appearance.icc
 var Srgb_lab_profile_data []byte
+
+var Srgb_xyz_profile = sync.OnceValue(func() *Profile {
+	p, _ := NewProfileReader(bytes.NewReader(Srgb_xyz_profile_data)).ReadProfile()
+	return p
+})
+
+var Srgb_lab_profile = sync.OnceValue(func() *Profile {
+	p, _ := NewProfileReader(bytes.NewReader(Srgb_lab_profile_data)).ReadProfile()
+	return p
+})
 
 func WellKnownProfileFromDescription(x string) WellKnownProfile {
 	switch x {
@@ -126,7 +138,7 @@ func (p *Profile) CreateTransformerToPCS(rendering_intent RenderingIntent) (ans 
 	}
 	fmt.Println(22222222222, found)
 	if found {
-		fmt.Println(3333333333, string(p.TagTable.entries[a2b][:8]), len(p.TagTable.entries[a2b]))
+		fmt.Println(3333333333, string(p.TagTable.entries[a2b].data[:8]), len(p.TagTable.entries[a2b].data))
 	} else {
 		var rc, gc, bc Curve1D
 		if rc, err = p.TagTable.load_curve_tag(RedTRCTagSignature); err != nil {

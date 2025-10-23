@@ -362,7 +362,7 @@ func calculate_reverse_for_well_behaved_sampled_curve(points []float64) []float6
 			y := float64(i) / float64(required_samples)
 			frac := (y - y1) / (y2 - y1)
 			x1 := float64(points_y_idx-1) * n_inv
-			// y is x1 + frac * (x2 - x1)
+			// x = x1 + frac * (x2 - x1)
 			y_to_x[i] = x1 + frac*n_inv
 		}
 	}

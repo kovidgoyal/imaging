@@ -70,18 +70,28 @@ type parsed_tag struct {
 	err error
 }
 
+type raw_tag_entry struct {
+	offset int
+	data   []byte
+}
+
+type parse_cache_key struct {
+	offset, size int
+}
+
 type TagTable struct {
-	entries map[Signature][]byte
-	lock    sync.Mutex
-	parsed  map[Signature]parsed_tag
+	entries     map[Signature]raw_tag_entry
+	lock        sync.Mutex
+	parsed      map[Signature]parsed_tag
+	parse_cache map[parse_cache_key]parsed_tag
 }
 
 func (t *TagTable) Has(sig Signature) bool {
-	return t.entries[sig] != nil
+	return t.entries[sig].data != nil
 }
 
-func (t *TagTable) add(sig Signature, data []byte) {
-	t.entries[sig] = data
+func (t *TagTable) add(sig Signature, offset int, data []byte) {
+	t.entries[sig] = raw_tag_entry{offset, data}
 }
 
 func (t *TagTable) get_parsed(sig Signature) (ans any, err error) {
@@ -93,11 +103,22 @@ func (t *TagTable) get_parsed(sig Signature) (ans any, err error) {
 	}
 	if t.parsed == nil {
 		t.parsed = make(map[Signature]parsed_tag)
+		t.parse_cache = make(map[parse_cache_key]parsed_tag)
 	}
+	var key parse_cache_key
 	defer func() {
 		t.parsed[sig] = parsed_tag{ans, err}
+		t.parse_cache[key] = parsed_tag{ans, err}
 	}()
-	return parse_tag(sig, t.entries[sig])
+	re := t.entries[sig]
+	if re.data == nil {
+		return nil, &not_found{sig}
+	}
+	key.offset, key.size = re.offset, len(re.data)
+	if cached, ok := t.parse_cache[key]; ok {
+		return cached.tag, cached.err
+	}
+	return parse_tag(sig, re.data)
 }
 
 func (t *TagTable) getDescription(s Signature) (string, error) {
@@ -127,10 +148,10 @@ func (t *TagTable) getDeviceModelDescription() (string, error) {
 func (t *TagTable) load_curve_tag(s Signature) (Curve1D, error) {
 	r, err := t.get_parsed(s)
 	if err != nil {
-		return nil, fmt.Errorf("could not load %s tag form profile with error: %w", s, err)
+		return nil, fmt.Errorf("could not load %s tag from profile with error: %w", s, err)
 	}
 	if ans, ok := r.(Curve1D); !ok {
-		return nil, fmt.Errorf("could not load %s tag form profile as it is of unsupported type: %T", s, r)
+		return nil, fmt.Errorf("could not load %s tag from profile as it is of unsupported type: %T", s, r)
 	} else {
 		return ans, nil
 	}
@@ -164,7 +185,7 @@ func (t *TagTable) load_rgb_matrix() (ChannelTransformer, ChannelTransformer, er
 
 func emptyTagTable() TagTable {
 	return TagTable{
-		entries: make(map[Signature][]byte),
+		entries: make(map[Signature]raw_tag_entry),
 	}
 }
 

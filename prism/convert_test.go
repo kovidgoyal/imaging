@@ -3,7 +3,6 @@
 package prism
 
 import (
-	"bytes"
 	"fmt"
 	"testing"
 
@@ -45,20 +44,14 @@ func TestCGOConversion(t *testing.T) {
 }
 
 func TestAgainstLCMS2(t *testing.T) {
-	p, err := icc.NewProfileReader(bytes.NewReader(icc.Srgb_xyz_profile_data)).ReadProfile()
+	p := icc.Srgb_xyz_profile()
+	println(p.Header.String())
+	_, err := p.CreateTransformerToPCS(icc.PerceptualRenderingIntent)
 	if err != nil {
 		t.Fatal(err)
 	}
 	println(p.Header.String())
-	_, err = p.CreateTransformerToPCS(icc.PerceptualRenderingIntent)
-	if err != nil {
-		t.Fatal(err)
-	}
-	println(p.Header.String())
-	p, err = icc.NewProfileReader(bytes.NewReader(icc.Srgb_lab_profile_data)).ReadProfile()
-	if err != nil {
-		t.Fatal(err)
-	}
+	p = icc.Srgb_lab_profile()
 	_, err = p.CreateTransformerToPCS(icc.PerceptualRenderingIntent)
 	if err != nil {
 		t.Fatal(err)

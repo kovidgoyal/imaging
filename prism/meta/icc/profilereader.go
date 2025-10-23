@@ -63,7 +63,7 @@ func (pr *ProfileReader) readTagTable(tagTable *TagTable) (err error) {
 		return
 	}
 	type tagIndexEntry struct {
-		Sig    uint32
+		Sig    Signature
 		Offset uint32
 		Size   uint32
 	}
@@ -84,7 +84,7 @@ func (pr *ProfileReader) readTagTable(tagTable *TagTable) (err error) {
 		for _, t := range tag_indices {
 			startOffset := t.Offset - tagDataOffset
 			endOffset := startOffset + t.Size
-			tagTable.add(Signature(t.Sig), tagData[startOffset:endOffset])
+			tagTable.add(t.Sig, int(startOffset), tagData[startOffset:endOffset])
 		}
 	}
 
