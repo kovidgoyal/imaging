@@ -126,7 +126,7 @@ func (p *Profile) CreateTransformerToPCS(rendering_intent RenderingIntent) (ans 
 	}
 	fmt.Println(22222222222, found)
 	if found {
-		fmt.Println(11111111, string(p.TagTable.entries[a2b][:8]), len(p.TagTable.entries[a2b]))
+		fmt.Println(3333333333, string(p.TagTable.entries[a2b][:8]), len(p.TagTable.entries[a2b]))
 	} else {
 		var rc, gc, bc Curve1D
 		if rc, err = p.TagTable.load_curve_tag(RedTRCTagSignature); err != nil {
@@ -138,7 +138,13 @@ func (p *Profile) CreateTransformerToPCS(rendering_intent RenderingIntent) (ans 
 		if bc, err = p.TagTable.load_curve_tag(BlueTRCTagSignature); err != nil {
 			return nil, err
 		}
-		_, _, _ = rc, gc, bc
+		ct := NewInverseCurveTransformer(rc, gc, bc)
+		m, _, err := p.TagTable.load_rgb_matrix()
+		if err != nil {
+			return nil, err
+		}
+		fmt.Println(333333333, ct, m)
+		fmt.Println(ct.(*InverseCurveTransformer3).g.(*PointsCurve).points)
 	}
 	for sig := range p.TagTable.entries {
 		fmt.Println(11111111, sig.String())

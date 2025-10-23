@@ -123,19 +123,19 @@ func modularDecoder(raw []byte) (ans any, err error) {
 	}
 	ans = mt
 	if mt.a_curves != nil {
-		mt.transforms = append(mt.transforms, NewCurveTransformer(mt.a_curves))
+		mt.transforms = append(mt.transforms, NewCurveTransformer(mt.a_curves...))
 	}
 	if mt.clut != nil {
 		mt.transforms = append(mt.transforms, mt.clut)
 	}
 	if mt.m_curves != nil {
-		mt.transforms = append(mt.transforms, NewCurveTransformer(mt.m_curves))
+		mt.transforms = append(mt.transforms, NewCurveTransformer(mt.m_curves...))
 	}
 	if mt.matrix != nil {
 		mt.transforms = append(mt.transforms, mt.matrix)
 	}
 	if mt.b_curves != nil {
-		mt.transforms = append(mt.transforms, NewCurveTransformer(mt.b_curves))
+		mt.transforms = append(mt.transforms, NewCurveTransformer(mt.b_curves...))
 	}
 	if !is_a_to_b {
 		slices.Reverse(mt.transforms)

@@ -50,11 +50,17 @@ func TestAgainstLCMS2(t *testing.T) {
 		t.Fatal(err)
 	}
 	println(p.Header.String())
-	p.CreateTransformerToPCS(icc.PerceptualRenderingIntent)
+	_, err = p.CreateTransformerToPCS(icc.PerceptualRenderingIntent)
+	if err != nil {
+		t.Fatal(err)
+	}
 	println(p.Header.String())
 	p, err = icc.NewProfileReader(bytes.NewReader(icc.Srgb_lab_profile_data)).ReadProfile()
 	if err != nil {
 		t.Fatal(err)
 	}
-	p.CreateTransformerToPCS(icc.PerceptualRenderingIntent)
+	_, err = p.CreateTransformerToPCS(icc.PerceptualRenderingIntent)
+	if err != nil {
+		t.Fatal(err)
+	}
 }

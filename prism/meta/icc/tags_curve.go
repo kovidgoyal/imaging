@@ -41,6 +41,7 @@ var _ Curve1D = (*ComplexCurve)(nil)
 type CurveTransformer struct {
 	curves []Curve1D
 }
+type InverseCurveTransformer struct{ curves []Curve1D }
 
 func (c CurveTransformer) IsSuitableFor(num_input_channels, num_output_channels int) bool {
 	return len(c.curves) == num_input_channels && len(c.curves) == num_output_channels
@@ -49,6 +50,17 @@ func (c CurveTransformer) WorkspaceSize() int { return 0 }
 func (c CurveTransformer) Transform(output, workspace []float64, inputs ...float64) error {
 	for i, x := range inputs {
 		output[i] = c.curves[i].Transform(x)
+	}
+	return nil
+}
+
+func (c InverseCurveTransformer) IsSuitableFor(num_input_channels, num_output_channels int) bool {
+	return len(c.curves) == num_input_channels && len(c.curves) == num_output_channels
+}
+func (c InverseCurveTransformer) WorkspaceSize() int { return 0 }
+func (c InverseCurveTransformer) Transform(output, workspace []float64, inputs ...float64) error {
+	for i, x := range inputs {
+		output[i] = c.curves[i].InverseTransform(x)
 	}
 	return nil
 }
@@ -68,12 +80,38 @@ func (c CurveTransformer3) Transform(output, workspace []float64, inputs ...floa
 	return nil
 }
 
-func NewCurveTransformer(curves []Curve1D) ChannelTransformer {
+type InverseCurveTransformer3 struct{ r, g, b Curve1D }
+
+func (c CurveTransformer3) String() string        { return c.r.String() }
+func (c CurveTransformer) String() string         { return c.curves[0].String() }
+func (c InverseCurveTransformer3) String() string { return c.r.String() }
+func (c InverseCurveTransformer) String() string  { return c.curves[0].String() }
+
+func (c InverseCurveTransformer3) IsSuitableFor(num_input_channels, num_output_channels int) bool {
+	return 3 == num_input_channels && 3 == num_output_channels
+}
+func (c InverseCurveTransformer3) WorkspaceSize() int { return 0 }
+func (c InverseCurveTransformer3) Transform(output, workspace []float64, inputs ...float64) error {
+	output[0] = c.r.InverseTransform(inputs[0])
+	output[1] = c.g.InverseTransform(inputs[1])
+	output[2] = c.b.InverseTransform(inputs[2])
+	return nil
+}
+
+func NewCurveTransformer(curves ...Curve1D) ChannelTransformer {
 	switch len(curves) {
 	case 3:
 		return &CurveTransformer3{curves[0], curves[1], curves[2]}
 	default:
 		return &CurveTransformer{curves}
+	}
+}
+func NewInverseCurveTransformer(curves ...Curve1D) ChannelTransformer {
+	switch len(curves) {
+	case 3:
+		return &InverseCurveTransformer3{curves[0], curves[1], curves[2]}
+	default:
+		return &InverseCurveTransformer{curves}
 	}
 }
 

@@ -42,9 +42,10 @@ func parse_tag(sig Signature, data []byte) (result any, err error) {
 	if len(data) < 4 {
 		return nil, &unsupported{sig}
 	}
-	switch signature(data) {
+	s := signature(data)
+	switch s {
 	default:
-		return nil, &unsupported{sig}
+		return nil, &unsupported{s}
 	case DescSignature, DeviceManufacturerDescriptionSignature, DeviceModelDescriptionSignature, MultiLocalisedUnicodeSignature, TextTagSignature:
 		return parse_text_tag(data)
 	case SignateTagSignature:
@@ -59,6 +60,8 @@ func parse_tag(sig Signature, data []byte) (result any, err error) {
 		return decode_mft8(data)
 	case XYZTypeSignature:
 		return decode_xyz(data)
+	case CurveTypeSignature, ParametricCurveTypeSignature:
+		return curveDecoder(data)
 	}
 }
 
@@ -131,6 +134,32 @@ func (t *TagTable) load_curve_tag(s Signature) (Curve1D, error) {
 	} else {
 		return ans, nil
 	}
+}
+
+func (t *TagTable) load_rgb_matrix() (ChannelTransformer, ChannelTransformer, error) {
+	r, err := t.get_parsed(RedMatrixColumnTagSignature)
+	if err != nil {
+		return nil, nil, err
+	}
+	g, err := t.get_parsed(GreenMatrixColumnTagSignature)
+	if err != nil {
+		return nil, nil, err
+	}
+	b, err := t.get_parsed(BlueMatrixColumnTagSignature)
+	if err != nil {
+		return nil, nil, err
+	}
+	rc, bc, gc := r.(*XYZType), g.(*XYZType), b.(*XYZType)
+	var m Matrix3
+	m[0][0], m[0][1], m[0][2] = rc.x, bc.x, gc.x
+	m[1][0], m[1][1], m[1][2] = rc.y, bc.y, gc.y
+	m[2][0], m[2][1], m[2][2] = rc.z, bc.z, gc.z
+	if is_identity_matrix(&m) {
+		im := IdentityMatrix(0)
+		return &im, &im, nil
+	}
+	im, err := m.Inverted()
+	return &m, &im, err
 }
 
 func emptyTagTable() TagTable {

@@ -2,6 +2,7 @@ package icc
 
 import (
 	"errors"
+	"fmt"
 )
 
 type Matrix3 [3][3]float64
@@ -68,15 +69,44 @@ func matrixDecoder(raw []byte) (any, error) {
 }
 
 func (m *Matrix3) Transform(output, workspace []float64, inputs ...float64) error {
-	for i := range 3 {
-		output[i] = 0
+	output[0] = m[0][0]*inputs[0] + m[0][1]*inputs[1] + m[0][2]*inputs[2]
+	output[1] = m[1][0]*inputs[0] + m[1][1]*inputs[1] + m[1][2]*inputs[2]
+	output[2] = m[2][0]*inputs[0] + m[2][1]*inputs[1] + m[2][2]*inputs[2]
+	return nil
+}
+
+func (mat *Matrix3) Inverted() (ans Matrix3, err error) {
+	det := mat[0][0]*(mat[1][1]*mat[2][2]-mat[1][2]*mat[2][1]) -
+		mat[0][1]*(mat[1][0]*mat[2][2]-mat[1][2]*mat[2][0]) +
+		mat[0][2]*(mat[1][0]*mat[2][1]-mat[1][1]*mat[2][0])
+
+	if det == 0 {
+		return ans, fmt.Errorf("matrix is singular and cannot be inverted")
+	}
+	invDet := 1 / det
+	adj := Matrix3{
+		{
+			(mat[1][1]*mat[2][2] - mat[1][2]*mat[2][1]),
+			(mat[0][2]*mat[2][1] - mat[0][1]*mat[2][2]), // Note the sign change for cofactor C12
+			(mat[0][1]*mat[1][2] - mat[0][2]*mat[1][1]), // Note the sign change for cofactor C13
+		},
+		{
+			(mat[1][2]*mat[2][0] - mat[1][0]*mat[2][2]),
+			(mat[0][0]*mat[2][2] - mat[0][2]*mat[2][0]),
+			(mat[0][2]*mat[1][0] - mat[0][0]*mat[1][2]),
+		},
+		{
+			(mat[1][0]*mat[2][1] - mat[1][1]*mat[2][0]),
+			(mat[0][1]*mat[2][0] - mat[0][0]*mat[2][1]),
+			(mat[0][0]*mat[1][1] - mat[0][1]*mat[1][0]),
+		},
 	}
 	for i := range 3 {
 		for j := range 3 {
-			output[i] += m[i][j] * inputs[j]
+			ans[i][j] = invDet * adj[i][j]
 		}
 	}
-	return nil
+	return
 }
 
 func (m IdentityMatrix) Transform(output, workspace []float64, inputs ...float64) error {
