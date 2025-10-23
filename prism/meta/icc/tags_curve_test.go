@@ -230,7 +230,7 @@ func generate_sampled_curve(c Curve1D) Curve1D {
 	return &PointsCurve{points: points}
 }
 
-func srgb_sampled_curve() Curve1D {
+func srgb_sampled_curve() *PointsCurve {
 	p := Srgb_xyz_profile()
 	rte := p.TagTable.entries[RedTRCTagSignature]
 	raw := rte.data
@@ -242,6 +242,7 @@ func srgb_sampled_curve() Curve1D {
 		fp[i] = float64(p) / math.MaxUint16
 	}
 	c := &PointsCurve{points: fp}
+	c.Prepare()
 	return c
 }
 
@@ -254,6 +255,20 @@ func TestCurveInverse(t *testing.T) {
 	curve_inverse(t, &ComplexCurve{a: 1, b: 2, c: 3, d: 4, e: 5, f: 6, g: 2}, 1e-8)
 	curve_inverse(t, generate_sampled_curve(&GammaCurve{gamma: 2}), 5e-3)
 	curve_inverse(t, srgb_sampled_curve(), 1e-3)
+}
+
+func srgb_to_linear(v float64) float64 {
+	if v <= 0.0031308 {
+		return v * 12.92
+	}
+	return 1.055*math.Pow(float64(v), 1/2.4) - 0.055
+}
+
+func linear_to_srgb(v float64) float64 {
+	if v <= 0.0031308*12.92 {
+		return v / 12.92
+	}
+	return math.Pow((v+0.055)/1.055, 2.4)
 }
 
 func TestParametricCurveTag_Transform(t *testing.T) {
@@ -281,4 +296,15 @@ func TestParametricCurveTag_Transform(t *testing.T) {
 	t.Run("ComplexFunction_NegativeBranch", func(t *testing.T) {
 		rt(t, &ComplexCurve{a: 1, b: 0, c: 0.5, d: 0.6, e: 0.1, f: 0.2, g: 2}, 0.5, 0.45)
 	})
+	rc := SRGBCurve()
+	sc := srgb_sampled_curve()
+	num := 4 * len(sc.points)
+	for i := range num {
+		x := float64(i) / float64(num-1)
+		require.InDelta(t, rc.Transform(x), linear_to_srgb(x), 1e-9, fmt.Sprintf("failed for analytic curve i=%d x=%f", i, x))
+		require.InDelta(t, rc.Transform(x), sc.Transform(x), 1e-5, fmt.Sprintf("failed for sampled curve i=%d x=%f", i, x))
+		// now test inverse transforms
+		require.InDelta(t, rc.InverseTransform(x), srgb_to_linear(x), 1e-9, fmt.Sprintf("failed for analytic inverse curve i=%d x=%f", i, x))
+		require.InDelta(t, rc.InverseTransform(x), sc.InverseTransform(x), 0.002, fmt.Sprintf("failed for sampled curve inverse i=%d x=%f", i, x))
+	}
 }

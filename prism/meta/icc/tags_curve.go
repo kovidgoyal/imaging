@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"sync"
 )
 
 // Determinant lower than that are assumed zero (used on matrix invert)
@@ -146,6 +147,21 @@ func fixed88ToFloat(raw []byte) float64 {
 	return float64(uint16(raw[0])<<8|uint16(raw[1])) / 256
 }
 
+func samples_to_analytic(points []float64) Curve1D {
+	if len(points) < 64 {
+		return nil
+	}
+	n := 1 / float64(len(points)-1)
+	srgb := SRGBCurve().Transform
+	for i, y := range points {
+		x := float64(i) * n
+		if math.Abs(y-srgb(x)) > 1e-3 {
+			return nil
+		}
+	}
+	return SRGBCurve()
+}
+
 func embeddedCurveDecoder(raw []byte) (any, int, error) {
 	if len(raw) < 12 {
 		return nil, 0, errors.New("curv tag too short")
@@ -174,6 +190,10 @@ func embeddedCurveDecoder(raw []byte) (any, int, error) {
 		fp := make([]float64, len(points))
 		for i, p := range points {
 			fp[i] = float64(p) / math.MaxUint16
+		}
+		analytic := samples_to_analytic(fp)
+		if analytic != nil {
+			return analytic, consumed, nil
 		}
 		c := &PointsCurve{points: fp}
 		if err := c.Prepare(); err != nil {
@@ -545,3 +565,9 @@ func (c *ComplexCurve) InverseTransform(y float64) float64 {
 	}
 	return 0
 }
+
+var SRGBCurve = sync.OnceValue(func() *SplitCurve {
+	ans := &SplitCurve{g: 2.4, a: 1 / 1.055, b: 0.055 / 1.055, c: 1 / 12.92, d: 0.0031308 * 12.92}
+	ans.Prepare()
+	return ans
+})
