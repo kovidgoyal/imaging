@@ -230,6 +230,21 @@ func generate_sampled_curve(c Curve1D) Curve1D {
 	return &PointsCurve{points: points}
 }
 
+func srgb_sampled_curve() Curve1D {
+	p := Srgb_xyz_profile()
+	rte := p.TagTable.entries[RedTRCTagSignature]
+	raw := rte.data
+	count := int(binary.BigEndian.Uint32(raw[8:12]))
+	points := make([]uint16, count)
+	binary.Decode(raw[12:], binary.BigEndian, points)
+	fp := make([]float64, len(points))
+	for i, p := range points {
+		fp[i] = float64(p) / math.MaxUint16
+	}
+	c := &PointsCurve{points: fp}
+	return c
+}
+
 func TestCurveInverse(t *testing.T) {
 	curve_inverse(t, IdentityCurve(0), 1e-8)
 	curve_inverse(t, &GammaCurve{gamma: 2}, 1e-8)
@@ -238,6 +253,7 @@ func TestCurveInverse(t *testing.T) {
 	curve_inverse(t, &SplitCurve{a: 1, b: 2, c: 3, d: 4, g: 2}, 1e-8)
 	curve_inverse(t, &ComplexCurve{a: 1, b: 2, c: 3, d: 4, e: 5, f: 6, g: 2}, 1e-8)
 	curve_inverse(t, generate_sampled_curve(&GammaCurve{gamma: 2}), 5e-3)
+	curve_inverse(t, srgb_sampled_curve(), 1e-3)
 }
 
 func TestParametricCurveTag_Transform(t *testing.T) {

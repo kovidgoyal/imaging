@@ -173,7 +173,7 @@ func embeddedCurveDecoder(raw []byte) (any, int, error) {
 		}
 		fp := make([]float64, len(points))
 		for i, p := range points {
-			fp[i] = float64(p) / 65535
+			fp[i] = float64(p) / math.MaxUint16
 		}
 		c := &PointsCurve{points: fp}
 		if err := c.Prepare(); err != nil {
@@ -312,21 +312,9 @@ func calculate_reverse_for_well_behaved_sampled_curve(points []float64) []float6
 	}
 	var prev, maxy float64
 	var miny float64 = math.MaxFloat64
-	required_samples := n
 	for _, y := range points {
 		if y < prev || y < 0 || y > 1 {
 			return nil // not monotonic or range not in [0, 1]
-		}
-		if y != prev {
-			// make sure y and prev have distinct indices in an array of length required_samples
-			for {
-				iy := int(float64(required_samples) * y)
-				iprev := int(float64(required_samples) * prev)
-				if iy != iprev {
-					break
-				}
-				required_samples *= 2
-			}
 		}
 		prev = y
 		miny = min(y, miny)
@@ -336,7 +324,7 @@ func calculate_reverse_for_well_behaved_sampled_curve(points []float64) []float6
 	if r != 1 {
 		return nil
 	}
-	y_to_x := make([]float64, required_samples+1)
+	y_to_x := make([]float64, n+1)
 	points_y_idx := 0
 	n_inv := 1.0 / float64(n)
 	for i := range y_to_x {
@@ -345,9 +333,14 @@ func calculate_reverse_for_well_behaved_sampled_curve(points []float64) []float6
 			y_to_x[i] = 1
 			continue
 		}
-		if int(points[points_y_idx]*float64(required_samples)) == i {
+		if int(points[points_y_idx]*float64(n)) == i {
 			y_to_x[i] = float64(points_y_idx) * n_inv
-			points_y_idx++
+			for {
+				points_y_idx++
+				if points_y_idx > n || int(points[points_y_idx]*float64(n)) != i {
+					break
+				}
+			}
 		} else {
 			if points_y_idx == 0 {
 				// we are between 0 and miny
@@ -367,7 +360,7 @@ func calculate_reverse_for_well_behaved_sampled_curve(points []float64) []float6
 					y2 = points[points_y_idx]
 				}
 			}
-			y := float64(i) / float64(required_samples)
+			y := float64(i) * n_inv
 			frac := (y - y1) / (y2 - y1)
 			x1 := float64(points_y_idx-1) * n_inv
 			// x = x1 + frac * (x2 - x1)
