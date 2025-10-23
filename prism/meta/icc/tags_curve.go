@@ -99,6 +99,11 @@ func (c InverseCurveTransformer3) Transform(output, workspace []float64, inputs 
 }
 
 func NewCurveTransformer(curves ...Curve1D) ChannelTransformer {
+	for _, c := range curves {
+		if c == nil {
+			panic("curve must not be nil")
+		}
+	}
 	switch len(curves) {
 	case 3:
 		return &CurveTransformer3{curves[0], curves[1], curves[2]}
@@ -107,6 +112,11 @@ func NewCurveTransformer(curves ...Curve1D) ChannelTransformer {
 	}
 }
 func NewInverseCurveTransformer(curves ...Curve1D) ChannelTransformer {
+	for _, c := range curves {
+		if c == nil {
+			panic("curve must not be nil")
+		}
+	}
 	switch len(curves) {
 	case 3:
 		return &InverseCurveTransformer3{curves[0], curves[1], curves[2]}
@@ -150,9 +160,7 @@ func embeddedCurveDecoder(raw []byte) (any, int, error) {
 		if len(raw) < 14 {
 			return nil, 0, errors.New("curv tag missing gamma value")
 		}
-		// 8.8 fixed-point
-		val := uint16(raw[12])<<8 | uint16(raw[13])
-		c := &GammaCurve{gamma: float64(val) / 256}
+		c := &GammaCurve{gamma: fixed88ToFloat(raw[12:14])}
 		if err := c.Prepare(); err != nil {
 			return nil, 0, err
 		}

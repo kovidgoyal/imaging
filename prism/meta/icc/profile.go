@@ -136,7 +136,6 @@ func (p *Profile) CreateTransformerToPCS(rendering_intent RenderingIntent) (ans 
 		a2b = AToB0TagSignature
 		found = true
 	}
-	fmt.Println(22222222222, found)
 	if found {
 		fmt.Println(3333333333, string(p.TagTable.entries[a2b].data[:8]), len(p.TagTable.entries[a2b].data))
 	} else {
@@ -155,8 +154,7 @@ func (p *Profile) CreateTransformerToPCS(rendering_intent RenderingIntent) (ans 
 		if err != nil {
 			return nil, err
 		}
-		fmt.Println(333333333, ct, m)
-		fmt.Println(ct.(*InverseCurveTransformer3).g.(*PointsCurve).points)
+		_, _ = ct, m
 	}
 	for sig := range p.TagTable.entries {
 		fmt.Println(11111111, sig.String())
