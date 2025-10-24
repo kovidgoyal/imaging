@@ -3,6 +3,7 @@ package icc
 import (
 	"errors"
 	"fmt"
+	"math"
 )
 
 type Matrix3 [3][3]unit_float
@@ -14,7 +15,15 @@ type MatrixWithOffset struct {
 }
 
 func is_identity_matrix(m *Matrix3) bool {
-	return m[0][0] == 1 && m[0][1] == 0 && m[0][2] == 0 && m[1][0] == 0 && m[1][1] == 1 && m[1][2] == 0 && m[2][0] == 0 && m[2][1] == 0 && m[2][2] == 1
+	for r := range 3 {
+		for c := range 3 {
+			q := IfElse(r == c, unit_float(1), unit_float(0))
+			if math.Abs(float64(m[r][c]-q)) > FLOAT_EQUALITY_THRESHOLD {
+				return false
+			}
+		}
+	}
+	return true
 }
 
 func (c *Matrix3) WorkspaceSize() int { return 0 }
@@ -87,6 +96,10 @@ func Dot(v1, v2 [3]unit_float) unit_float {
 	return v1[0]*v2[0] + v1[1]*v2[1] + v1[2]*v2[2]
 }
 
+func (m Matrix3) String() string {
+	return fmt.Sprintf("Matrix3{ %v, %v, %v }", m[0], m[1], m[2])
+}
+
 func (m Matrix3) Multiply(o Matrix3) Matrix3 {
 	t := m.Transpose()
 	return Matrix3{
@@ -116,8 +129,8 @@ func (m Matrix3) Inverted() (ans Matrix3, err error) {
 	}
 
 	det := m[0][0]*o[0][0] + m[1][0]*o[0][1] + m[2][0]*o[0][2]
-	if det == 0 {
-		return ans, fmt.Errorf("matrix is singular and cannot be inverted")
+	if abs32(det) < FLOAT_EQUALITY_THRESHOLD {
+		return ans, fmt.Errorf("matrix is singular and cannot be inverted, det=%v", det)
 	}
 	det = 1 / det
 

@@ -8,12 +8,6 @@ import (
 	"sync"
 )
 
-// Determinant lower than that are assumed zero (used on matrix invert)
-const MATRIX_DET_TOLERANCE = 0.0001
-
-func pow32(a, b unit_float) unit_float { return unit_float(math.Pow(float64(a), float64(b))) }
-func abs32(a unit_float) unit_float    { return unit_float(math.Abs(float64(a))) }
-
 type IdentityCurve int
 type GammaCurve struct {
 	gamma, inv_gamma unit_float
@@ -298,7 +292,7 @@ func (c *GammaCurve) Prepare() error {
 		return fmt.Errorf("gamma curve has zero gamma value")
 	}
 	c.inv_gamma = 1 / c.gamma
-	c.is_one = abs32(c.gamma-1) < MATRIX_DET_TOLERANCE
+	c.is_one = abs32(c.gamma-1) < FLOAT_EQUALITY_THRESHOLD
 	return nil
 }
 func (c GammaCurve) String() string { return fmt.Sprintf("GammaCurve{%f}", c.gamma) }

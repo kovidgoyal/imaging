@@ -105,6 +105,18 @@ func TestMtxDecoder(t *testing.T) {
 	})
 }
 
+func TestMatrixOperations(t *testing.T) {
+	m := Matrix3{
+		{1, 2, 3},
+		{4, 6, 5},
+		{7, 9, 10},
+	}
+	mi, err := m.Inverted()
+	require.NoError(t, err)
+	q := m.Multiply(mi)
+	require.True(t, is_identity_matrix(&q), q.String())
+}
+
 func TestMatrixTag_Transform(t *testing.T) {
 	output := make([]unit_float, 3)
 	t.Run("SuccessWithoutOffset", func(t *testing.T) {
