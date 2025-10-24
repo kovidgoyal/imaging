@@ -113,6 +113,7 @@ const (
 	BToA0TagSignature                          Signature = 0x42324130 /* 'B2A0' */
 	BToA1TagSignature                          Signature = 0x42324131 /* 'B2A1' */
 	BToA2TagSignature                          Signature = 0x42324132 /* 'B2A2' */
+	BToA3TagSignature                          Signature = 0x42324133 /* 'B2A3' */
 	CalibrationDateTimeTagSignature            Signature = 0x63616C74 /* 'calt' */
 	CharTargetTagSignature                     Signature = 0x74617267 /* 'targ' */
 	ChromaticAdaptationTagSignature            Signature = 0x63686164 /* 'chad' */

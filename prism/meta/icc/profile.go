@@ -136,6 +136,99 @@ func (p *Profile) get_effective_chromatic_adaption() (*Matrix3, error) {
 	return p.TagTable.get_chromatic_adaption()
 }
 
+func (p *Profile) create_matrix_trc_transformer(forward bool, chromatic_adaptation *Matrix3) (ans ChannelTransformer, err error) {
+	if p.Header.ProfileConnectionSpace != ColorSpaceXYZ {
+		return nil, fmt.Errorf("matrix/TRC based profile using non XYZ PCS color space: %v", p.Header.ProfileConnectionSpace)
+	}
+	// See section F.3 of ICC.1-2202-5.pdf for how these transforms are composed
+	var rc, gc, bc Curve1D
+	if rc, err = p.TagTable.load_curve_tag(RedTRCTagSignature); err != nil {
+		return nil, err
+	}
+	if gc, err = p.TagTable.load_curve_tag(GreenTRCTagSignature); err != nil {
+		return nil, err
+	}
+	if bc, err = p.TagTable.load_curve_tag(BlueTRCTagSignature); err != nil {
+		return nil, err
+	}
+	m, err := p.TagTable.load_rgb_matrix()
+	if err != nil {
+		return nil, err
+	}
+	if is_identity_matrix(m) {
+		m = chromatic_adaptation
+		chromatic_adaptation = nil
+	}
+	if forward {
+		ct := NewCurveTransformer(rc, gc, bc)
+		if chromatic_adaptation != nil {
+			combined := chromatic_adaptation.Multiply(*m)
+			m = &combined
+		}
+		if m == nil {
+			return ct, nil
+		}
+		return NewCombinedTransformer(ct, m), nil
+	} else {
+		ct := NewInverseCurveTransformer(rc, gc, bc)
+		inv, err := m.Inverted()
+		if err != nil {
+			return nil, fmt.Errorf("the colorspace conversion matrix is not invertible: %w", err)
+		}
+		m = &inv
+		if chromatic_adaptation != nil {
+			minv, err := chromatic_adaptation.Inverted()
+			if err != nil {
+				return nil, fmt.Errorf("the chromatic_adaptation matrix is not invertible: %w", err)
+			}
+			combined := m.Multiply(minv)
+			m = &combined
+		}
+		return NewCombinedTransformer(m, ct), nil
+	}
+}
+
+// See section 8.10.2 of ICC.1-2202-05.pdf for tag selection algorithm
+func (p *Profile) CreateTransformerToDevice(rendering_intent RenderingIntent) (ans ChannelTransformer, err error) {
+	b2a := UnknownSignature
+	switch rendering_intent {
+	case PerceptualRenderingIntent:
+		b2a = BToA0TagSignature
+	case RelativeColorimetricRenderingIntent:
+		b2a = BToA1TagSignature
+	case SaturationRenderingIntent:
+		b2a = BToA2TagSignature
+	case AbsoluteColorimetricRenderingIntent:
+		b2a = BToA3TagSignature
+	default:
+		return nil, fmt.Errorf("unknown rendering intent: %v", rendering_intent)
+	}
+	found_b2a := p.TagTable.Has(b2a)
+	const fallback = BToA0TagSignature
+	if !found_b2a && p.TagTable.Has(fallback) {
+		b2a = fallback
+		found_b2a = true
+	}
+	chromatic_adaptation, err := p.get_effective_chromatic_adaption()
+	if err != nil {
+		return nil, err
+	}
+	if found_b2a {
+		c, err := p.TagTable.get_parsed(b2a)
+		if err != nil {
+			return nil, err
+		}
+		fmt.Println(3333333, c)
+		fmt.Println(3333333333, string(p.TagTable.entries[b2a].data[:8]), len(p.TagTable.entries[b2a].data))
+		for sig := range p.TagTable.entries {
+			fmt.Println(11111111, sig.String())
+		}
+	} else {
+		return p.create_matrix_trc_transformer(false, chromatic_adaptation)
+	}
+	return nil, fmt.Errorf("could not find any conversion tags in the profile")
+}
+
 // See section 8.10.2 of ICC.1-2202-05.pdf for tag selection algorithm
 func (p *Profile) CreateTransformerToPCS(rendering_intent RenderingIntent) (ans ChannelTransformer, err error) {
 	a2b := UnknownSignature
@@ -148,6 +241,8 @@ func (p *Profile) CreateTransformerToPCS(rendering_intent RenderingIntent) (ans 
 		a2b = AToB2TagSignature
 	case AbsoluteColorimetricRenderingIntent:
 		a2b = AToB3TagSignature
+	default:
+		return nil, fmt.Errorf("unknown rendering intent: %v", rendering_intent)
 	}
 	found_a2b := p.TagTable.Has(a2b)
 	const fallback = AToB0TagSignature
@@ -170,36 +265,9 @@ func (p *Profile) CreateTransformerToPCS(rendering_intent RenderingIntent) (ans 
 			fmt.Println(11111111, sig.String())
 		}
 	} else {
-		// See section F.3 of ICC.1-2202-5.pdf for how these transforms are composed
-		var rc, gc, bc Curve1D
-		if rc, err = p.TagTable.load_curve_tag(RedTRCTagSignature); err != nil {
-			return nil, err
-		}
-		if gc, err = p.TagTable.load_curve_tag(GreenTRCTagSignature); err != nil {
-			return nil, err
-		}
-		if bc, err = p.TagTable.load_curve_tag(BlueTRCTagSignature); err != nil {
-			return nil, err
-		}
-		ct := NewCurveTransformer(rc, gc, bc)
-		m, err := p.TagTable.load_rgb_matrix()
-		if err != nil {
-			return nil, err
-		}
-		if is_identity_matrix(m) {
-			m = chromatic_adaptation
-			chromatic_adaptation = nil
-		}
-		if chromatic_adaptation != nil {
-			combined := chromatic_adaptation.Multiply(*m)
-			m = &combined
-		}
-		if m == nil {
-			return ct, nil
-		}
-		return NewCombinedTransformer(ct, m), nil
+		return p.create_matrix_trc_transformer(true, chromatic_adaptation)
 	}
-	return nil, nil
+	return nil, fmt.Errorf("could not find any conversion tags in the profile")
 }
 
 func newProfile() *Profile {

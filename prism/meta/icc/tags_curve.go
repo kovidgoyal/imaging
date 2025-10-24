@@ -54,7 +54,8 @@ func (c InverseCurveTransformer) IsSuitableFor(num_input_channels, num_output_ch
 }
 func (c InverseCurveTransformer) WorkspaceSize() int { return 0 }
 func (c InverseCurveTransformer) Transform(workspace []unit_float, r, g, b unit_float) (unit_float, unit_float, unit_float) {
-	return c.curves[0].InverseTransform(r), c.curves[1].InverseTransform(g), c.curves[2].InverseTransform(b)
+	// we need to clamp as per spec section F.3 of ICC.1-2202-05.pdf
+	return c.curves[0].InverseTransform(clamp01(r)), c.curves[1].InverseTransform(clamp01(g)), c.curves[2].InverseTransform(clamp01(b))
 }
 
 type CurveTransformer3 struct {
@@ -81,7 +82,8 @@ func (c InverseCurveTransformer3) IsSuitableFor(num_input_channels, num_output_c
 }
 func (c InverseCurveTransformer3) WorkspaceSize() int { return 0 }
 func (c InverseCurveTransformer3) Transform(workspace []unit_float, r, g, b unit_float) (unit_float, unit_float, unit_float) {
-	return c.r.InverseTransform(r), c.g.InverseTransform(g), c.b.InverseTransform(b)
+	// we need to clamp as per spec section F.3 of ICC.1-2202-05.pdf
+	return c.r.InverseTransform(clamp01(r)), c.g.InverseTransform(clamp01(g)), c.b.InverseTransform(clamp01(b))
 }
 
 func NewCurveTransformer(curves ...Curve1D) ChannelTransformer {
