@@ -14,6 +14,10 @@ type CLUTTag struct {
 	Values         []unit_float // flattened [in1, in2, ..., out1, out2, ...]
 }
 
+func (c CLUTTag) String() string {
+	return fmt.Sprintf("CLUTTag{ %v %v }", c.GridPoints, c.Values)
+}
+
 var _ ChannelTransformer = (*CLUTTag)(nil)
 
 // section 10.12.3 (CLUT) in ICC.1-2202-05.pdf

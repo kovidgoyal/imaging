@@ -147,6 +147,18 @@ func samples_to_analytic(points []unit_float) Curve1D {
 	return SRGBCurve()
 }
 
+func load_points_curve(fp []unit_float) (Curve1D, error) {
+	analytic := samples_to_analytic(fp)
+	if analytic != nil {
+		return analytic, nil
+	}
+	c := &PointsCurve{points: fp}
+	if err := c.Prepare(); err != nil {
+		return nil, err
+	}
+	return c, nil
+}
+
 func embeddedCurveDecoder(raw []byte) (any, int, error) {
 	if len(raw) < 12 {
 		return nil, 0, errors.New("curv tag too short")
@@ -176,15 +188,8 @@ func embeddedCurveDecoder(raw []byte) (any, int, error) {
 		for i, p := range points {
 			fp[i] = unit_float(p) / math.MaxUint16
 		}
-		analytic := samples_to_analytic(fp)
-		if analytic != nil {
-			return analytic, consumed, nil
-		}
-		c := &PointsCurve{points: fp}
-		if err := c.Prepare(); err != nil {
-			return nil, 0, err
-		}
-		return c, consumed, nil
+		c, err := load_points_curve(fp)
+		return c, consumed, err
 	}
 }
 

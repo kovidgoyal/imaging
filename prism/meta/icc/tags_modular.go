@@ -17,6 +17,10 @@ type ModularTag struct {
 	is_a_to_b                               bool
 }
 
+func (m ModularTag) String() string {
+	return fmt.Sprintf("%s{a:%v, b:%v, m:%v, matrix:%v, clut:%v}", IfElse(m.is_a_to_b, "mAB", "mBA"), m.a_curves, m.b_curves, m.m_curves, m.matrix, m.clut)
+}
+
 var _ ChannelTransformer = (*ModularTag)(nil)
 
 func (m *ModularTag) WorkspaceSize() int { return m.workspace_size }

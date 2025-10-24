@@ -225,6 +225,7 @@ type ChannelTransformer interface {
 	Transform(workspace []unit_float, r, g, b unit_float) (unit_float, unit_float, unit_float)
 	IsSuitableFor(num_input_channels int, num_output_channels int) bool
 	WorkspaceSize() int
+	String() string
 }
 
 type TwoTransformers struct {
