@@ -65,8 +65,8 @@ func TestCurveDecoder(t *testing.T) {
 		raw := curv_bytes(1.0)
 		val, err := curveDecoder(raw)
 		require.NoError(t, err)
-		c := val.(*GammaCurve)
-		in_delta(t, 1.0, unit_float(c.gamma), 0.001)
+		_, ok := val.(*IdentityCurve)
+		require.True(t, ok)
 	})
 	t.Run("PointsCurve", func(t *testing.T) {
 		raw := curv_bytes(0.1, 0.2, 0.3)
@@ -106,11 +106,11 @@ func TestParametricCurveDecoder(t *testing.T) {
 		return val
 	}
 	t.Run("GammaCurve", func(t *testing.T) {
-		val := w(t, 0, false, 1.0)
+		val := w(t, 0, false, 1.2)
 		q := &GammaCurve{}
 		require.IsType(t, q, val)
 		p := val.(*GammaCurve)
-		in_delta(t, 1.0, p.gamma, 0.0001)
+		in_delta(t, 1.2, p.gamma, 0.0001)
 	})
 	t.Run("ConditionalZeroCurve", func(t *testing.T) {
 		w(t, 1, true, 3, 0, 7)

@@ -60,9 +60,11 @@ func (m *ModularTag) IsSuitableFor(num_input_channels, num_output_channels int) 
 	return m.num_input_channels == num_input_channels && m.num_output_channels == num_output_channels
 }
 func (m *ModularTag) Transform(workspace []unit_float, r, g, b unit_float) (unit_float, unit_float, unit_float) {
-	for _, t := range m.transforms {
+	for i, t := range m.transforms {
+		fmt.Println(11111111, r, g, b, m.transform_objects[i].String())
 		r, g, b = t(workspace, r, g, b)
 	}
+	fmt.Println(222222222, r, g, b)
 	return r, g, b
 }
 
@@ -158,9 +160,18 @@ func modularDecoder(raw []byte) (ans any, err error) {
 	ans = mt
 	add_curves := func(c []Curve1D) {
 		if len(c) > 0 {
-			nc := NewCurveTransformer(mt.a_curves...)
-			mt.transforms = append(mt.transforms, nc.Transform)
-			mt.transform_objects = append(mt.transform_objects, nc)
+			has_non_identity := false
+			for _, x := range c {
+				if _, ok := x.(*IdentityCurve); !ok {
+					has_non_identity = true
+					break
+				}
+			}
+			if has_non_identity {
+				nc := NewCurveTransformer(mt.a_curves...)
+				mt.transforms = append(mt.transforms, nc.Transform)
+				mt.transform_objects = append(mt.transform_objects, nc)
+			}
 		}
 	}
 	add_curves(mt.a_curves)

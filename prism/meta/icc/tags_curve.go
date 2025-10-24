@@ -175,9 +175,14 @@ func embeddedCurveDecoder(raw []byte) (any, int, error) {
 		if len(raw) < 14 {
 			return nil, 0, errors.New("curv tag missing gamma value")
 		}
-		c := &GammaCurve{gamma: fixed88ToFloat(raw[12:14])}
-		if err := c.Prepare(); err != nil {
+		g := &GammaCurve{gamma: fixed88ToFloat(raw[12:14])}
+		if err := g.Prepare(); err != nil {
 			return nil, 0, err
+		}
+		var c Curve1D = g
+		if g.is_one {
+			ic := IdentityCurve(0)
+			c = &ic
 		}
 		return c, consumed, nil
 	default:
@@ -227,7 +232,13 @@ func embeddedParametricCurveDecoder(raw []byte) (ans any, consumed int, err erro
 		if consumed = header_len + 4; block_len < consumed {
 			return nil, 0, errors.New("para tag too short")
 		}
-		c = &GammaCurve{gamma: p()}
+		g := &GammaCurve{gamma: p()}
+		if abs(g.gamma-1) < FLOAT_EQUALITY_THRESHOLD {
+			ic := IdentityCurve(0)
+			c = &ic
+		} else {
+			c = g
+		}
 	case ConditionalZeroFunction:
 		if consumed = header_len + 3*4; block_len < consumed {
 			return nil, 0, errors.New("para tag too short")
@@ -272,7 +283,7 @@ func (c IdentityCurve) InverseTransform(x unit_float) unit_float {
 }
 
 func (c IdentityCurve) Prepare() error { return nil }
-func (c IdentityCurve) String() string { return "IdentityCurve{}" }
+func (c IdentityCurve) String() string { return "IdentityCurve" }
 
 func (c GammaCurve) Transform(x unit_float) unit_float {
 	if x < 0 {
