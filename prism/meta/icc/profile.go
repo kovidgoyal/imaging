@@ -175,14 +175,22 @@ func (p *Profile) CreateTransformerToPCS(rendering_intent RenderingIntent) (ans 
 			return nil, err
 		}
 		ct := NewInverseCurveTransformer(rc, gc, bc)
-		m, _, err := p.TagTable.load_rgb_matrix()
+		m, err := p.TagTable.load_rgb_matrix()
 		if err != nil {
 			return nil, err
 		}
-		if chromatic_adaptation == nil {
-			return NewCombinedTransformer(ct, m), nil
+		if is_identity_matrix(m) {
+			m = chromatic_adaptation
+			chromatic_adaptation = nil
 		}
-		return NewCombinedTransformer(ct, m, chromatic_adaptation), nil
+		if chromatic_adaptation != nil {
+			combined := chromatic_adaptation.Multiply(*m)
+			m = &combined
+		}
+		if m == nil {
+			return ct, nil
+		}
+		return NewCombinedTransformer(ct, m), nil
 	}
 	return nil, nil
 }

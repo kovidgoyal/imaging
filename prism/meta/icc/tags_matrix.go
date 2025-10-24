@@ -75,38 +75,62 @@ func (m *Matrix3) Transform(workspace []unit_float, r, g, b unit_float) (unit_fl
 	return r, g, b
 }
 
-func (mat *Matrix3) Inverted() (ans Matrix3, err error) {
-	det := mat[0][0]*(mat[1][1]*mat[2][2]-mat[1][2]*mat[2][1]) -
-		mat[0][1]*(mat[1][0]*mat[2][2]-mat[1][2]*mat[2][0]) +
-		mat[0][2]*(mat[1][0]*mat[2][1]-mat[1][1]*mat[2][0])
+func (m Matrix3) Transpose() Matrix3 {
+	return Matrix3{
+		{m[0][0], m[1][0], m[2][0]},
+		{m[0][1], m[1][1], m[2][1]},
+		{m[0][2], m[1][2], m[2][2]},
+	}
+}
 
+func Dot(v1, v2 [3]unit_float) unit_float {
+	return v1[0]*v2[0] + v1[1]*v2[1] + v1[2]*v2[2]
+}
+
+func (m Matrix3) Multiply(o Matrix3) Matrix3 {
+	t := m.Transpose()
+	return Matrix3{
+		{Dot(t[0], o[0]), Dot(t[1], o[0]), Dot(t[2], o[0])},
+		{Dot(t[0], o[1]), Dot(t[1], o[1]), Dot(t[2], o[1])},
+		{Dot(t[0], o[2]), Dot(t[1], o[2]), Dot(t[2], o[2])},
+	}
+}
+
+func (m Matrix3) Inverted() (ans Matrix3, err error) {
+	o := Matrix3{
+		{
+			m[1][1]*m[2][2] - m[2][1]*m[1][2],
+			-(m[0][1]*m[2][2] - m[2][1]*m[0][2]),
+			m[0][1]*m[1][2] - m[1][1]*m[0][2],
+		},
+		{
+			-(m[1][0]*m[2][2] - m[2][0]*m[1][2]),
+			m[0][0]*m[2][2] - m[2][0]*m[0][2],
+			-(m[0][0]*m[1][2] - m[1][0]*m[0][2]),
+		},
+		{
+			m[1][0]*m[2][1] - m[2][0]*m[1][1],
+			-(m[0][0]*m[2][1] - m[2][0]*m[0][1]),
+			m[0][0]*m[1][1] - m[1][0]*m[0][1],
+		},
+	}
+
+	det := m[0][0]*o[0][0] + m[1][0]*o[0][1] + m[2][0]*o[0][2]
 	if det == 0 {
 		return ans, fmt.Errorf("matrix is singular and cannot be inverted")
 	}
-	invDet := 1 / det
-	adj := Matrix3{
-		{
-			(mat[1][1]*mat[2][2] - mat[1][2]*mat[2][1]),
-			(mat[0][2]*mat[2][1] - mat[0][1]*mat[2][2]), // Note the sign change for cofactor C12
-			(mat[0][1]*mat[1][2] - mat[0][2]*mat[1][1]), // Note the sign change for cofactor C13
-		},
-		{
-			(mat[1][2]*mat[2][0] - mat[1][0]*mat[2][2]),
-			(mat[0][0]*mat[2][2] - mat[0][2]*mat[2][0]),
-			(mat[0][2]*mat[1][0] - mat[0][0]*mat[1][2]),
-		},
-		{
-			(mat[1][0]*mat[2][1] - mat[1][1]*mat[2][0]),
-			(mat[0][1]*mat[2][0] - mat[0][0]*mat[2][1]),
-			(mat[0][0]*mat[1][1] - mat[0][1]*mat[1][0]),
-		},
-	}
-	for i := range 3 {
-		for j := range 3 {
-			ans[i][j] = invDet * adj[i][j]
-		}
-	}
-	return
+	det = 1 / det
+
+	o[0][0] *= det
+	o[0][1] *= det
+	o[0][2] *= det
+	o[1][0] *= det
+	o[1][1] *= det
+	o[1][2] *= det
+	o[2][0] *= det
+	o[2][1] *= det
+	o[2][2] *= det
+	return o, nil
 }
 
 func (m IdentityMatrix) Transform(workspace []unit_float, r, g, b unit_float) (unit_float, unit_float, unit_float) {
