@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"math"
 )
 
 // CLUTTag represents a color lookup table tag (TagColorLookupTable)
@@ -53,11 +54,12 @@ func embeddedClutDecoder(raw []byte, InputChannels, OutputChannels int) (any, er
 	switch bytes_per_channel {
 	case 1:
 		for i, b := range raw[:len(values)] {
-			values[i] = unit_float(b) / 255
+			values[i] = unit_float(b) / math.MaxUint8
 		}
 	case 2:
 		for i := range len(values) {
-			values[i] = unit_float(binary.BigEndian.Uint16(raw[i*2:i*2+2])) / 65535
+			values[i] = unit_float(binary.BigEndian.Uint16(raw[:2])) / math.MaxUint16
+			raw = raw[2:]
 		}
 	}
 	ans := &CLUTTag{
