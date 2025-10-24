@@ -312,7 +312,7 @@ func (c *GammaCurve) Prepare() error {
 func (c GammaCurve) String() string { return fmt.Sprintf("GammaCurve{%f}", c.gamma) }
 
 func sampled_value(samples []unit_float, max_idx unit_float, x unit_float) unit_float {
-	idx := x * max_idx
+	idx := clamp01(x) * max_idx
 	lof := unit_float(math.Trunc(float64(idx)))
 	lo := int(lof)
 	if lof == idx {
