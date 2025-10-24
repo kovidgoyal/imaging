@@ -143,7 +143,7 @@ func modularDecoder(raw []byte) (ans any, err error) {
 		mt.clut = temp.(ChannelTransformer)
 	}
 	if matrix > 0 {
-		if temp, err = embeddedMatrixDecoder(raw[clut:]); err != nil {
+		if temp, err = embeddedMatrixDecoder(raw[matrix:]); err != nil {
 			return nil, err
 		}
 		if _, is_identity_matrix := temp.(*IdentityMatrix); !is_identity_matrix {
