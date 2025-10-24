@@ -44,6 +44,8 @@ func (c *IdentityMatrix) IsSuitableFor(num_input_channels, num_output_channels i
 	return num_input_channels == 3 && num_output_channels == 3
 }
 
+func (c IdentityMatrix) String() string { return "IdentityMatrix" }
+
 var _ ChannelTransformer = (*MatrixWithOffset)(nil)
 
 func embeddedMatrixDecoder(body []byte) (any, error) {

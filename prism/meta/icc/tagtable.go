@@ -2,6 +2,7 @@ package icc
 
 import (
 	"fmt"
+	"strings"
 	"sync"
 )
 
@@ -251,6 +252,10 @@ func (t *TwoTransformers) Transform(ws []unit_float, r, g, b unit_float) (unit_f
 	return r, g, b
 }
 
+func (t TwoTransformers) String() string {
+	return fmt.Sprintf("TwoTransformers{ %v %v }", t.transformers[0], t.transformers[1])
+}
+
 type ThreeTransformers struct {
 	a, b, c      func(ws []unit_float, r, g, b unit_float) (unit_float, unit_float, unit_float)
 	ws           int
@@ -277,6 +282,10 @@ func (t *ThreeTransformers) Transform(ws []unit_float, r, g, b unit_float) (unit
 	return r, g, b
 }
 
+func (t ThreeTransformers) String() string {
+	return fmt.Sprintf("ThreeTransformers{ %v %v %v }", t.transformers[0], t.transformers[1], t.transformers[2])
+}
+
 type MultipleTransformers struct {
 	ws           int
 	transformers []ChannelTransformer
@@ -300,6 +309,14 @@ func (t *MultipleTransformers) Transform(ws []unit_float, r, g, b unit_float) (u
 		r, g, b = x.Transform(ws, r, g, b)
 	}
 	return r, g, b
+}
+
+func (t MultipleTransformers) String() string {
+	b := strings.Builder{}
+	for _, x := range t.transformers {
+		b.WriteString(fmt.Sprintf("%v ", x))
+	}
+	return fmt.Sprintf("MultipleTransformers{ %s }", b.String())
 }
 
 func NewCombinedTransformer(t ...ChannelTransformer) ChannelTransformer {
