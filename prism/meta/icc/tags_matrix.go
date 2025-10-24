@@ -67,6 +67,9 @@ func embeddedMatrixDecoder(body []byte) (any, error) {
 	r2.offset1 = readS15Fixed16BE(body[:4])
 	r2.offset2 = readS15Fixed16BE(body[4:8])
 	r2.offset3 = readS15Fixed16BE(body[8:12])
+	if r2.offset1 == 0 && r2.offset2 == 0 && r2.offset3 == 0 {
+		return m, nil
+	}
 	return r2, nil
 
 }
