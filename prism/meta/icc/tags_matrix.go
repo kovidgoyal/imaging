@@ -78,10 +78,7 @@ func matrixDecoder(raw []byte) (any, error) {
 }
 
 func (m *Matrix3) Transform(workspace []unit_float, r, g, b unit_float) (unit_float, unit_float, unit_float) {
-	r = m[0][0]*r + m[0][1]*g + m[0][2]*b
-	g = m[1][0]*r + m[1][1]*g + m[1][2]*b
-	b = m[2][0]*r + m[2][1]*g + m[2][2]*b
-	return r, g, b
+	return m[0][0]*r + m[0][1]*g + m[0][2]*b, m[1][0]*r + m[1][1]*g + m[1][2]*b, m[2][0]*r + m[2][1]*g + m[2][2]*b
 }
 
 func (m Matrix3) Transpose() Matrix3 {
@@ -100,12 +97,13 @@ func (m Matrix3) String() string {
 	return fmt.Sprintf("Matrix3{ %v, %v, %v }", m[0], m[1], m[2])
 }
 
+// Return m * o
 func (m Matrix3) Multiply(o Matrix3) Matrix3 {
-	t := m.Transpose()
+	t := o.Transpose()
 	return Matrix3{
-		{Dot(t[0], o[0]), Dot(t[1], o[0]), Dot(t[2], o[0])},
-		{Dot(t[0], o[1]), Dot(t[1], o[1]), Dot(t[2], o[1])},
-		{Dot(t[0], o[2]), Dot(t[1], o[2]), Dot(t[2], o[2])},
+		{Dot(t[0], m[0]), Dot(t[1], m[0]), Dot(t[2], m[0])},
+		{Dot(t[0], m[1]), Dot(t[1], m[1]), Dot(t[2], m[1])},
+		{Dot(t[0], m[2]), Dot(t[1], m[2]), Dot(t[2], m[2])},
 	}
 }
 

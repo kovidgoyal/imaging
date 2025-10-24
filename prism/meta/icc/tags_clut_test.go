@@ -14,7 +14,7 @@ import (
 
 var _ = fmt.Println
 
-func in_delta(t *testing.T, expected, actual interface{}, delta float64, msgAndArgs ...interface{}) bool {
+func in_delta(t *testing.T, expected, actual any, delta float64, msgAndArgs ...any) bool {
 	t.Helper()
 	if e, ok := expected.(unit_float); ok {
 		expected = float64(e)
@@ -25,7 +25,7 @@ func in_delta(t *testing.T, expected, actual interface{}, delta float64, msgAndA
 	return assert.InDelta(t, expected, actual, delta, msgAndArgs...)
 }
 
-func in_delta_slice(t *testing.T, expected, actual interface{}, delta float64, msgAndArgs ...interface{}) bool {
+func in_delta_slice(t *testing.T, expected, actual any, delta float64, msgAndArgs ...any) bool {
 	t.Helper()
 	if expected == nil || actual == nil ||
 		reflect.TypeOf(actual).Kind() != reflect.Slice ||
@@ -34,8 +34,12 @@ func in_delta_slice(t *testing.T, expected, actual interface{}, delta float64, m
 	}
 	actualSlice := reflect.ValueOf(actual)
 	expectedSlice := reflect.ValueOf(expected)
+	if actualSlice.Len() != expectedSlice.Len() {
+		return assert.Fail(t, fmt.Sprintf("Slices have different lengths: want %d got %d", expectedSlice.Len(), actualSlice.Len()), msgAndArgs...)
+	}
 	for i := 0; i < actualSlice.Len(); i++ {
-		result := in_delta(t, actualSlice.Index(i).Interface(), expectedSlice.Index(i).Interface(), delta, msgAndArgs...)
+		e, a := expectedSlice.Index(i).Interface(), actualSlice.Index(i).Interface()
+		result := in_delta(t, e, a, delta, msgAndArgs...)
 		if !result {
 			return result
 		}

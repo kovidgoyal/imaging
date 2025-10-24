@@ -2,9 +2,11 @@ package icc
 
 import (
 	"bytes"
+	"fmt"
+	"testing"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"testing"
 )
 
 func encode_matrix_vals(values ...unit_float) string {
@@ -106,15 +108,39 @@ func TestMtxDecoder(t *testing.T) {
 }
 
 func TestMatrixOperations(t *testing.T) {
+	mt := Matrix3{
+		{1, 1, 1},
+		{2, 2, 2},
+		{3, 3, 3},
+	}
+	r, g, b := mt.Transform(nil, 1, 2, 3)
+	in_delta_slice(t, []unit_float{6, 12, 18}, []unit_float{r, g, b}, FLOAT_EQUALITY_THRESHOLD, []unit_float{r, g, b})
+	mc := mt.Transpose()
+	mr := mt.Multiply(mc)
+	in_delta_slice(t, []unit_float{3, 6, 9}, mr[0][:], FLOAT_EQUALITY_THRESHOLD, mr.String())
+	in_delta_slice(t, []unit_float{6, 12, 18}, mr[1][:], FLOAT_EQUALITY_THRESHOLD, mr.String())
+	in_delta_slice(t, []unit_float{9, 18, 27}, mr[2][:], FLOAT_EQUALITY_THRESHOLD, mr.String())
+
 	m := Matrix3{
 		{1, 2, 3},
 		{4, 6, 5},
-		{7, 9, 10},
+		{7, 9, 11},
 	}
 	mi, err := m.Inverted()
 	require.NoError(t, err)
 	q := m.Multiply(mi)
 	require.True(t, is_identity_matrix(&q), q.String())
+	m2 := Matrix3{
+		{11, 22, 33},
+		{44, 66, 55},
+		{77, 99, 101},
+	}
+	r, g, b = m.Transform(nil, 1, 2, 3)
+	r, g, b = m2.Transform(nil, r, g, b)
+	mc = m2.Multiply(m)
+	er, eg, eb := mc.Transform(nil, 1, 2, 3)
+	in_delta_slice(t, []unit_float{r, g, b}, []unit_float{er, eg, eb}, FLOAT_EQUALITY_THRESHOLD,
+		fmt.Sprintf("%v != %v", []unit_float{r, g, b}, []unit_float{er, eg, eb}))
 }
 
 func TestMatrixTag_Transform(t *testing.T) {

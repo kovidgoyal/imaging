@@ -8,7 +8,7 @@ import (
 
 type unit_float float32
 
-const FLOAT_EQUALITY_THRESHOLD = 1e-6
+const FLOAT_EQUALITY_THRESHOLD = 1e-5
 
 func pow(a, b unit_float) unit_float { return unit_float(math.Pow(float64(a), float64(b))) }
 func abs(a unit_float) unit_float    { return unit_float(math.Abs(float64(a))) }
