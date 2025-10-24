@@ -260,7 +260,8 @@ func add_chromatic_adaptation(chad *Matrix3, tag ChannelTransformer, prepend boo
 }
 
 func (p *Profile) CreateTransformerToDevice(rendering_intent RenderingIntent) (ans ChannelTransformer, err error) {
-	b2a, err := p.find_conversion_tag(false, rendering_intent)
+	const forward = false
+	b2a, err := p.find_conversion_tag(forward, rendering_intent)
 	if err != nil {
 		return nil, err
 	}
@@ -269,13 +270,14 @@ func (p *Profile) CreateTransformerToDevice(rendering_intent RenderingIntent) (a
 		return nil, err
 	}
 	if b2a != nil {
-		return add_chromatic_adaptation(chromatic_adaptation, b2a, true), nil
+		return add_chromatic_adaptation(chromatic_adaptation, b2a, !forward), nil
 	}
-	return p.create_matrix_trc_transformer(false, chromatic_adaptation)
+	return p.create_matrix_trc_transformer(forward, chromatic_adaptation)
 }
 
 func (p *Profile) CreateTransformerToPCS(rendering_intent RenderingIntent) (ans ChannelTransformer, err error) {
-	a2b, err := p.find_conversion_tag(false, rendering_intent)
+	const forward = true
+	a2b, err := p.find_conversion_tag(forward, rendering_intent)
 	if err != nil {
 		return nil, err
 	}
@@ -284,9 +286,9 @@ func (p *Profile) CreateTransformerToPCS(rendering_intent RenderingIntent) (ans 
 		return nil, err
 	}
 	if a2b != nil {
-		return add_chromatic_adaptation(chromatic_adaptation, a2b, false), nil
+		return add_chromatic_adaptation(chromatic_adaptation, a2b, !forward), nil
 	}
-	return p.create_matrix_trc_transformer(true, chromatic_adaptation)
+	return p.create_matrix_trc_transformer(forward, chromatic_adaptation)
 }
 
 func newProfile() *Profile {
