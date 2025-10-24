@@ -29,6 +29,9 @@ func embeddedClutDecoder(raw []byte, InputChannels, OutputChannels int) (any, er
 	if len(raw) < 20 {
 		return nil, errors.New("clut tag too short")
 	}
+	if InputChannels > 4 {
+		return nil, fmt.Errorf("clut supports at most 4 input channels not: %d", InputChannels)
+	}
 	gridPoints := make([]int, InputChannels)
 	for i, b := range raw[:InputChannels] {
 		gridPoints[i] = int(b)
@@ -63,9 +66,6 @@ func embeddedClutDecoder(raw []byte, InputChannels, OutputChannels int) (any, er
 		OutputChannels: OutputChannels,
 		Values:         values,
 	}
-	if ans.InputChannels > 6 {
-		return nil, fmt.Errorf("unsupported num of CLUT input channels: %d", ans.InputChannels)
-	}
 	return ans, nil
 }
 
@@ -77,107 +77,77 @@ func expectedValues(gridPoints []int, outputChannels int) int {
 	return expectedPoints * outputChannels
 }
 
-func (c *CLUTTag) WorkspaceSize() int { return c.InputChannels }
+func (c *CLUTTag) WorkspaceSize() int { return 0 }
 
 func (c *CLUTTag) IsSuitableFor(num_input_channels, num_output_channels int) bool {
 	return num_input_channels == int(c.InputChannels) && num_output_channels == c.OutputChannels && num_input_channels <= 6
 }
 
-func clut_trilinear_interpolate(input_channels int, grid_points []int, values []unit_float, out []unit_float, gridPos []int, gridFrac []unit_float) {
-	numCorners := 1 << input_channels // 2^inputs
-	// walk all corners of the hypercube
-	for corner := range numCorners {
-		weight := unit_float(1.0)
-		idx := 0
-		stride := 1
-		for dim := input_channels - 1; dim >= 0; dim-- {
-			bit := (corner >> dim) & 1
-			pos := gridPos[dim] + bit
-			idx += pos * stride
-			stride *= grid_points[dim]
-			if bit == 0 {
-				weight *= 1 - gridFrac[dim]
+// Lookup performs an n-linear interpolation on the CLUT for the given input color using an iterative method.
+// Input values should be normalized between 0.0 and 1.0.
+func (c *CLUTTag) Lookup(input, workspace, output []unit_float) {
+	// output MUST be zero initialized
+	// Pre-allocate slices for indices and weights
+	var buf [4]int
+	var wbuf [4]unit_float
+	indices := buf[:c.InputChannels]
+	weights := wbuf[:c.InputChannels]
+	input = input[:c.InputChannels]
+
+	// Calculate the base indices and interpolation weights for each dimension.
+	for i, val := range input {
+		gp := c.GridPoints[i]
+		val = clamp01(val)
+		// Scale the value to the grid dimensions
+		pos := val * unit_float(gp-1)
+		// The base index is the floor of the position.
+		idx := int(pos)
+		// The weight is the fractional part of the position.
+		weight := pos - unit_float(idx)
+		// Clamp index to be at most the second to last grid point.
+		if idx >= gp-1 {
+			idx = gp - 2
+			weight = 1 // set weight to 1 for border index
+		}
+		indices[i] = idx
+		weights[i] = weight
+	}
+	// Initialize the final output color array
+	// Iterate through all 2^InputChannels corners of the n-dimensional hypercube
+	for i := range 1 << c.InputChannels {
+		// Calculate the combined weight for this corner
+		cornerWeight := unit_float(1)
+		// Calculate the N-dimensional index to look up in the table
+		tableIndex := 0
+		multiplier := unit_float(1)
+
+		for j := c.InputChannels - 1; j >= 0; j-- {
+			// Check the j-th bit of i to decide if we are at the lower or upper bound for this dimension
+			if (i>>j)&1 == 1 {
+				// Upper bound for this dimension
+				cornerWeight *= weights[j]
+				tableIndex += int(unit_float(indices[j]+1) * multiplier)
 			} else {
-				weight *= gridFrac[dim]
+				// Lower bound for this dimension
+				cornerWeight *= (1.0 - weights[j])
+				tableIndex += int(unit_float(indices[j]) * multiplier)
 			}
+			multiplier *= unit_float(c.GridPoints[j])
 		}
-		base := idx * len(out)
-		for o := range len(out) {
-			out[o] += weight * values[base+o]
-		}
-	}
-}
-
-func clut_trilinear_interpolate3(grid_points []int, values []unit_float, gridPos []int, gridFrac []unit_float) (or unit_float, og unit_float, ob unit_float) {
-	const input_channels = 3
-	numCorners := 1 << input_channels // 2^inputs
-	// walk all corners of the hypercube
-	for corner := range numCorners {
-		weight := unit_float(1.0)
-		idx := 0
-		stride := 1
-		for dim := input_channels - 1; dim >= 0; dim-- {
-			bit := (corner >> dim) & 1
-			pos := gridPos[dim] + bit
-			idx += pos * stride
-			stride *= grid_points[dim]
-			if bit == 0 {
-				weight *= 1 - gridFrac[dim]
-			} else {
-				weight *= gridFrac[dim]
-			}
-		}
-		base := idx * input_channels
-		or += weight * values[base]
-		og += weight * values[base+1]
-		ob += weight * values[base+2]
-	}
-	return
-}
-
-func clut_transform(input_channels, output_channels int, grid_points []int, values []unit_float, output, workspace []unit_float, inputs []unit_float) {
-	gridFrac := workspace[0:input_channels]
-	var buf [6]int
-	gridPos := buf[:]
-	for i, v := range inputs {
-		nPoints := grid_points[i]
-		pos := clamp01(v) * unit_float(nPoints-1)
-		gridPos[i] = int(pos)
-		if gridPos[i] >= nPoints-1 {
-			gridPos[i] = nPoints - 2 // clamp
-			gridFrac[i] = 1.0
-		} else {
-			gridFrac[i] = pos - unit_float(gridPos[i])
+		// Get the color value from the table for the current corner
+		offset := tableIndex * c.OutputChannels
+		// Add the weighted corner color to the output
+		for k, v := range c.Values[offset : offset+c.OutputChannels] {
+			output[k] += v * cornerWeight
 		}
 	}
-	for i := range output_channels {
-		output[i] = 0
-	}
-	clut_trilinear_interpolate(input_channels, grid_points, values, output[:output_channels], gridPos, gridFrac)
-}
-
-func clut_transform3(grid_points []int, values []unit_float, workspace []unit_float, r, g, b unit_float) (unit_float, unit_float, unit_float) {
-	const input_channels = 3
-	gridFrac := workspace[0:input_channels]
-	var buf [6]int
-	var ibuf = [3]unit_float{r, g, b}
-	gridPos := buf[:]
-	for i, v := range ibuf {
-		nPoints := grid_points[i]
-		pos := clamp01(v) * unit_float(nPoints-1)
-		gridPos[i] = int(pos)
-		if gridPos[i] >= nPoints-1 {
-			gridPos[i] = nPoints - 2 // clamp
-			gridFrac[i] = 1.0
-		} else {
-			gridFrac[i] = pos - unit_float(gridPos[i])
-		}
-	}
-	return clut_trilinear_interpolate3(grid_points, values, gridPos, gridFrac)
 }
 
 func (c *CLUTTag) Transform(workspace []unit_float, r, g, b unit_float) (unit_float, unit_float, unit_float) {
-	return clut_transform3(c.GridPoints, c.Values, workspace, r, g, b)
+	var obuf [3]unit_float
+	var ibuf = [3]unit_float{r, g, b}
+	c.Lookup(ibuf[:], workspace, obuf[:])
+	return obuf[0], obuf[1], obuf[2]
 }
 
 func clamp01(v unit_float) unit_float {

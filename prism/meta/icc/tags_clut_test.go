@@ -140,6 +140,38 @@ func TestCLUTTransform(t *testing.T) {
 		out[0], out[1], out[2] = clut.Transform(work, 1.0, 1.0, 1.0) // Should hit [1.0]
 		in_delta(t, 1.0, out[0], 1e-6)
 	})
+	t.Run("RGB->1-RGB", func(t *testing.T) {
+		clut := &CLUTTag{
+			InputChannels:  3,
+			OutputChannels: 3,
+			GridPoints:     []int{2, 2, 2},
+			// The table below has the output on the left and input in the comment on the right.
+			// As per section 10.12.3 of of ICC.1-2022-5.pdf spec the first input channel (R)
+			// varies least rapidly and the last (B) varies most rapidly
+			Values: []unit_float{
+				// Output <-   Input
+				1, 1, 1, // <- R=0, G=0, B=0
+				1, 1, 0, // <- R=0, G=0, B=1
+				1, 0, 1, // <- R=0, G=1, B=0
+				1, 0, 0, // <- R=0, G=1, B=1
+
+				0, 1, 1, // <- R=1, G=0, B=0
+				0, 1, 0, // <- R=1, G=0, B=0
+				0, 0, 1, // <- R=1, G=1, B=0
+				0, 0, 0, // <- R=1, G=1, B=1
+			}, // 8 points per output
+		}
+		type u = [3]unit_float
+		for _, c := range []u{
+			{0, 0, 0}, {1, 1, 1}, {1, 0, 0}, {0, 1, 0}, {0, 0, 1}, {0.5, 0.5, 0.5},
+			{0.5, 0, 0}, {0.5, 1, 1}, {0.25, 0.5, 0.75}, {0.75, 0.5, 0.25},
+		} {
+			expected := []unit_float{1 - c[0], 1 - c[1], 1 - c[2]}
+			r, g, b := clut.Transform(work, c[0], c[1], c[2])
+			actual := []unit_float{r, g, b}
+			in_delta_slice(t, expected, actual, FLOAT_EQUALITY_THRESHOLD, fmt.Sprintf("%v -> %v != %v", c, actual, expected))
+		}
+	})
 }
 
 func TestClamp01(t *testing.T) {
