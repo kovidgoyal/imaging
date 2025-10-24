@@ -245,6 +245,20 @@ func (p *Profile) find_conversion_tag(forward bool, rendering_intent RenderingIn
 	return ans, nil
 }
 
+func add_chromatic_adaptation(chad *Matrix3, tag ChannelTransformer, prepend bool) ChannelTransformer {
+	if chad == nil {
+		return tag
+	}
+	if mod, ok := tag.(*ModularTag); ok {
+		mod.AddTransform(chad, prepend)
+		return mod
+	}
+	if prepend {
+		return NewCombinedTransformer(chad, tag)
+	}
+	return NewCombinedTransformer(tag, chad)
+}
+
 func (p *Profile) CreateTransformerToDevice(rendering_intent RenderingIntent) (ans ChannelTransformer, err error) {
 	b2a, err := p.find_conversion_tag(false, rendering_intent)
 	if err != nil {
@@ -255,13 +269,11 @@ func (p *Profile) CreateTransformerToDevice(rendering_intent RenderingIntent) (a
 		return nil, err
 	}
 	if b2a != nil {
-		// TODO: handle chromatic_adaptation
-		return b2a, nil
+		return add_chromatic_adaptation(chromatic_adaptation, b2a, true), nil
 	}
 	return p.create_matrix_trc_transformer(false, chromatic_adaptation)
 }
 
-// See section 8.10.2 of ICC.1-2202-05.pdf for tag selection algorithm
 func (p *Profile) CreateTransformerToPCS(rendering_intent RenderingIntent) (ans ChannelTransformer, err error) {
 	a2b, err := p.find_conversion_tag(false, rendering_intent)
 	if err != nil {
@@ -272,8 +284,7 @@ func (p *Profile) CreateTransformerToPCS(rendering_intent RenderingIntent) (ans 
 		return nil, err
 	}
 	if a2b != nil {
-		// TODO: handle chromatic_adaptation
-		return a2b, nil
+		return add_chromatic_adaptation(chromatic_adaptation, a2b, false), nil
 	}
 	return p.create_matrix_trc_transformer(true, chromatic_adaptation)
 }

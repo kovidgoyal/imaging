@@ -13,15 +13,47 @@ type ModularTag struct {
 	a_curves, m_curves, b_curves            []Curve1D
 	clut, matrix                            ChannelTransformer
 	transforms                              []func(workspace []unit_float, r, g, b unit_float) (unit_float, unit_float, unit_float)
+	transform_objects                       []ChannelTransformer
 	workspace_size                          int
 	is_a_to_b                               bool
 }
 
 func (m ModularTag) String() string {
-	return fmt.Sprintf("%s{a:%v, b:%v, m:%v, matrix:%v, clut:%v}", IfElse(m.is_a_to_b, "mAB", "mBA"), m.a_curves, m.b_curves, m.m_curves, m.matrix, m.clut)
+	return fmt.Sprintf("%s{ %s }", IfElse(m.is_a_to_b, "mAB", "mBA"), transformers_as_string(m.transform_objects...))
 }
 
 var _ ChannelTransformer = (*ModularTag)(nil)
+
+func (m *ModularTag) AddTransform(c ChannelTransformer, prepend bool) {
+	m.workspace_size = max(c.WorkspaceSize(), m.workspace_size)
+	if len(m.transforms) == 0 {
+		m.transform_objects = append(m.transform_objects, c)
+		m.transforms = append(m.transforms, c.Transform)
+		return
+	}
+	if cm, ok := c.(*Matrix3); ok {
+		idx := IfElse(prepend, 0, len(m.transform_objects)-1)
+		q := m.transform_objects[idx]
+		if mat, ok := q.(*Matrix3); ok {
+			var combined Matrix3
+			if prepend {
+				combined = mat.Multiply(*cm)
+			} else {
+				combined = cm.Multiply(*mat)
+			}
+			m.transform_objects[idx] = &combined
+			m.transforms[idx] = combined.Transform
+			return
+		}
+	}
+	if prepend {
+		slices.Insert(m.transform_objects, 0, c)
+		slices.Insert(m.transforms, 0, c.Transform)
+	} else {
+		m.transform_objects = append(m.transform_objects, c)
+		m.transforms = append(m.transforms, c.Transform)
+	}
+}
 
 func (m *ModularTag) WorkspaceSize() int { return m.workspace_size }
 func (m *ModularTag) IsSuitableFor(num_input_channels, num_output_channels int) bool {
@@ -124,23 +156,27 @@ func modularDecoder(raw []byte) (ans any, err error) {
 		}
 	}
 	ans = mt
-	if mt.a_curves != nil {
-		mt.transforms = append(mt.transforms, NewCurveTransformer(mt.a_curves...).Transform)
+	add_curves := func(c []Curve1D) {
+		if len(c) > 0 {
+			nc := NewCurveTransformer(mt.a_curves...)
+			mt.transforms = append(mt.transforms, nc.Transform)
+			mt.transform_objects = append(mt.transform_objects, nc)
+		}
 	}
+	add_curves(mt.a_curves)
 	if mt.clut != nil {
 		mt.transforms = append(mt.transforms, mt.clut.Transform)
+		mt.transform_objects = append(mt.transform_objects, mt.clut)
 	}
-	if mt.m_curves != nil {
-		mt.transforms = append(mt.transforms, NewCurveTransformer(mt.m_curves...).Transform)
-	}
+	add_curves(mt.m_curves)
 	if mt.matrix != nil {
 		mt.transforms = append(mt.transforms, mt.matrix.Transform)
+		mt.transform_objects = append(mt.transform_objects, mt.matrix)
 	}
-	if mt.b_curves != nil {
-		mt.transforms = append(mt.transforms, NewCurveTransformer(mt.b_curves...).Transform)
-	}
+	add_curves(mt.b_curves)
 	if !is_a_to_b {
 		slices.Reverse(mt.transforms)
+		slices.Reverse(mt.transform_objects)
 	}
 	return
 }

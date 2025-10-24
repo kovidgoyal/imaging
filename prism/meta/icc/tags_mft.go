@@ -18,7 +18,7 @@ type MFT struct {
 }
 
 func (c MFT) String() string {
-	return fmt.Sprintf("MFT{grid_points:%v, input:%v, matrix:%v, clut:%v, output:%v }", c.grid_points, c.input_curves, c.matrix, c.clut, c.output_curves)
+	return fmt.Sprintf("MFT{grid_points:%v, matrix:%v input:%v, clut:%v, output:%v }", c.grid_points, c.matrix, c.input_curves, c.clut, c.output_curves)
 }
 
 func (c *MFT) WorkspaceSize() int { return c.in_channels }

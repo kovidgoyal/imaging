@@ -312,12 +312,20 @@ func (t *MultipleTransformers) Transform(ws []unit_float, r, g, b unit_float) (u
 	return r, g, b
 }
 
+func transformers_as_string(t ...ChannelTransformer) string {
+	b := strings.Builder{}
+	for _, x := range t {
+		b.WriteString(fmt.Sprintf("%v ", x))
+	}
+	return b.String()
+}
+
 func (t MultipleTransformers) String() string {
 	b := strings.Builder{}
 	for _, x := range t.transformers {
 		b.WriteString(fmt.Sprintf("%v ", x))
 	}
-	return fmt.Sprintf("MultipleTransformers{ %s }", b.String())
+	return fmt.Sprintf("MultipleTransformers{ %s }", transformers_as_string(t.transformers...))
 }
 
 func NewCombinedTransformer(t ...ChannelTransformer) ChannelTransformer {
