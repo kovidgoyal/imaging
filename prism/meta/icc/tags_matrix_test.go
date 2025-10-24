@@ -113,7 +113,7 @@ func TestMatrixOperations(t *testing.T) {
 		{2, 2, 2},
 		{3, 3, 3},
 	}
-	r, g, b := mt.Transform(nil, 1, 2, 3)
+	r, g, b := mt.Transform(1, 2, 3)
 	in_delta_slice(t, []unit_float{6, 12, 18}, []unit_float{r, g, b}, FLOAT_EQUALITY_THRESHOLD, []unit_float{r, g, b})
 	mc := mt.Transpose()
 	mr := mt.Multiply(mc)
@@ -135,10 +135,10 @@ func TestMatrixOperations(t *testing.T) {
 		{44, 66, 55},
 		{77, 99, 101},
 	}
-	r, g, b = m.Transform(nil, 1, 2, 3)
-	r, g, b = m2.Transform(nil, r, g, b)
+	r, g, b = m.Transform(1, 2, 3)
+	r, g, b = m2.Transform(r, g, b)
 	mc = m2.Multiply(m)
-	er, eg, eb := mc.Transform(nil, 1, 2, 3)
+	er, eg, eb := mc.Transform(1, 2, 3)
 	in_delta_slice(t, []unit_float{r, g, b}, []unit_float{er, eg, eb}, FLOAT_EQUALITY_THRESHOLD,
 		fmt.Sprintf("%v != %v", []unit_float{r, g, b}, []unit_float{er, eg, eb}))
 }
@@ -152,7 +152,7 @@ func TestMatrixTag_Transform(t *testing.T) {
 			{0, 0, 1},
 		}
 		input := []unit_float{0.5, 0.25, 0.75}
-		output[0], output[1], output[2] = matrix.Transform(nil, 0.5, 0.25, 0.75)
+		output[0], output[1], output[2] = matrix.Transform(0.5, 0.25, 0.75)
 		in_delta_slice(t, input, output, 0.0001)
 	})
 	t.Run("SuccessWithOffset", func(t *testing.T) {
@@ -165,7 +165,7 @@ func TestMatrixTag_Transform(t *testing.T) {
 			offset1: 0.1, offset2: 0.2, offset3: 0.3,
 		}
 		expected := []unit_float{0.6, 0.45, 1.05} // input + offset
-		output[0], output[1], output[2] = matrix.Transform(nil, 0.5, 0.25, 0.75)
+		output[0], output[1], output[2] = matrix.Transform(0.5, 0.25, 0.75)
 		in_delta_slice(t, expected, output, 0.0001)
 	})
 	t.Run("MatrixApplied", func(t *testing.T) {
@@ -175,7 +175,7 @@ func TestMatrixTag_Transform(t *testing.T) {
 			{0, 0, 4},
 		}
 		expected := []unit_float{2, 3, 4}
-		output[0], output[1], output[2] = matrix.Transform(nil, 1, 1, 1)
+		output[0], output[1], output[2] = matrix.Transform(1, 1, 1)
 		in_delta_slice(t, expected, output, 0.0001)
 	})
 }

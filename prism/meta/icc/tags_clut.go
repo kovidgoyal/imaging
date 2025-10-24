@@ -85,7 +85,7 @@ func (c *CLUTTag) IsSuitableFor(num_input_channels, num_output_channels int) boo
 
 // Lookup performs an n-linear interpolation on the CLUT for the given input color using an iterative method.
 // Input values should be normalized between 0.0 and 1.0. Output MUST be zero initialized.
-func (c *CLUTTag) Lookup(input, workspace, output []unit_float) {
+func (c *CLUTTag) Lookup(input, output []unit_float) {
 	// Pre-allocate slices for indices and weights
 	var buf [4]int
 	var wbuf [4]unit_float
@@ -111,7 +111,6 @@ func (c *CLUTTag) Lookup(input, workspace, output []unit_float) {
 		indices[i] = idx
 		weights[i] = weight
 	}
-	// Initialize the final output color array
 	// Iterate through all 2^InputChannels corners of the n-dimensional hypercube
 	for i := range 1 << c.InputChannels {
 		// Calculate the combined weight for this corner
@@ -142,10 +141,10 @@ func (c *CLUTTag) Lookup(input, workspace, output []unit_float) {
 	}
 }
 
-func (c *CLUTTag) Transform(workspace []unit_float, r, g, b unit_float) (unit_float, unit_float, unit_float) {
+func (c *CLUTTag) Transform(r, g, b unit_float) (unit_float, unit_float, unit_float) {
 	var obuf [3]unit_float
 	var ibuf = [3]unit_float{r, g, b}
-	c.Lookup(ibuf[:], workspace, obuf[:])
+	c.Lookup(ibuf[:], obuf[:])
 	return obuf[0], obuf[1], obuf[2]
 }
 

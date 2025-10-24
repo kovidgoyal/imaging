@@ -44,16 +44,14 @@ type InverseCurveTransformer struct{ curves []Curve1D }
 func (c CurveTransformer) IsSuitableFor(num_input_channels, num_output_channels int) bool {
 	return len(c.curves) == num_input_channels && len(c.curves) == num_output_channels
 }
-func (c CurveTransformer) WorkspaceSize() int { return 0 }
-func (c CurveTransformer) Transform(workspace []unit_float, r, g, b unit_float) (unit_float, unit_float, unit_float) {
+func (c CurveTransformer) Transform(r, g, b unit_float) (unit_float, unit_float, unit_float) {
 	return c.curves[0].Transform(r), c.curves[1].Transform(g), c.curves[2].Transform(b)
 }
 
 func (c InverseCurveTransformer) IsSuitableFor(num_input_channels, num_output_channels int) bool {
 	return len(c.curves) == num_input_channels && len(c.curves) == num_output_channels
 }
-func (c InverseCurveTransformer) WorkspaceSize() int { return 0 }
-func (c InverseCurveTransformer) Transform(workspace []unit_float, r, g, b unit_float) (unit_float, unit_float, unit_float) {
+func (c InverseCurveTransformer) Transform(r, g, b unit_float) (unit_float, unit_float, unit_float) {
 	// we need to clamp as per spec section F.3 of ICC.1-2202-05.pdf
 	return c.curves[0].InverseTransform(clamp01(r)), c.curves[1].InverseTransform(clamp01(g)), c.curves[2].InverseTransform(clamp01(b))
 }
@@ -65,8 +63,7 @@ type CurveTransformer3 struct {
 func (c CurveTransformer3) IsSuitableFor(num_input_channels, num_output_channels int) bool {
 	return 3 == num_input_channels && 3 == num_output_channels
 }
-func (c CurveTransformer3) WorkspaceSize() int { return 0 }
-func (c CurveTransformer3) Transform(workspace []unit_float, r, g, b unit_float) (unit_float, unit_float, unit_float) {
+func (c CurveTransformer3) Transform(r, g, b unit_float) (unit_float, unit_float, unit_float) {
 	return c.r.Transform(r), c.g.Transform(g), c.b.Transform(b)
 }
 
@@ -80,8 +77,7 @@ func (c InverseCurveTransformer) String() string  { return "Inverse" + c.curves[
 func (c InverseCurveTransformer3) IsSuitableFor(num_input_channels, num_output_channels int) bool {
 	return 3 == num_input_channels && 3 == num_output_channels
 }
-func (c InverseCurveTransformer3) WorkspaceSize() int { return 0 }
-func (c InverseCurveTransformer3) Transform(workspace []unit_float, r, g, b unit_float) (unit_float, unit_float, unit_float) {
+func (c InverseCurveTransformer3) Transform(r, g, b unit_float) (unit_float, unit_float, unit_float) {
 	// we need to clamp as per spec section F.3 of ICC.1-2202-05.pdf
 	return c.r.InverseTransform(clamp01(r)), c.g.InverseTransform(clamp01(g)), c.b.InverseTransform(clamp01(b))
 }

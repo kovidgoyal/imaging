@@ -297,10 +297,6 @@ func newProfile() *Profile {
 	}
 }
 
-func MakeWorkspace(c ChannelTransformer) []unit_float {
-	return make([]unit_float, c.WorkspaceSize())
-}
-
 var Points_for_transformer_comparison = sync.OnceValue(func() []XYZType {
 	const num = 16
 	ans := make([]XYZType, 0, num*num*num)
@@ -329,11 +325,10 @@ func transformers_functionally_identical(a, b ChannelTransformer) bool {
 		end := min(start+chunk_sz, limit)
 		go func(start, end int) {
 			defer recover() // ignore panic on sending to closed channel
-			workspace := make([]unit_float, max(a.WorkspaceSize(), b.WorkspaceSize()))
 			for i := start; i < end; i++ {
 				p := pts[i]
-				ar, ag, ab := a.Transform(workspace, p.X, p.Y, p.Z)
-				br, bg, bb := b.Transform(workspace, p.X, p.Y, p.Z)
+				ar, ag, ab := a.Transform(p.X, p.Y, p.Z)
+				br, bg, bb := b.Transform(p.X, p.Y, p.Z)
 				if abs(ar-br) > FLOAT_EQUALITY_THRESHOLD || abs(ag-bg) > FLOAT_EQUALITY_THRESHOLD || abs(ab-bb) > FLOAT_EQUALITY_THRESHOLD {
 					c <- false
 				}

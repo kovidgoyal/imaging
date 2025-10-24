@@ -117,8 +117,8 @@ func TestCLUTDecoder(t *testing.T) {
 }
 
 func TestCLUTTransform(t *testing.T) {
-	var output, workspace [16]unit_float
-	out, work := output[:], workspace[:]
+	var output [16]unit_float
+	out := output[:]
 	t.Run("HappyPath_3D", func(t *testing.T) {
 		clut := &CLUTTag{
 			InputChannels:  3,
@@ -135,9 +135,9 @@ func TestCLUTTransform(t *testing.T) {
 				1, 1, 1,
 			}, // 8 points per output
 		}
-		out[0], out[1], out[2] = clut.Transform(work, 0.0, 0.0, 0.0) // Should hit [0.0]
+		out[0], out[1], out[2] = clut.Transform(0.0, 0.0, 0.0) // Should hit [0.0]
 		in_delta(t, 0.0, out[0], 1e-6)
-		out[0], out[1], out[2] = clut.Transform(work, 1.0, 1.0, 1.0) // Should hit [1.0]
+		out[0], out[1], out[2] = clut.Transform(1.0, 1.0, 1.0) // Should hit [1.0]
 		in_delta(t, 1.0, out[0], 1e-6)
 	})
 	t.Run("RGB->1-RGB", func(t *testing.T) {
@@ -167,7 +167,7 @@ func TestCLUTTransform(t *testing.T) {
 			{0.5, 0, 0}, {0.5, 1, 1}, {0.25, 0.5, 0.75}, {0.75, 0.5, 0.25},
 		} {
 			expected := []unit_float{1 - c[0], 1 - c[1], 1 - c[2]}
-			r, g, b := clut.Transform(work, c[0], c[1], c[2])
+			r, g, b := clut.Transform(c[0], c[1], c[2])
 			actual := []unit_float{r, g, b}
 			in_delta_slice(t, expected, actual, FLOAT_EQUALITY_THRESHOLD, fmt.Sprintf("%v -> %v != %v", c, actual, expected))
 		}

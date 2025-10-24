@@ -12,9 +12,8 @@ type ModularTag struct {
 	num_input_channels, num_output_channels int
 	a_curves, m_curves, b_curves            []Curve1D
 	clut, matrix                            ChannelTransformer
-	transforms                              []func(workspace []unit_float, r, g, b unit_float) (unit_float, unit_float, unit_float)
+	transforms                              []func(r, g, b unit_float) (unit_float, unit_float, unit_float)
 	transform_objects                       []ChannelTransformer
-	workspace_size                          int
 	is_a_to_b                               bool
 }
 
@@ -25,7 +24,6 @@ func (m ModularTag) String() string {
 var _ ChannelTransformer = (*ModularTag)(nil)
 
 func (m *ModularTag) AddTransform(c ChannelTransformer, prepend bool) {
-	m.workspace_size = max(c.WorkspaceSize(), m.workspace_size)
 	if len(m.transforms) == 0 {
 		m.transform_objects = append(m.transform_objects, c)
 		m.transforms = append(m.transforms, c.Transform)
@@ -55,16 +53,13 @@ func (m *ModularTag) AddTransform(c ChannelTransformer, prepend bool) {
 	}
 }
 
-func (m *ModularTag) WorkspaceSize() int { return m.workspace_size }
 func (m *ModularTag) IsSuitableFor(num_input_channels, num_output_channels int) bool {
 	return m.num_input_channels == num_input_channels && m.num_output_channels == num_output_channels
 }
-func (m *ModularTag) Transform(workspace []unit_float, r, g, b unit_float) (unit_float, unit_float, unit_float) {
-	for i, t := range m.transforms {
-		fmt.Println(11111111, r, g, b, m.transform_objects[i].String())
-		r, g, b = t(workspace, r, g, b)
+func (m *ModularTag) Transform(r, g, b unit_float) (unit_float, unit_float, unit_float) {
+	for _, t := range m.transforms {
+		r, g, b = t(r, g, b)
 	}
-	fmt.Println(222222222, r, g, b)
 	return r, g, b
 }
 
@@ -146,7 +141,6 @@ func modularDecoder(raw []byte) (ans any, err error) {
 			return nil, err
 		}
 		mt.clut = temp.(ChannelTransformer)
-		mt.workspace_size = max(mt.workspace_size, mt.clut.WorkspaceSize())
 	}
 	if matrix > 0 {
 		if temp, err = embeddedMatrixDecoder(raw[clut:]); err != nil {
@@ -154,7 +148,6 @@ func modularDecoder(raw []byte) (ans any, err error) {
 		}
 		if _, is_identity_matrix := temp.(*IdentityMatrix); !is_identity_matrix {
 			mt.matrix = temp.(ChannelTransformer)
-			mt.workspace_size = max(mt.workspace_size, mt.matrix.WorkspaceSize())
 		}
 	}
 	ans = mt

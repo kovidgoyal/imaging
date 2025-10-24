@@ -222,20 +222,14 @@ func emptyTagTable() TagTable {
 }
 
 type ChannelTransformer interface {
-	Transform(workspace []unit_float, r, g, b unit_float) (unit_float, unit_float, unit_float)
+	Transform(r, g, b unit_float) (unit_float, unit_float, unit_float)
 	IsSuitableFor(num_input_channels int, num_output_channels int) bool
-	WorkspaceSize() int
 	String() string
 }
 
 type TwoTransformers struct {
-	a, b         func(ws []unit_float, r, g, b unit_float) (unit_float, unit_float, unit_float)
-	ws           int
+	a, b         func(r, g, b unit_float) (unit_float, unit_float, unit_float)
 	transformers []ChannelTransformer
-}
-
-func (t *TwoTransformers) WorkspaceSize() int {
-	return t.ws
 }
 
 func (t *TwoTransformers) IsSuitableFor(i, o int) bool {
@@ -247,9 +241,9 @@ func (t *TwoTransformers) IsSuitableFor(i, o int) bool {
 	return true
 }
 
-func (t *TwoTransformers) Transform(ws []unit_float, r, g, b unit_float) (unit_float, unit_float, unit_float) {
-	r, g, b = t.a(ws, r, g, b)
-	r, g, b = t.b(ws, r, g, b)
+func (t *TwoTransformers) Transform(r, g, b unit_float) (unit_float, unit_float, unit_float) {
+	r, g, b = t.a(r, g, b)
+	r, g, b = t.b(r, g, b)
 	return r, g, b
 }
 
@@ -258,13 +252,8 @@ func (t TwoTransformers) String() string {
 }
 
 type ThreeTransformers struct {
-	a, b, c      func(ws []unit_float, r, g, b unit_float) (unit_float, unit_float, unit_float)
-	ws           int
+	a, b, c      func(r, g, b unit_float) (unit_float, unit_float, unit_float)
 	transformers []ChannelTransformer
-}
-
-func (t *ThreeTransformers) WorkspaceSize() int {
-	return t.ws
 }
 
 func (t *ThreeTransformers) IsSuitableFor(i, o int) bool {
@@ -276,10 +265,10 @@ func (t *ThreeTransformers) IsSuitableFor(i, o int) bool {
 	return true
 }
 
-func (t *ThreeTransformers) Transform(ws []unit_float, r, g, b unit_float) (unit_float, unit_float, unit_float) {
-	r, g, b = t.a(ws, r, g, b)
-	r, g, b = t.b(ws, r, g, b)
-	r, g, b = t.c(ws, r, g, b)
+func (t *ThreeTransformers) Transform(r, g, b unit_float) (unit_float, unit_float, unit_float) {
+	r, g, b = t.a(r, g, b)
+	r, g, b = t.b(r, g, b)
+	r, g, b = t.c(r, g, b)
 	return r, g, b
 }
 
@@ -288,12 +277,7 @@ func (t ThreeTransformers) String() string {
 }
 
 type MultipleTransformers struct {
-	ws           int
 	transformers []ChannelTransformer
-}
-
-func (t *MultipleTransformers) WorkspaceSize() int {
-	return t.ws
 }
 
 func (t *MultipleTransformers) IsSuitableFor(i, o int) bool {
@@ -305,9 +289,9 @@ func (t *MultipleTransformers) IsSuitableFor(i, o int) bool {
 	return true
 }
 
-func (t *MultipleTransformers) Transform(ws []unit_float, r, g, b unit_float) (unit_float, unit_float, unit_float) {
+func (t *MultipleTransformers) Transform(r, g, b unit_float) (unit_float, unit_float, unit_float) {
 	for _, x := range t.transformers {
-		r, g, b = x.Transform(ws, r, g, b)
+		r, g, b = x.Transform(r, g, b)
 	}
 	return r, g, b
 }
@@ -329,10 +313,6 @@ func (t MultipleTransformers) String() string {
 }
 
 func NewCombinedTransformer(t ...ChannelTransformer) ChannelTransformer {
-	ws := 0
-	for _, x := range t {
-		ws = max(ws, x.WorkspaceSize())
-	}
 	switch len(t) {
 	case 0:
 		m := IdentityMatrix(0)
@@ -340,10 +320,10 @@ func NewCombinedTransformer(t ...ChannelTransformer) ChannelTransformer {
 	case 1:
 		return t[0]
 	case 2:
-		return &TwoTransformers{t[0].Transform, t[1].Transform, ws, t}
+		return &TwoTransformers{t[0].Transform, t[1].Transform, t}
 	case 3:
-		return &ThreeTransformers{t[0].Transform, t[1].Transform, t[2].Transform, ws, t}
+		return &ThreeTransformers{t[0].Transform, t[1].Transform, t[2].Transform, t}
 	default:
-		return &MultipleTransformers{ws, t}
+		return &MultipleTransformers{t}
 	}
 }

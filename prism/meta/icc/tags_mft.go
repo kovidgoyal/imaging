@@ -21,23 +21,21 @@ func (c MFT) String() string {
 	return fmt.Sprintf("MFT{grid_points:%v, matrix:%v input:%v, clut:%v, output:%v }", c.grid_points, c.matrix, c.input_curves, c.clut, c.output_curves)
 }
 
-func (c *MFT) WorkspaceSize() int { return c.in_channels }
-
 func (c *MFT) IsSuitableFor(num_input_channels, num_output_channels int) bool {
 	return num_input_channels == int(c.in_channels) && num_output_channels == c.out_channels && num_input_channels <= 6
 }
 
 var _ ChannelTransformer = (*MFT)(nil)
 
-func (mft *MFT) Transform(workspace []unit_float, r, g, b unit_float) (unit_float, unit_float, unit_float) {
+func (mft *MFT) Transform(r, g, b unit_float) (unit_float, unit_float, unit_float) {
 	// Apply matrix
-	r, g, b = mft.matrix.Transform(nil, r, g, b)
+	r, g, b = mft.matrix.Transform(r, g, b)
 	// Apply input curves with linear interpolation
 	r = mft.input_curves[0].Transform(r)
 	g = mft.input_curves[1].Transform(g)
 	b = mft.input_curves[2].Transform(b)
 	// Apply CLUT
-	r, g, b = mft.clut.Transform(workspace, r, g, b)
+	r, g, b = mft.clut.Transform(r, g, b)
 	// Apply output curves with interpolation
 	r = mft.output_curves[0].Transform(r)
 	g = mft.output_curves[1].Transform(g)

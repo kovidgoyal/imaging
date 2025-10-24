@@ -30,19 +30,13 @@ func is_identity_matrix(m *Matrix3) bool {
 	return true
 }
 
-func (c *Matrix3) WorkspaceSize() int { return 0 }
-
 func (c *Matrix3) IsSuitableFor(num_input_channels, num_output_channels int) bool {
 	return num_input_channels == 3 && num_output_channels == 3
 }
 
-func (c *MatrixWithOffset) WorkspaceSize() int { return 0 }
-
 func (c *MatrixWithOffset) IsSuitableFor(num_input_channels, num_output_channels int) bool {
 	return num_input_channels == 3 && num_output_channels == 3
 }
-
-func (c *IdentityMatrix) WorkspaceSize() int { return 0 }
 
 func (c *IdentityMatrix) IsSuitableFor(num_input_channels, num_output_channels int) bool {
 	return num_input_channels == 3 && num_output_channels == 3
@@ -83,7 +77,7 @@ func matrixDecoder(raw []byte) (any, error) {
 	return embeddedMatrixDecoder(raw[8:])
 }
 
-func (m *Matrix3) Transform(workspace []unit_float, r, g, b unit_float) (unit_float, unit_float, unit_float) {
+func (m *Matrix3) Transform(r, g, b unit_float) (unit_float, unit_float, unit_float) {
 	return m[0][0]*r + m[0][1]*g + m[0][2]*b, m[1][0]*r + m[1][1]*g + m[1][2]*b, m[2][0]*r + m[2][1]*g + m[2][2]*b
 }
 
@@ -150,12 +144,12 @@ func (m Matrix3) Inverted() (ans Matrix3, err error) {
 	return o, nil
 }
 
-func (m IdentityMatrix) Transform(workspace []unit_float, r, g, b unit_float) (unit_float, unit_float, unit_float) {
+func (m IdentityMatrix) Transform(r, g, b unit_float) (unit_float, unit_float, unit_float) {
 	return r, g, b
 }
 
-func (m *MatrixWithOffset) Transform(workspace []unit_float, r, g, b unit_float) (unit_float, unit_float, unit_float) {
-	r, g, b = m.m.Transform(workspace, r, g, b)
+func (m *MatrixWithOffset) Transform(r, g, b unit_float) (unit_float, unit_float, unit_float) {
+	r, g, b = m.m.Transform(r, g, b)
 	r += m.offset1
 	g += m.offset2
 	b += m.offset3

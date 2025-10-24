@@ -71,11 +71,10 @@ func test_profile(t *testing.T, name string, profile_data []byte) {
 		require.NoError(t, err)
 		pts := icc.Points_for_transformer_comparison()
 		actual := make([]float32, 0, len(pts)*3)
-		workspace := icc.MakeWorkspace(tr)
 		for _, pt := range pts {
-			r, g, b := tr.Transform(workspace, pt.X, pt.Y, pt.Z)
+			r, g, b := tr.Transform(pt.X, pt.Y, pt.Z)
 			actual = append(actual, float32(r), float32(g), float32(b))
-			r, g, b = inv.Transform(workspace, r, g, b)
+			r, g, b = inv.Transform(r, g, b)
 			require.InDeltaSlice(
 				t, []float32{pt.X, pt.Y, pt.Z}, []float32{r, g, b}, icc.FLOAT_EQUALITY_THRESHOLD,
 				"b2a of a2b result differs from original color")
@@ -85,6 +84,14 @@ func test_profile(t *testing.T, name string, profile_data []byte) {
 		require.InDeltaSlice(t, expected, actual, icc.FLOAT_EQUALITY_THRESHOLD)
 		expected = pts_for_lcms2()
 	})
+}
+
+func TestDevelop(t *testing.T) {
+	p := icc.Srgb_lab_profile()
+	tr, err := p.CreateTransformerToPCS(icc.PerceptualRenderingIntent)
+	require.NoError(t, err)
+	r, g, b := tr.Transform(0.5, 0.25, 1)
+	fmt.Println(1111111, r, g, b, []float32{45.2933, 58.3075, -85.6426})
 }
 
 func TestAgainstLCMS2(t *testing.T) {
