@@ -84,9 +84,8 @@ func (c *CLUTTag) IsSuitableFor(num_input_channels, num_output_channels int) boo
 }
 
 // Lookup performs an n-linear interpolation on the CLUT for the given input color using an iterative method.
-// Input values should be normalized between 0.0 and 1.0.
+// Input values should be normalized between 0.0 and 1.0. Output MUST be zero initialized.
 func (c *CLUTTag) Lookup(input, workspace, output []unit_float) {
-	// output MUST be zero initialized
 	// Pre-allocate slices for indices and weights
 	var buf [4]int
 	var wbuf [4]unit_float
