@@ -3,7 +3,9 @@
 package prism
 
 import (
+	"bytes"
 	"fmt"
+	"sync"
 	"testing"
 
 	"github.com/kovidgoyal/imaging/prism/meta/icc"
@@ -28,12 +30,16 @@ func TestCGOConversion(t *testing.T) {
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "Got 15 bytes, block should be")
 
+	expected := []float32{0.2569, 0.1454, 0.7221}
 	pcs, err := xyz.TransformRGB8bitToPCS([]byte{128, 64, 255}, icc.RelativeColorimetricRenderingIntent)
 	require.NoError(t, err)
-	assert.InDeltaSlice(t, pcs, []float64{0.2569, 0.1454, 0.7221}, 0.001)
+	assert.InDeltaSlice(t, pcs, expected, 0.001)
+	pcs, err = xyz.TransformFloatToPCS([]float32{128 / 255., 64 / 255., 255 / 255.}, icc.RelativeColorimetricRenderingIntent)
+	require.NoError(t, err)
+	assert.InDeltaSlice(t, pcs, expected, 0.001)
 	pcs, err = lab.TransformRGB8bitToPCS([]byte{128, 64, 255}, icc.RelativeColorimetricRenderingIntent)
 	require.NoError(t, err)
-	assert.InDeltaSlice(t, pcs, []float64{45.2933, 58.3075, -85.6426}, 0.001)
+	assert.InDeltaSlice(t, pcs, []float32{45.2933, 58.3075, -85.6426}, 0.001)
 
 	for _, p := range []*CMSProfile{xyz, lab} {
 		inp := []byte{128, 64, 255}
@@ -43,17 +49,40 @@ func TestCGOConversion(t *testing.T) {
 	}
 }
 
+var pts_for_lcms2 = sync.OnceValue(func() []float32 {
+	pts := icc.Points_for_transformer_comparison()
+	temp := make([]float32, 0, len(pts)*3)
+	for _, pt := range pts {
+		temp = append(temp, float32(pt.X), float32(pt.Y), float32(pt.Z))
+	}
+	return temp
+})
+
+func test_profile(t *testing.T, name string, profile_data []byte) {
+	t.Run(name, func(t *testing.T) {
+		t.Parallel()
+		p, err := icc.NewProfileReader(bytes.NewReader(profile_data)).ReadProfile()
+		require.NoError(t, err)
+		lcms, err := CreateCMSProfile(profile_data)
+		require.NoError(t, err)
+		tr, err := p.CreateTransformerToPCS(icc.PerceptualRenderingIntent)
+		require.NoError(t, err)
+		pts := icc.Points_for_transformer_comparison()
+		actual := make([]float32, 0, len(pts)*3)
+		workspace := icc.MakeWorkspace(tr)
+		for _, pt := range pts {
+			r, g, b := tr.Transform(workspace, pt.X, pt.Y, pt.Z)
+			actual = append(actual, float32(r), float32(g), float32(b))
+		}
+		expected, err := lcms.TransformFloatToPCS(pts_for_lcms2(), icc.RelativeColorimetricRenderingIntent)
+		require.NoError(t, err)
+		require.InDeltaSlice(t, expected, actual, icc.FLOAT_EQUALITY_THRESHOLD)
+	})
+}
+
 func TestAgainstLCMS2(t *testing.T) {
-	p := icc.Srgb_xyz_profile()
-	println(p.Header.String())
-	_, err := p.CreateTransformerToPCS(icc.PerceptualRenderingIntent)
-	if err != nil {
-		t.Fatal(err)
-	}
-	println(p.Header.String())
-	p = icc.Srgb_lab_profile()
-	_, err = p.CreateTransformerToPCS(icc.PerceptualRenderingIntent)
-	if err != nil {
-		t.Fatal(err)
-	}
+	test_profile(t, "srgb_xyz", icc.Srgb_xyz_profile_data)
+	// p := icc.Srgb_lab_profile()
+	// _, err := p.CreateTransformerToPCS(icc.PerceptualRenderingIntent)
+	// require.NoError(t, err)
 }

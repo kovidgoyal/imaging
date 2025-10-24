@@ -73,8 +73,8 @@ type InverseCurveTransformer3 struct{ r, g, b Curve1D }
 
 func (c CurveTransformer3) String() string        { return c.r.String() }
 func (c CurveTransformer) String() string         { return c.curves[0].String() }
-func (c InverseCurveTransformer3) String() string { return c.r.String() }
-func (c InverseCurveTransformer) String() string  { return c.curves[0].String() }
+func (c InverseCurveTransformer3) String() string { return "Inverse" + c.r.String() }
+func (c InverseCurveTransformer) String() string  { return "Inverse" + c.curves[0].String() }
 
 func (c InverseCurveTransformer3) IsSuitableFor(num_input_channels, num_output_channels int) bool {
 	return 3 == num_input_channels && 3 == num_output_channels
@@ -497,7 +497,15 @@ func (c *SplitCurve) Prepare() error {
 	return nil
 }
 
+func (c SplitCurve) is_srgb() bool {
+	s := SRGBCurve()
+	return c == *s
+}
+
 func (c *SplitCurve) String() string {
+	if c.is_srgb() {
+		return "SRGBCurve"
+	}
 	return fmt.Sprintf("SplitCurve{a: %v b: %v c: %v d: %v g: %v}", c.a, c.b, c.c, c.d, c.g)
 }
 

@@ -22,7 +22,7 @@ func (e *unsupported) Error() string {
 	return fmt.Sprintf("the tag: %s (0x%x) is not supported", e.sig, uint32(e.sig))
 }
 
-type XYZType struct{ x, y, z unit_float }
+type XYZType struct{ X, Y, Z unit_float }
 
 func xyz_type(data []byte) XYZType {
 	return XYZType{readS15Fixed16BE(data[:4]), readS15Fixed16BE(data[4:8]), readS15Fixed16BE(data[8:12])}
@@ -185,9 +185,9 @@ func (t *TagTable) load_rgb_matrix() (*Matrix3, error) {
 	}
 	rc, bc, gc := r.(*XYZType), g.(*XYZType), b.(*XYZType)
 	var m Matrix3
-	m[0][0], m[0][1], m[0][2] = rc.x, bc.x, gc.x
-	m[1][0], m[1][1], m[1][2] = rc.y, bc.y, gc.y
-	m[2][0], m[2][1], m[2][2] = rc.z, bc.z, gc.z
+	m[0][0], m[0][1], m[0][2] = rc.X, bc.X, gc.X
+	m[1][0], m[1][1], m[1][2] = rc.Y, bc.Y, gc.Y
+	m[2][0], m[2][1], m[2][2] = rc.Z, bc.Z, gc.Z
 	return &m, nil
 }
 

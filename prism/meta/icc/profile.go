@@ -4,6 +4,7 @@ import (
 	"bytes"
 	_ "embed"
 	"fmt"
+	"runtime"
 	"sync"
 )
 
@@ -164,6 +165,7 @@ func (p *Profile) CreateTransformerToPCS(rendering_intent RenderingIntent) (ans 
 			fmt.Println(11111111, sig.String())
 		}
 	} else {
+		// See section F.3 of ICC.1-2202-5.pdf for how these transforms are composed
 		var rc, gc, bc Curve1D
 		if rc, err = p.TagTable.load_curve_tag(RedTRCTagSignature); err != nil {
 			return nil, err
@@ -174,7 +176,7 @@ func (p *Profile) CreateTransformerToPCS(rendering_intent RenderingIntent) (ans 
 		if bc, err = p.TagTable.load_curve_tag(BlueTRCTagSignature); err != nil {
 			return nil, err
 		}
-		ct := NewInverseCurveTransformer(rc, gc, bc)
+		ct := NewCurveTransformer(rc, gc, bc)
 		m, err := p.TagTable.load_rgb_matrix()
 		if err != nil {
 			return nil, err
@@ -199,4 +201,57 @@ func newProfile() *Profile {
 	return &Profile{
 		TagTable: emptyTagTable(),
 	}
+}
+
+func MakeWorkspace(c ChannelTransformer) []unit_float {
+	return make([]unit_float, c.WorkspaceSize())
+}
+
+var Points_for_transformer_comparison = sync.OnceValue(func() []XYZType {
+	const num = 16
+	ans := make([]XYZType, 0, num*num*num)
+	m := 1 / unit_float(num-1)
+	for a := range num {
+		aa := unit_float(a) * m
+		for b := range num {
+			bb := unit_float(b) * m
+			for c := range num {
+				cc := unit_float(c) * m
+				ans = append(ans, XYZType{aa, bb, cc})
+			}
+		}
+	}
+	return ans
+})
+
+func transformers_functionally_identical(a, b ChannelTransformer) bool {
+	pts := Points_for_transformer_comparison()
+	num := max(1, runtime.GOMAXPROCS(0))
+	c := make(chan bool)
+	defer func() { close(c) }()
+	start, limit := 0, len(pts)
+	chunk_sz := max(1, limit/num)
+	for start < limit {
+		end := min(start+chunk_sz, limit)
+		go func(start, end int) {
+			defer recover() // ignore panic on sending to closed channel
+			workspace := make([]unit_float, max(a.WorkspaceSize(), b.WorkspaceSize()))
+			for i := start; i < end; i++ {
+				p := pts[i]
+				ar, ag, ab := a.Transform(workspace, p.X, p.Y, p.Z)
+				br, bg, bb := b.Transform(workspace, p.X, p.Y, p.Z)
+				if abs(ar-br) > FLOAT_EQUALITY_THRESHOLD || abs(ag-bg) > FLOAT_EQUALITY_THRESHOLD || abs(ab-bb) > FLOAT_EQUALITY_THRESHOLD {
+					c <- false
+				}
+			}
+			c <- true
+		}(start, end)
+		start = end
+	}
+	for val := range c {
+		if !val {
+			return false
+		}
+	}
+	return true
 }
