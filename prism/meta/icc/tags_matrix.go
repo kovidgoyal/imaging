@@ -48,30 +48,31 @@ var _ ChannelTransformer = (*MatrixWithOffset)(nil)
 
 func embeddedMatrixDecoder(body []byte) (any, error) {
 	result := Matrix3{}
+	if len(body) < 36 {
+		return nil, fmt.Errorf("embedded matrix tag too short: %d < 36", len(body))
+	}
 	var m ChannelTransformer = &result
 	for i := range 9 {
-		result[i/3][i%3] = readS15Fixed16BE(body[i*4 : (i+1)*4])
+		result[i/3][i%3] = readS15Fixed16BE(body[:4])
+		body = body[4:]
 	}
 	if is_identity_matrix(&result) {
 		t := IdentityMatrix(0)
 		m = &t
 	}
-	body = body[36:]
 	if len(body) < 3*4 {
 		return m, nil
 	}
 	r2 := &MatrixWithOffset{m: m}
-	if len(body) >= 3*4 {
-		r2.offset1 = readS15Fixed16BE(body[:4])
-		r2.offset2 = readS15Fixed16BE(body[4:8])
-		r2.offset3 = readS15Fixed16BE(body[8:12])
-	}
+	r2.offset1 = readS15Fixed16BE(body[:4])
+	r2.offset2 = readS15Fixed16BE(body[4:8])
+	r2.offset3 = readS15Fixed16BE(body[8:12])
 	return r2, nil
 
 }
 
 func matrixDecoder(raw []byte) (any, error) {
-	if len(raw) < 8+(9*4) {
+	if len(raw) < 8+36 {
 		return nil, errors.New("mtx tag too short")
 	}
 	return embeddedMatrixDecoder(raw[8:])
