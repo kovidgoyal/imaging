@@ -274,7 +274,7 @@ func (c GammaCurve) Transform(x unit_float) unit_float {
 		}
 		return 0
 	}
-	return pow32(x, c.gamma)
+	return pow(x, c.gamma)
 }
 
 func (c GammaCurve) InverseTransform(x unit_float) unit_float {
@@ -284,7 +284,7 @@ func (c GammaCurve) InverseTransform(x unit_float) unit_float {
 		}
 		return 0
 	}
-	return pow32(x, c.inv_gamma)
+	return pow(x, c.inv_gamma)
 }
 
 func (c *GammaCurve) Prepare() error {
@@ -292,7 +292,7 @@ func (c *GammaCurve) Prepare() error {
 		return fmt.Errorf("gamma curve has zero gamma value")
 	}
 	c.inv_gamma = 1 / c.gamma
-	c.is_one = abs32(c.gamma-1) < FLOAT_EQUALITY_THRESHOLD
+	c.is_one = abs(c.gamma-1) < FLOAT_EQUALITY_THRESHOLD
 	return nil
 }
 func (c GammaCurve) String() string { return fmt.Sprintf("GammaCurve{%f}", c.gamma) }
@@ -438,7 +438,7 @@ func (c *ConditionalZeroCurve) Transform(x unit_float) unit_float {
 	// Y = (aX+b)^g if X ≥ -b/a else 0
 	if x >= c.threshold {
 		if e := c.a*x + c.b; e > 0 {
-			return pow32(e, c.g)
+			return pow(e, c.g)
 		}
 	}
 	return 0
@@ -447,7 +447,7 @@ func (c *ConditionalZeroCurve) Transform(x unit_float) unit_float {
 func (c *ConditionalZeroCurve) InverseTransform(y unit_float) unit_float {
 	// X = (Y^(1/g) - b) / a if Y >= 0 else X = -b/a
 	// the below doesnt match the actual spec but matches lcms2 implementation
-	return max(0, (pow32(y, c.inv_gamma)-c.b)*c.inv_a)
+	return max(0, (pow(y, c.inv_gamma)-c.b)*c.inv_a)
 }
 
 func (c *ConditionalCCurve) Prepare() error {
@@ -466,7 +466,7 @@ func (c *ConditionalCCurve) Transform(x unit_float) unit_float {
 	// Y = (aX+b)^g + c if X ≥ -b/a else c
 	if x >= c.threshold {
 		if e := c.a*x + c.b; e > 0 {
-			return pow32(e, c.g) + c.c
+			return pow(e, c.g) + c.c
 		}
 		return 0
 	}
@@ -479,7 +479,7 @@ func (c *ConditionalCCurve) InverseTransform(y unit_float) unit_float {
 		if e == 0 {
 			return 0
 		}
-		return (pow32(e, c.inv_gamma) - c.b) * c.inv_a
+		return (pow(e, c.inv_gamma) - c.b) * c.inv_a
 	}
 	return c.threshold
 }
@@ -488,7 +488,7 @@ func (c *SplitCurve) Prepare() error {
 	if c.a == 0 || c.g == 0 || c.c == 0 {
 		return fmt.Errorf("conditional C curve as zero parameter value: a=%f or g=%f or c=%f", c.a, c.g, c.c)
 	}
-	c.threshold, c.inv_g, c.inv_a, c.inv_c = pow32(c.a*c.d+c.b, c.g), 1/c.g, 1/c.a, 1/c.c
+	c.threshold, c.inv_g, c.inv_a, c.inv_c = pow(c.a*c.d+c.b, c.g), 1/c.g, 1/c.a, 1/c.c
 	return nil
 }
 
@@ -500,7 +500,7 @@ func (c *SplitCurve) Transform(x unit_float) unit_float {
 	// Y = (aX+b)^g if X ≥ d else cX
 	if x >= c.d {
 		if e := c.a*x + c.b; e > 0 {
-			return pow32(e, c.g)
+			return pow(e, c.g)
 		}
 		return 0
 	}
@@ -513,14 +513,14 @@ func (c *SplitCurve) InverseTransform(y unit_float) unit_float {
 	if y < c.threshold {
 		return y * c.inv_c
 	}
-	return (pow32(y, c.inv_g) - c.b) * c.inv_a
+	return (pow(y, c.inv_g) - c.b) * c.inv_a
 }
 
 func (c *ComplexCurve) Prepare() error {
 	if c.a == 0 || c.g == 0 || c.c == 0 {
 		return fmt.Errorf("conditional C curve as zero parameter value: a=%f or g=%f or c=%f", c.a, c.g, c.c)
 	}
-	c.threshold, c.inv_g, c.inv_a, c.inv_c = pow32(c.a*c.d+c.b, c.g)+c.e, 1/c.g, 1/c.a, 1/c.c
+	c.threshold, c.inv_g, c.inv_a, c.inv_c = pow(c.a*c.d+c.b, c.g)+c.e, 1/c.g, 1/c.a, 1/c.c
 	return nil
 }
 
@@ -532,7 +532,7 @@ func (c *ComplexCurve) Transform(x unit_float) unit_float {
 	// Y = (aX+b)^g + e if X ≥ d else cX+f
 	if x >= c.d {
 		if e := c.a*x + c.b; e > 0 {
-			return pow32(e, c.g) + c.e
+			return pow(e, c.g) + c.e
 		}
 		return c.e
 	}
@@ -546,7 +546,7 @@ func (c *ComplexCurve) InverseTransform(y unit_float) unit_float {
 		return (y - c.f) * c.inv_c
 	}
 	if e := y - c.e; e > 0 {
-		return (pow32(e, c.inv_g) - c.b) * c.inv_a
+		return (pow(e, c.inv_g) - c.b) * c.inv_a
 	}
 	return 0
 }

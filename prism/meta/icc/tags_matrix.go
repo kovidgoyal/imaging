@@ -129,7 +129,7 @@ func (m Matrix3) Inverted() (ans Matrix3, err error) {
 	}
 
 	det := m[0][0]*o[0][0] + m[1][0]*o[0][1] + m[2][0]*o[0][2]
-	if abs32(det) < FLOAT_EQUALITY_THRESHOLD {
+	if abs(det) < FLOAT_EQUALITY_THRESHOLD {
 		return ans, fmt.Errorf("matrix is singular and cannot be inverted, det=%v", det)
 	}
 	det = 1 / det

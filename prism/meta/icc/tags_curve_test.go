@@ -262,14 +262,14 @@ func srgb_to_linear(v unit_float) unit_float {
 	if v <= 0.0031308 {
 		return v * 12.92
 	}
-	return 1.055*pow32(unit_float(v), 1/2.4) - 0.055
+	return 1.055*pow(unit_float(v), 1/2.4) - 0.055
 }
 
 func linear_to_srgb(v unit_float) unit_float {
 	if v <= 0.0031308*12.92 {
 		return v / 12.92
 	}
-	return pow32((v+0.055)/1.055, 2.4)
+	return pow((v+0.055)/1.055, 2.4)
 }
 
 func TestParametricCurveTag_Transform(t *testing.T) {
@@ -292,7 +292,7 @@ func TestParametricCurveTag_Transform(t *testing.T) {
 		rt(t, &SplitCurve{a: 1, b: 0, c: 0.5, d: 0.4, g: 2}, 0.5, 0.25)
 	})
 	t.Run("ComplexFunction", func(t *testing.T) {
-		rt(t, &ComplexCurve{a: 1, b: 0, c: 2, d: 0.5, e: 0.1, f: 0.2, g: 2}, 0.6, pow32(0.6, 2)+0.1)
+		rt(t, &ComplexCurve{a: 1, b: 0, c: 2, d: 0.5, e: 0.1, f: 0.2, g: 2}, 0.6, pow(0.6, 2)+0.1)
 	})
 	t.Run("ComplexFunction_NegativeBranch", func(t *testing.T) {
 		rt(t, &ComplexCurve{a: 1, b: 0, c: 0.5, d: 0.6, e: 0.1, f: 0.2, g: 2}, 0.5, 0.45)
