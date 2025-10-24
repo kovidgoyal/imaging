@@ -81,8 +81,6 @@ func test_profile(t *testing.T, name string, profile_data []byte) {
 }
 
 func TestAgainstLCMS2(t *testing.T) {
+	// test_profile(t, "srgb_lab", icc.Srgb_lab_profile_data)
 	test_profile(t, "srgb_xyz", icc.Srgb_xyz_profile_data)
-	// p := icc.Srgb_lab_profile()
-	// _, err := p.CreateTransformerToPCS(icc.PerceptualRenderingIntent)
-	// require.NoError(t, err)
 }

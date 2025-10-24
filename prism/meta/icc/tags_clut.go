@@ -15,7 +15,11 @@ type CLUTTag struct {
 }
 
 func (c CLUTTag) String() string {
-	return fmt.Sprintf("CLUTTag{ %v %v }", c.GridPoints, c.Values)
+	return fmt.Sprintf("CLUTTag{ %v num_values:%v }", c.GridPoints, len(c.Values))
+}
+
+func make_clut(grid_points []int, inp, outp int, values []unit_float) *CLUTTag {
+	return &CLUTTag{grid_points, inp, outp, values}
 }
 
 var _ ChannelTransformer = (*CLUTTag)(nil)

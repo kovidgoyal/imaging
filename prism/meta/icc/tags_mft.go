@@ -12,13 +12,13 @@ type MFT struct {
 	in_channels, out_channels   int
 	grid_points                 []int
 	input_curves, output_curves []Curve1D
-	clut                        []unit_float
+	clut                        *CLUTTag
 	matrix                      ChannelTransformer
 	is8bit                      bool
 }
 
 func (c MFT) String() string {
-	return fmt.Sprintf("MFT{grid_points:%v, input:%v, matrix:%v, clut:%v, output:%v }", c.grid_points, c.input_curves, c.matrix, len(c.clut), c.output_curves)
+	return fmt.Sprintf("MFT{grid_points:%v, input:%v, matrix:%v, clut:%v, output:%v }", c.grid_points, c.input_curves, c.matrix, c.clut, c.output_curves)
 }
 
 func (c *MFT) WorkspaceSize() int { return c.in_channels }
@@ -37,7 +37,7 @@ func (mft *MFT) Transform(workspace []unit_float, r, g, b unit_float) (unit_floa
 	g = mft.input_curves[1].Transform(g)
 	b = mft.input_curves[2].Transform(b)
 	// Apply CLUT
-	r, g, b = clut_transform3(mft.grid_points, mft.clut, workspace, r, g, b)
+	r, g, b = mft.clut.Transform(workspace, r, g, b)
 	// Apply output curves with interpolation
 	r = mft.output_curves[0].Transform(r)
 	g = mft.output_curves[1].Transform(g)
@@ -104,9 +104,10 @@ func load_mft_body(a *MFT, raw []byte, load_table func([]byte, int) ([]unit_floa
 		}
 	}
 	num_clut := expectedValues(a.grid_points, a.out_channels)
-	if a.clut, raw, err = load_table(raw, num_clut); err != nil {
+	if fp, raw, err = load_table(raw, num_clut); err != nil {
 		return err
 	}
+	a.clut = make_clut(a.grid_points, a.in_channels, a.out_channels, fp)
 	for i := range a.out_channels {
 		if fp, raw, err = load_table(raw, output_table_entries); err != nil {
 			return err

@@ -160,6 +160,11 @@ func (p *Profile) CreateTransformerToPCS(rendering_intent RenderingIntent) (ans 
 		return nil, err
 	}
 	if found_a2b {
+		c, err := p.TagTable.get_parsed(a2b)
+		if err != nil {
+			return nil, err
+		}
+		fmt.Println(3333333, c)
 		fmt.Println(3333333333, string(p.TagTable.entries[a2b].data[:8]), len(p.TagTable.entries[a2b].data))
 		for sig := range p.TagTable.entries {
 			fmt.Println(11111111, sig.String())

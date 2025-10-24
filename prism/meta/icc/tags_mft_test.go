@@ -73,7 +73,7 @@ func (m *MFT) as_bytes() []byte {
 			writeval(x)
 		}
 	}
-	for _, x := range m.clut {
+	for _, x := range m.clut.Values {
 		writeval(x)
 	}
 	for _, curve := range m.output_curves {
@@ -95,7 +95,7 @@ func (a *MFT) require_equal(t *testing.T, b *MFT) {
 	for i := range a.input_curves {
 		in_delta_slice(t, curve_points(a.input_curves[i]), curve_points(b.input_curves[i]), tolerance)
 	}
-	in_delta_slice(t, a.clut, b.clut, tolerance)
+	in_delta_slice(t, a.clut.Values, b.clut.Values, tolerance)
 	for i := range a.output_curves {
 		in_delta_slice(t, curve_points(a.output_curves[i]), curve_points(b.output_curves[i]), tolerance)
 	}
@@ -117,7 +117,7 @@ func TestMFTTag(t *testing.T) {
 	m := MFT{
 		in_channels: 3, out_channels: 3, grid_points: gp,
 		input_curves: []Curve1D{c, c, c}, output_curves: []Curve1D{c, c, c},
-		clut: curve_points(make_curve(expectedValues(gp, 3))), matrix: &im,
+		clut: make_clut(gp, 3, 3, curve_points(make_curve(expectedValues(gp, 3)))), matrix: &im,
 	}
 
 	roundtrip := func() {
