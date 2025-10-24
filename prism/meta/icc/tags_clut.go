@@ -15,7 +15,7 @@ type CLUTTag struct {
 }
 
 func (c CLUTTag) String() string {
-	return fmt.Sprintf("CLUTTag{ %v num_values:%v }", c.GridPoints, len(c.Values))
+	return fmt.Sprintf("CLUTTag{ inp:%v outp:%v grid:%v num_values:%v }", c.InputChannels, c.OutputChannels, c.GridPoints, len(c.Values))
 }
 
 func make_clut(grid_points []int, inp, outp int, values []unit_float) *CLUTTag {
