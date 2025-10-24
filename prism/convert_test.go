@@ -67,16 +67,23 @@ func test_profile(t *testing.T, name string, profile_data []byte) {
 		require.NoError(t, err)
 		tr, err := p.CreateTransformerToPCS(icc.PerceptualRenderingIntent)
 		require.NoError(t, err)
+		inv, err := p.CreateTransformerToDevice(icc.PerceptualRenderingIntent)
+		require.NoError(t, err)
 		pts := icc.Points_for_transformer_comparison()
 		actual := make([]float32, 0, len(pts)*3)
 		workspace := icc.MakeWorkspace(tr)
 		for _, pt := range pts {
 			r, g, b := tr.Transform(workspace, pt.X, pt.Y, pt.Z)
 			actual = append(actual, float32(r), float32(g), float32(b))
+			r, g, b = inv.Transform(workspace, r, g, b)
+			require.InDeltaSlice(
+				t, []float32{pt.X, pt.Y, pt.Z}, []float32{r, g, b}, icc.FLOAT_EQUALITY_THRESHOLD,
+				"b2a of a2b result differs from original color")
 		}
 		expected, err := lcms.TransformFloatToPCS(pts_for_lcms2(), icc.RelativeColorimetricRenderingIntent)
 		require.NoError(t, err)
 		require.InDeltaSlice(t, expected, actual, icc.FLOAT_EQUALITY_THRESHOLD)
+		expected = pts_for_lcms2()
 	})
 }
 
