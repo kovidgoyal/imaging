@@ -189,85 +189,93 @@ func (p *Profile) create_matrix_trc_transformer(forward bool, chromatic_adaptati
 }
 
 // See section 8.10.2 of ICC.1-2202-05.pdf for tag selection algorithm
-func (p *Profile) CreateTransformerToDevice(rendering_intent RenderingIntent) (ans ChannelTransformer, err error) {
-	b2a := UnknownSignature
-	switch rendering_intent {
-	case PerceptualRenderingIntent:
-		b2a = BToA0TagSignature
-	case RelativeColorimetricRenderingIntent:
-		b2a = BToA1TagSignature
-	case SaturationRenderingIntent:
-		b2a = BToA2TagSignature
-	case AbsoluteColorimetricRenderingIntent:
-		b2a = BToA3TagSignature
-	default:
-		return nil, fmt.Errorf("unknown rendering intent: %v", rendering_intent)
+func (p *Profile) find_conversion_tag(forward bool, rendering_intent RenderingIntent) (ans ChannelTransformer, err error) {
+	var ans_sig Signature = UnknownSignature
+	found_tag := false
+	if forward {
+		switch rendering_intent {
+		case PerceptualRenderingIntent:
+			ans_sig = AToB0TagSignature
+		case RelativeColorimetricRenderingIntent:
+			ans_sig = AToB1TagSignature
+		case SaturationRenderingIntent:
+			ans_sig = AToB2TagSignature
+		case AbsoluteColorimetricRenderingIntent:
+			ans_sig = AToB3TagSignature
+		default:
+			return nil, fmt.Errorf("unknown rendering intent: %v", rendering_intent)
+		}
+		found_tag = p.TagTable.Has(ans_sig)
+		const fallback = AToB0TagSignature
+		if !found_tag && p.TagTable.Has(fallback) {
+			ans_sig = fallback
+			found_tag = true
+		}
+	} else {
+		switch rendering_intent {
+		case PerceptualRenderingIntent:
+			ans_sig = BToA0TagSignature
+		case RelativeColorimetricRenderingIntent:
+			ans_sig = BToA1TagSignature
+		case SaturationRenderingIntent:
+			ans_sig = BToA2TagSignature
+		case AbsoluteColorimetricRenderingIntent:
+			ans_sig = BToA3TagSignature
+		default:
+			return nil, fmt.Errorf("unknown rendering intent: %v", rendering_intent)
+		}
+		found_tag = p.TagTable.Has(ans_sig)
+		const fallback = BToA0TagSignature
+		if !found_tag && p.TagTable.Has(fallback) {
+			ans_sig = fallback
+			found_tag = true
+		}
 	}
-	found_b2a := p.TagTable.Has(b2a)
-	const fallback = BToA0TagSignature
-	if !found_b2a && p.TagTable.Has(fallback) {
-		b2a = fallback
-		found_b2a = true
+	if !found_tag {
+		return nil, nil
+	}
+	c, err := p.TagTable.get_parsed(ans_sig)
+	if err != nil {
+		return nil, err
+	}
+	ans, ok := c.(ChannelTransformer)
+	if !ok {
+		return nil, fmt.Errorf("%s tag is not a ChannelTransformer: %T", ans_sig, c)
+	}
+	return ans, nil
+}
+
+func (p *Profile) CreateTransformerToDevice(rendering_intent RenderingIntent) (ans ChannelTransformer, err error) {
+	b2a, err := p.find_conversion_tag(false, rendering_intent)
+	if err != nil {
+		return nil, err
 	}
 	chromatic_adaptation, err := p.get_effective_chromatic_adaption()
 	if err != nil {
 		return nil, err
 	}
-	if found_b2a {
-		c, err := p.TagTable.get_parsed(b2a)
-		if err != nil {
-			return nil, err
-		}
-		fmt.Println(3333333, c)
-		fmt.Println(3333333333, string(p.TagTable.entries[b2a].data[:8]), len(p.TagTable.entries[b2a].data))
-		for sig := range p.TagTable.entries {
-			fmt.Println(11111111, sig.String())
-		}
-	} else {
-		return p.create_matrix_trc_transformer(false, chromatic_adaptation)
+	if b2a != nil {
+		// TODO: handle chromatic_adaptation
+		return b2a, nil
 	}
-	return nil, fmt.Errorf("could not find any conversion tags in the profile")
+	return p.create_matrix_trc_transformer(false, chromatic_adaptation)
 }
 
 // See section 8.10.2 of ICC.1-2202-05.pdf for tag selection algorithm
 func (p *Profile) CreateTransformerToPCS(rendering_intent RenderingIntent) (ans ChannelTransformer, err error) {
-	a2b := UnknownSignature
-	switch rendering_intent {
-	case PerceptualRenderingIntent:
-		a2b = AToB0TagSignature
-	case RelativeColorimetricRenderingIntent:
-		a2b = AToB1TagSignature
-	case SaturationRenderingIntent:
-		a2b = AToB2TagSignature
-	case AbsoluteColorimetricRenderingIntent:
-		a2b = AToB3TagSignature
-	default:
-		return nil, fmt.Errorf("unknown rendering intent: %v", rendering_intent)
-	}
-	found_a2b := p.TagTable.Has(a2b)
-	const fallback = AToB0TagSignature
-	if !found_a2b && p.TagTable.Has(fallback) {
-		a2b = fallback
-		found_a2b = true
+	a2b, err := p.find_conversion_tag(false, rendering_intent)
+	if err != nil {
+		return nil, err
 	}
 	chromatic_adaptation, err := p.get_effective_chromatic_adaption()
 	if err != nil {
 		return nil, err
 	}
-	if found_a2b {
-		c, err := p.TagTable.get_parsed(a2b)
-		if err != nil {
-			return nil, err
-		}
-		fmt.Println(3333333, c)
-		fmt.Println(3333333333, string(p.TagTable.entries[a2b].data[:8]), len(p.TagTable.entries[a2b].data))
-		for sig := range p.TagTable.entries {
-			fmt.Println(11111111, sig.String())
-		}
-	} else {
-		return p.create_matrix_trc_transformer(true, chromatic_adaptation)
+	if a2b != nil {
+		// TODO: handle chromatic_adaptation
+		return a2b, nil
 	}
-	return nil, fmt.Errorf("could not find any conversion tags in the profile")
+	return p.create_matrix_trc_transformer(true, chromatic_adaptation)
 }
 
 func newProfile() *Profile {
