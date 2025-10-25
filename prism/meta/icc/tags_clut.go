@@ -170,68 +170,10 @@ func (c *CLUTTag) IsSuitableFor(num_input_channels, num_output_channels int) boo
 	return num_input_channels == int(c.InputChannels) && num_output_channels == c.OutputChannels && num_input_channels <= 6
 }
 
-// Lookup performs an n-linear interpolation on the CLUT for the given input color using an iterative method.
-// Input values should be normalized between 0.0 and 1.0. Output MUST be zero initialized.
-func (c *CLUTTag) Lookup(input, output []unit_float) {
-	// Pre-allocate slices for indices and weights
-	var buf [4]int
-	var wbuf [4]unit_float
-	indices := buf[:c.InputChannels]
-	weights := wbuf[:c.InputChannels]
-	input = input[:c.InputChannels]
-
-	// Calculate the base indices and interpolation weights for each dimension.
-	for i, val := range input {
-		gp := c.GridPoints[i]
-		val = clamp01(val)
-		// Scale the value to the grid dimensions
-		pos := val * unit_float(gp-1)
-		// The base index is the floor of the position.
-		idx := int(pos)
-		// The weight is the fractional part of the position.
-		weight := pos - unit_float(idx)
-		// Clamp index to be at most the second to last grid point.
-		if idx >= gp-1 {
-			idx = gp - 2
-			weight = 1 // set weight to 1 for border index
-		}
-		indices[i] = idx
-		weights[i] = weight
-	}
-	// Iterate through all 2^InputChannels corners of the n-dimensional hypercube
-	for i := range 1 << c.InputChannels {
-		// Calculate the combined weight for this corner
-		cornerWeight := unit_float(1)
-		// Calculate the N-dimensional index to look up in the table
-		tableIndex := 0
-		multiplier := unit_float(1)
-
-		for j := c.InputChannels - 1; j >= 0; j-- {
-			// Check the j-th bit of i to decide if we are at the lower or upper bound for this dimension
-			if (i>>j)&1 == 1 {
-				// Upper bound for this dimension
-				cornerWeight *= weights[j]
-				tableIndex += int(unit_float(indices[j]+1) * multiplier)
-			} else {
-				// Lower bound for this dimension
-				cornerWeight *= (1.0 - weights[j])
-				tableIndex += int(unit_float(indices[j]) * multiplier)
-			}
-			multiplier *= unit_float(c.GridPoints[j])
-		}
-		// Get the color value from the table for the current corner
-		offset := tableIndex * c.OutputChannels
-		// Add the weighted corner color to the output
-		for k, v := range c.Values[offset : offset+c.OutputChannels] {
-			output[k] += v * cornerWeight
-		}
-	}
-}
-
 func (c *CLUTTag) Transform(r, g, b unit_float) (unit_float, unit_float, unit_float) {
 	var obuf [3]unit_float
 	var ibuf = [3]unit_float{r, g, b}
-	c.Lookup(ibuf[:], obuf[:])
+	trilinear_interpolate(ibuf[:], c.Values, obuf[:], c.InputChannels, c.OutputChannels, c.GridPoints)
 	return obuf[0], obuf[1], obuf[2]
 }
 

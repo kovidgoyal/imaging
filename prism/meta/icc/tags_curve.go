@@ -311,19 +311,6 @@ func (c *GammaCurve) Prepare() error {
 }
 func (c GammaCurve) String() string { return fmt.Sprintf("GammaCurve{%f}", c.gamma) }
 
-func sampled_value(samples []unit_float, max_idx unit_float, x unit_float) unit_float {
-	idx := clamp01(x) * max_idx
-	lof := unit_float(math.Trunc(float64(idx)))
-	lo := int(lof)
-	if lof == idx {
-		return samples[lo]
-	}
-	p := idx - unit_float(lo)
-	vhi := unit_float(samples[lo+1])
-	vlo := unit_float(samples[lo])
-	return vlo + p*(vhi-vlo)
-}
-
 func calculate_reverse_for_well_behaved_sampled_curve(points []unit_float) []unit_float {
 	n := len(points) - 1
 	if n < 1 {
