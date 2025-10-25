@@ -72,7 +72,7 @@ func IfElse[T any](condition bool, if_val T, else_val T) T {
 	return else_val
 }
 
-func modularDecoder(raw []byte) (ans any, err error) {
+func modularDecoder(raw []byte, input_colorspace, output_colorspace ColorSpace) (ans any, err error) {
 	if len(raw) < 40 {
 		return nil, errors.New("modular (mAB/mBA) tag too short")
 	}
@@ -139,7 +139,7 @@ func modularDecoder(raw []byte) (ans any, err error) {
 	}
 	var temp any
 	if clut > 0 {
-		if temp, err = embeddedClutDecoder(raw[clut:], inputCh, outputCh); err != nil {
+		if temp, err = embeddedClutDecoder(raw[clut:], inputCh, outputCh, output_colorspace); err != nil {
 			return nil, err
 		}
 		mt.clut = temp.(ChannelTransformer)

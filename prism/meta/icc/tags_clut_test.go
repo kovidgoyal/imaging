@@ -47,6 +47,10 @@ func in_delta_slice(t *testing.T, expected, actual any, delta float64, msgAndArg
 	return true
 }
 
+func u1Fixed15NumberEncode(x unit_float) uint16 {
+	return uint16(x * (1 << 15))
+}
+
 func encode_clut16bit() []byte {
 	var buf bytes.Buffer
 	buf.Write([]byte{2, 2, 2})             // grid points for each input (2×2×2)
@@ -54,8 +58,8 @@ func encode_clut16bit() []byte {
 	buf.WriteString("\x02\x00\x00\x00")    // bytes_per_channel
 	// 2x2x2 = 8 grid points, 3 outputs per point = 24 outputs
 	for i := range 8 * 3 {
-		val := uint16((i * 65535) / (8*3 - 1)) // Spread nicely 0..65535
-		_ = binary.Write(&buf, binary.BigEndian, val)
+		val := unit_float(i) / unit_float(8*3-1)
+		_ = binary.Write(&buf, binary.BigEndian, u1Fixed15NumberEncode(val))
 	}
 	if extra := buf.Len() % 4; extra > 0 {
 		buf.WriteString(strings.Repeat("\x00", 4-extra))
@@ -65,7 +69,7 @@ func encode_clut16bit() []byte {
 
 func TestCLUTDecoder(t *testing.T) {
 	t.Run("Success3D16bit", func(t *testing.T) {
-		val, err := embeddedClutDecoder(encode_clut16bit(), 3, 3)
+		val, err := embeddedClutDecoder(encode_clut16bit(), 3, 3, ColorSpaceXYZ)
 		require.NoError(t, err)
 		require.IsType(t, &CLUTTag{}, val)
 		clut := val.(*CLUTTag)
@@ -86,7 +90,7 @@ func TestCLUTDecoder(t *testing.T) {
 			buf.WriteByte(uint8(i))
 		}
 		buf.WriteByte(255)
-		val, err := embeddedClutDecoder(buf.Bytes(), 3, 3)
+		val, err := embeddedClutDecoder(buf.Bytes(), 3, 3, ColorSpaceXYZ)
 		require.NoError(t, err)
 		require.IsType(t, &CLUTTag{}, val)
 		clut := val.(*CLUTTag)
@@ -99,7 +103,7 @@ func TestCLUTDecoder(t *testing.T) {
 	})
 	t.Run("TooShort", func(t *testing.T) {
 		data := make([]byte, 19) // should be at least 20 bytes
-		_, err := embeddedClutDecoder(data, 1, 1)
+		_, err := embeddedClutDecoder(data, 1, 1, ColorSpaceXYZ)
 		assert.ErrorContains(t, err, "clut tag too short")
 	})
 	t.Run("UnexpectedBodyLength", func(t *testing.T) {
@@ -111,8 +115,8 @@ func TestCLUTDecoder(t *testing.T) {
 		for i := 0; i < 8*3-1; i++ {
 			buf.WriteByte(uint8(i))
 		}
-		_, err := embeddedClutDecoder(buf.Bytes(), 3, 3)
-		assert.ErrorContains(t, err, "CLUT unexpected body length")
+		_, err := embeddedClutDecoder(buf.Bytes(), 3, 3, ColorSpaceXYZ)
+		assert.ErrorContains(t, err, "CLUT table too short 23 < 24")
 	})
 }
 

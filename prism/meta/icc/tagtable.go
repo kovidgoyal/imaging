@@ -64,11 +64,11 @@ func parse_tag(sig Signature, data []byte, input_colorspace, output_colorspace C
 	case MatrixElemTypeSignature:
 		return matrixDecoder(data)
 	case LutAtoBTypeSignature, LutBtoATypeSignature:
-		return modularDecoder(data)
+		return modularDecoder(data, input_colorspace, output_colorspace)
 	case Lut16TypeSignature:
-		return decode_mft16(data)
+		return decode_mft16(data, input_colorspace, output_colorspace)
 	case Lut8TypeSignature:
-		return decode_mft8(data)
+		return decode_mft8(data, input_colorspace, output_colorspace)
 	case XYZTypeSignature:
 		return decode_xyz(data)
 	case S15Fixed16ArrayTypeSignature:

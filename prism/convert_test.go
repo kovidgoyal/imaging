@@ -93,7 +93,6 @@ func TestDevelop(t *testing.T) {
 	require.NoError(t, err)
 	r, g, b := tr.Transform(0.5, 0.25, 1)
 	fmt.Println(1111111, r, g, b, []float32{45.2933, 58.3075, -85.6426})
-	fmt.Println("labbed:", r*100, -128+(127+128)*g, -128+(127+128)*b)
 }
 
 func TestAgainstLCMS2(t *testing.T) {

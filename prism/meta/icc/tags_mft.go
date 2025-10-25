@@ -89,7 +89,7 @@ func load_mft_header(raw []byte) (ans *MFT, leftover []byte, err error) {
 	return &a, raw[48:], nil
 }
 
-func load_mft_body(a *MFT, raw []byte, load_table func([]byte, int) ([]unit_float, []byte, error), input_table_entries, output_table_entries int) (err error) {
+func load_mft_body(a *MFT, raw []byte, load_table func([]byte, int) ([]unit_float, []byte, error), input_table_entries, output_table_entries int, output_colorspace ColorSpace, bytes_per_channel int) (err error) {
 	a.input_curves = make([]Curve1D, a.in_channels)
 	a.output_curves = make([]Curve1D, a.out_channels)
 	var fp []unit_float
@@ -101,10 +101,11 @@ func load_mft_body(a *MFT, raw []byte, load_table func([]byte, int) ([]unit_floa
 			return err
 		}
 	}
-	num_clut := expectedValues(a.grid_points, a.out_channels)
-	if fp, raw, err = load_table(raw, num_clut); err != nil {
+	fp, consumed, err := decode_clut_table(raw, int(bytes_per_channel), a.out_channels, a.grid_points, output_colorspace, true)
+	if err != nil {
 		return err
 	}
+	raw = raw[consumed:]
 	a.clut = make_clut(a.grid_points, a.in_channels, a.out_channels, fp)
 	for i := range a.out_channels {
 		if fp, raw, err = load_table(raw, output_table_entries); err != nil {
@@ -117,22 +118,22 @@ func load_mft_body(a *MFT, raw []byte, load_table func([]byte, int) ([]unit_floa
 	return nil
 }
 
-func decode_mft8(raw []byte) (ans any, err error) {
+func decode_mft8(raw []byte, input_colorspace, output_colorspace ColorSpace) (ans any, err error) {
 	var a *MFT
 	if a, raw, err = load_mft_header(raw); err != nil {
 		return nil, err
 	}
-	err = load_mft_body(a, raw, load_8bit_table, 256, 256)
+	err = load_mft_body(a, raw, load_8bit_table, 256, 256, output_colorspace, 1)
 	a.is8bit = true
 	return a, err
 }
 
-func decode_mft16(raw []byte) (ans any, err error) {
+func decode_mft16(raw []byte, input_colorspace, output_colorspace ColorSpace) (ans any, err error) {
 	var a *MFT
 	if a, raw, err = load_mft_header(raw); err != nil {
 		return nil, err
 	}
 	input_table_entries, output_table_entries := binary.BigEndian.Uint16(raw[:2]), binary.BigEndian.Uint16(raw[2:4])
-	err = load_mft_body(a, raw[4:], load_16bit_table, int(input_table_entries), int(output_table_entries))
+	err = load_mft_body(a, raw[4:], load_16bit_table, int(input_table_entries), int(output_table_entries), output_colorspace, 2)
 	return a, err
 }

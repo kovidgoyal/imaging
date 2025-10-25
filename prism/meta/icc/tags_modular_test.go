@@ -70,7 +70,7 @@ func TestModularDecoder(t *testing.T) {
 			"clut":   encode_clut16bit(),
 			"a":      join_curves(curv_bytes(3.0), curv_bytes(4.0), curv_bytes(0.1, 0.2, 0.3)),
 		})
-		val, err := modularDecoder(b)
+		val, err := modularDecoder(b, ColorSpaceRGB, ColorSpaceXYZ)
 		require.NoError(t, err)
 		require.IsType(t, &ModularTag{}, val)
 		tag := val.(*ModularTag)
@@ -81,7 +81,7 @@ func TestModularDecoder(t *testing.T) {
 	})
 	t.Run("TooShort", func(t *testing.T) {
 		data := []byte{1, 2, 3}
-		_, err := modularDecoder(data)
+		_, err := modularDecoder(data, ColorSpaceRGB, ColorSpaceXYZ)
 		assert.ErrorContains(t, err, "modular (mAB/mBA) tag too short")
 	})
 }
