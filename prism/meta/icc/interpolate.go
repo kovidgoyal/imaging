@@ -56,42 +56,39 @@ func (c *interpolation_data) tetrahedral_interpolation(r, g, b unit_float, outpu
 	if b < 1 {
 		Z1 += c.tetrahedral_index_lookup[0]
 	}
-
-	var c0, c1, c2, c3 unit_float // the weights for the four tetrahedron vertices
-
+	type w struct{ a, b int }
+	var c1, c2, c3 w
+	c0 := X0 + Y0 + Z0
+	// The six tetrahedra
+	switch {
+	case rx >= ry && ry >= rz:
+		c1 = w{X1 + Y0 + Z0, c0}
+		c2 = w{X1 + Y1 + Z0, X1 + Y0 + Z0}
+		c3 = w{X1 + Y1 + Z1, X1 + Y1 + Z0}
+	case rx >= rz && rz >= ry:
+		c1 = w{X1 + Y0 + Z0, c0}
+		c2 = w{X1 + Y1 + Z1, X1 + Y0 + Z1}
+		c3 = w{X1 + Y0 + Z1, X1 + Y0 + Z0}
+	case rz >= rx && rx >= ry:
+		c1 = w{X1 + Y0 + Z1, X0 + Y0 + Z1}
+		c2 = w{X1 + Y1 + Z1, X1 + Y0 + Z1}
+		c3 = w{X0 + Y0 + Z1, c0}
+	case ry >= rx && rx >= rz:
+		c1 = w{X1 + Y1 + Z0, X0 + Y1 + Z0}
+		c2 = w{X0 + Y1 + Z0, c0}
+		c3 = w{X1 + Y1 + Z1, X1 + Y1 + Z0}
+	case ry >= rz && rz >= rx:
+		c1 = w{X1 + Y1 + Z1, X0 + Y1 + Z1}
+		c2 = w{X0 + Y1 + Z0, c0}
+		c3 = w{X0 + Y1 + Z1, X0 + Y1 + Z0}
+	case rz >= ry && ry >= rx:
+		c1 = w{X1 + Y1 + Z1, X0 + Y1 + Z1}
+		c2 = w{X0 + Y1 + Z1, X0 + Y0 + Z1}
+		c3 = w{X0 + Y0 + Z1, c0}
+	}
 	for o := range c.num_outputs {
-		v := c.samples[o:]
-		c0 = v[X0+Y0+Z0]
-		// The six tetrahedra
-		switch {
-		case rx >= ry && ry >= rz:
-			c1 = v[X1+Y0+Z0] - c0
-			c2 = v[X1+Y1+Z0] - v[X1+Y0+Z0]
-			c3 = v[X1+Y1+Z1] - v[X1+Y1+Z0]
-		case rx >= rz && rz >= ry:
-			c1 = v[X1+Y0+Z0] - c0
-			c2 = v[X1+Y1+Z1] - v[X1+Y0+Z1]
-			c3 = v[X1+Y0+Z1] - v[X1+Y0+Z0]
-		case rz >= rx && rx >= ry:
-			c1 = v[X1+Y0+Z1] - v[X0+Y0+Z1]
-			c2 = v[X1+Y1+Z1] - v[X1+Y0+Z1]
-			c3 = v[X0+Y0+Z1] - c0
-		case ry >= rx && rx >= rz:
-			c1 = v[X1+Y1+Z0] - v[X0+Y1+Z0]
-			c2 = v[X0+Y1+Z0] - c0
-			c3 = v[X1+Y1+Z1] - v[X1+Y1+Z0]
-		case ry >= rz && rz >= rx:
-			c1 = v[X1+Y1+Z1] - v[X0+Y1+Z1]
-			c2 = v[X0+Y1+Z0] - c0
-			c3 = v[X0+Y1+Z1] - v[X0+Y1+Z0]
-		case rz >= ry && ry >= rx:
-			c1 = v[X1+Y1+Z1] - v[X0+Y1+Z1]
-			c2 = v[X0+Y1+Z1] - v[X0+Y0+Z1]
-			c3 = v[X0+Y0+Z1] - c0
-		default:
-			c1, c2, c3 = 0, 0, 0
-		}
-		output[o] = c0 + c1*rx + c2*ry + c3*rz
+		s := c.samples[o:]
+		output[o] = s[c0] + (s[c1.a]-s[c1.b])*rx + (s[c2.a]-s[c2.b])*ry + (s[c3.a]-s[c3.b])*rz
 	}
 }
 
