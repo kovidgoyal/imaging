@@ -76,7 +76,7 @@ func (m *MFT) as_bytes() []byte {
 			writeval(x)
 		}
 	}
-	for _, x := range m.clut.Values {
+	for _, x := range m.clut.Samples() {
 		writeclutval(x)
 	}
 	for _, curve := range m.output_curves {
@@ -98,7 +98,7 @@ func (a *MFT) require_equal(t *testing.T, b *MFT) {
 	for i := range a.input_curves {
 		in_delta_slice(t, curve_points(a.input_curves[i]), curve_points(b.input_curves[i]), tolerance)
 	}
-	in_delta_slice(t, a.clut.Values, b.clut.Values, tolerance)
+	in_delta_slice(t, a.clut.Samples(), b.clut.Samples(), tolerance)
 	for i := range a.output_curves {
 		in_delta_slice(t, curve_points(a.output_curves[i]), curve_points(b.output_curves[i]), tolerance)
 	}

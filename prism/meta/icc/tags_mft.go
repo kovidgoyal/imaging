@@ -12,7 +12,7 @@ type MFT struct {
 	in_channels, out_channels   int
 	grid_points                 []int
 	input_curves, output_curves []Curve1D
-	clut                        *CLUTTag
+	clut                        CLUT
 	matrix                      ChannelTransformer
 	is8bit                      bool
 }

@@ -9,30 +9,31 @@ import (
 
 // CLUTTag represents a color lookup table tag (TagColorLookupTable)
 type CLUTTag struct {
-	GridPoints     []int // e.g., [17,17,17] for 3D CLUT
-	InputChannels  int
-	OutputChannels int
-	Values         []unit_float // flattened [in1, in2, ..., out1, out2, ...]
+	d *interpolation_data
 }
 
 type CLUT3D struct {
 	d *interpolation_data
 }
 
+type CLUT interface {
+	ChannelTransformer
+	Samples() []unit_float
+}
+
+func (c *CLUTTag) Samples() []unit_float { return c.d.samples }
+func (c *CLUT3D) Samples() []unit_float  { return c.d.samples }
+
 func (c CLUT3D) String() string {
 	return fmt.Sprintf("CLUT3D{ outp:%v grid:%v values[:9]:%v }", c.d.num_outputs, c.d.grid_points, c.d.samples[:min(9, len(c.d.samples))])
 }
 
 func (c CLUTTag) String() string {
-	return fmt.Sprintf("CLUTTag{ inp:%v outp:%v grid:%v values[:9]:%v }", c.InputChannels, c.OutputChannels, c.GridPoints, c.Values[:min(9, len(c.Values))])
+	return fmt.Sprintf("CLUTTag{ inp:%v outp:%v grid:%v values[:9]:%v }", c.d.num_inputs, c.d.num_outputs, c.d.grid_points, c.d.samples[:min(9, len(c.d.samples))])
 }
 
-func make_clut(grid_points []int, inp, outp int, values []unit_float) *CLUTTag {
-	return &CLUTTag{grid_points, inp, outp, values}
-}
-
-var _ ChannelTransformer = (*CLUTTag)(nil)
-var _ ChannelTransformer = (*CLUT3D)(nil)
+var _ CLUT = (*CLUTTag)(nil)
+var _ CLUT = (*CLUT3D)(nil)
 
 func default8(x uint8) unit_float         { return unit_float(x) / math.MaxUint8 }
 func default16(x uint16) unit_float       { return unit_float(x) / math.MaxUint16 }
@@ -133,6 +134,13 @@ func decode_clut_table(raw []byte, bytes_per_channel, OutputChannels int, grid_p
 	return
 }
 
+func make_clut(grid_points []int, num_inputs, num_outputs int, samples []unit_float) CLUT {
+	if num_inputs == 3 {
+		return &CLUT3D{make_interpolation_data(num_inputs, num_outputs, grid_points, samples)}
+	}
+	return &CLUTTag{make_interpolation_data(num_inputs, num_outputs, grid_points, samples)}
+}
+
 // section 10.12.3 (CLUT) in ICC.1-2202-05.pdf
 func embeddedClutDecoder(raw []byte, InputChannels, OutputChannels int, output_colorspace ColorSpace) (any, error) {
 	if len(raw) < 20 {
@@ -156,15 +164,11 @@ func embeddedClutDecoder(raw []byte, InputChannels, OutputChannels int, output_c
 	if err != nil {
 		return nil, err
 	}
+	d := make_interpolation_data(InputChannels, OutputChannels, gridPoints, values)
 	if InputChannels == 3 {
-		return &CLUT3D{d: make_interpolation_data(InputChannels, OutputChannels, gridPoints, values)}, nil
+		return &CLUT3D{d: d}, nil
 	}
-	return &CLUTTag{
-		GridPoints:     gridPoints,
-		InputChannels:  InputChannels,
-		OutputChannels: OutputChannels,
-		Values:         values,
-	}, nil
+	return &CLUTTag{d: d}, nil
 }
 
 func expectedValues(gridPoints []int, outputChannels int) int {
@@ -176,7 +180,7 @@ func expectedValues(gridPoints []int, outputChannels int) int {
 }
 
 func (c *CLUTTag) IsSuitableFor(num_input_channels, num_output_channels int) bool {
-	return num_input_channels == int(c.InputChannels) && num_output_channels == c.OutputChannels && num_input_channels <= 6
+	return num_input_channels == int(c.d.num_inputs) && num_output_channels == c.d.num_outputs && num_input_channels <= 6
 }
 
 func (c *CLUT3D) IsSuitableFor(num_input_channels, num_output_channels int) bool {
@@ -186,14 +190,14 @@ func (c *CLUT3D) IsSuitableFor(num_input_channels, num_output_channels int) bool
 func (c *CLUTTag) Transform(r, g, b unit_float) (unit_float, unit_float, unit_float) {
 	var obuf [3]unit_float
 	var ibuf = [3]unit_float{r, g, b}
-	trilinear_interpolate(ibuf[:], c.Values, obuf[:], c.InputChannels, c.OutputChannels, c.GridPoints)
+	c.d.trilinear_interpolate(ibuf[:], obuf[:])
 	return obuf[0], obuf[1], obuf[2]
 }
 
 func (c *CLUT3D) Trilinear_interpolate(r, g, b unit_float) (unit_float, unit_float, unit_float) {
 	var obuf [3]unit_float
 	var ibuf = [3]unit_float{r, g, b}
-	trilinear_interpolate(ibuf[:], c.d.samples, obuf[:], 3, c.d.num_outputs, c.d.grid_points)
+	c.d.trilinear_interpolate(ibuf[:], obuf[:])
 	return obuf[0], obuf[1], obuf[2]
 }
 

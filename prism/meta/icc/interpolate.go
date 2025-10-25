@@ -110,35 +110,34 @@ func sampled_value(samples []unit_float, max_idx unit_float, x unit_float) unit_
 
 // Performs an n-linear interpolation on the CLUT values for the given input color using an iterative method.
 // Input values should be normalized between 0.0 and 1.0. Output MUST be zero initialized.
-func trilinear_interpolate(input, values, output []unit_float, input_channels, output_channels int, grid_points []int) {
+func (c *interpolation_data) trilinear_interpolate(input, output []unit_float) {
 	// Pre-allocate slices for indices and weights
 	var buf [4]int
 	var wbuf [4]unit_float
-	indices := buf[:input_channels]
-	weights := wbuf[:input_channels]
-	input = input[:input_channels]
-	output = output[:output_channels]
+	indices := buf[:c.num_inputs]
+	weights := wbuf[:c.num_inputs]
+	input = input[:c.num_inputs]
+	output = output[:c.num_outputs]
 
 	// Calculate the base indices and interpolation weights for each dimension.
 	for i, val := range input {
-		gp := grid_points[i]
 		val = clamp01(val)
 		// Scale the value to the grid dimensions
-		pos := val * unit_float(gp-1)
+		pos := val * unit_float(c.max_grid_points[i])
 		// The base index is the floor of the position.
 		idx := int(pos)
 		// The weight is the fractional part of the position.
 		weight := pos - unit_float(idx)
 		// Clamp index to be at most the second to last grid point.
-		if idx >= gp-1 {
-			idx = gp - 2
+		if idx >= c.max_grid_points[i] {
+			idx = c.max_grid_points[i] - 1
 			weight = 1 // set weight to 1 for border index
 		}
 		indices[i] = idx
 		weights[i] = weight
 	}
 	// Iterate through all 2^InputChannels corners of the n-dimensional hypercube
-	for i := range 1 << input_channels {
+	for i := range 1 << c.num_inputs {
 		// Calculate the combined weight for this corner
 		cornerWeight := unit_float(1)
 		// Calculate the N-dimensional index to look up in the table
@@ -147,7 +146,7 @@ func trilinear_interpolate(input, values, output []unit_float, input_channels, o
 
 		// As per section 10.12.3 of ICC.1-2022-5.pdf spec the first input channel
 		// varies least rapidly and the last varies most rapidly
-		for j := input_channels - 1; j >= 0; j-- {
+		for j := c.num_inputs - 1; j >= 0; j-- {
 			// Check the j-th bit of i to decide if we are at the lower or upper bound for this dimension
 			if (i>>j)&1 == 1 {
 				// Upper bound for this dimension
@@ -158,12 +157,12 @@ func trilinear_interpolate(input, values, output []unit_float, input_channels, o
 				cornerWeight *= (1.0 - weights[j])
 				tableIndex += int(unit_float(indices[j]) * multiplier)
 			}
-			multiplier *= unit_float(grid_points[j])
+			multiplier *= unit_float(c.grid_points[j])
 		}
 		// Get the color value from the table for the current corner
-		offset := tableIndex * output_channels
+		offset := tableIndex * c.num_outputs
 		// Add the weighted corner color to the output
-		for k, v := range values[offset : offset+output_channels] {
+		for k, v := range c.samples[offset : offset+c.num_outputs] {
 			output[k] += v * cornerWeight
 		}
 	}
