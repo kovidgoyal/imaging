@@ -15,6 +15,14 @@ type CLUTTag struct {
 	Values         []unit_float // flattened [in1, in2, ..., out1, out2, ...]
 }
 
+type CLUT3D struct {
+	d *interpolation_data
+}
+
+func (c CLUT3D) String() string {
+	return fmt.Sprintf("CLUT3D{ outp:%v grid:%v values[:9]:%v }", c.d.num_outputs, c.d.grid_points, c.d.samples[:min(9, len(c.d.samples))])
+}
+
 func (c CLUTTag) String() string {
 	return fmt.Sprintf("CLUTTag{ inp:%v outp:%v grid:%v values[:9]:%v }", c.InputChannels, c.OutputChannels, c.GridPoints, c.Values[:min(9, len(c.Values))])
 }
@@ -24,6 +32,7 @@ func make_clut(grid_points []int, inp, outp int, values []unit_float) *CLUTTag {
 }
 
 var _ ChannelTransformer = (*CLUTTag)(nil)
+var _ ChannelTransformer = (*CLUT3D)(nil)
 
 func default8(x uint8) unit_float         { return unit_float(x) / math.MaxUint8 }
 func default16(x uint16) unit_float       { return unit_float(x) / math.MaxUint16 }
@@ -147,13 +156,15 @@ func embeddedClutDecoder(raw []byte, InputChannels, OutputChannels int, output_c
 	if err != nil {
 		return nil, err
 	}
-	ans := &CLUTTag{
+	if InputChannels == 3 {
+		return &CLUT3D{d: make_interpolation_data(InputChannels, OutputChannels, gridPoints, values)}, nil
+	}
+	return &CLUTTag{
 		GridPoints:     gridPoints,
 		InputChannels:  InputChannels,
 		OutputChannels: OutputChannels,
 		Values:         values,
-	}
-	return ans, nil
+	}, nil
 }
 
 func expectedValues(gridPoints []int, outputChannels int) int {
@@ -164,10 +175,12 @@ func expectedValues(gridPoints []int, outputChannels int) int {
 	return expectedPoints * outputChannels
 }
 
-func (c *CLUTTag) WorkspaceSize() int { return 0 }
-
 func (c *CLUTTag) IsSuitableFor(num_input_channels, num_output_channels int) bool {
 	return num_input_channels == int(c.InputChannels) && num_output_channels == c.OutputChannels && num_input_channels <= 6
+}
+
+func (c *CLUT3D) IsSuitableFor(num_input_channels, num_output_channels int) bool {
+	return num_input_channels == 3 && num_output_channels == c.d.num_outputs
 }
 
 func (c *CLUTTag) Transform(r, g, b unit_float) (unit_float, unit_float, unit_float) {
@@ -175,6 +188,23 @@ func (c *CLUTTag) Transform(r, g, b unit_float) (unit_float, unit_float, unit_fl
 	var ibuf = [3]unit_float{r, g, b}
 	trilinear_interpolate(ibuf[:], c.Values, obuf[:], c.InputChannels, c.OutputChannels, c.GridPoints)
 	return obuf[0], obuf[1], obuf[2]
+}
+
+func (c *CLUT3D) Trilinear_interpolate(r, g, b unit_float) (unit_float, unit_float, unit_float) {
+	var obuf [3]unit_float
+	var ibuf = [3]unit_float{r, g, b}
+	trilinear_interpolate(ibuf[:], c.d.samples, obuf[:], 3, c.d.num_outputs, c.d.grid_points)
+	return obuf[0], obuf[1], obuf[2]
+}
+
+func (c *CLUT3D) Tetrahedral_interpolate(r, g, b unit_float) (unit_float, unit_float, unit_float) {
+	var obuf [3]unit_float
+	c.d.tetrahedral_interpolation(r, g, b, obuf[:])
+	return obuf[0], obuf[1], obuf[2]
+}
+
+func (c *CLUT3D) Transform(r, g, b unit_float) (unit_float, unit_float, unit_float) {
+	return c.Tetrahedral_interpolate(r, g, b)
 }
 
 func clamp01(v unit_float) unit_float {

@@ -7,6 +7,94 @@ import (
 
 var _ = fmt.Print
 
+type interpolation_data struct {
+	num_inputs, num_outputs  int
+	samples                  []unit_float
+	grid_points              []int
+	max_grid_points          []int
+	tetrahedral_index_lookup [3]int
+}
+
+func make_interpolation_data(num_inputs, num_outputs int, grid_points []int, samples []unit_float) *interpolation_data {
+	var tetrahedral_index_lookup [3]int
+	max_grid_points := make([]int, len(grid_points))
+	for i, g := range grid_points {
+		max_grid_points[i] = g - 1
+	}
+	if num_inputs == 3 {
+		tetrahedral_index_lookup[0] = num_outputs
+		for i := 1; i < num_outputs; i++ {
+			tetrahedral_index_lookup[i] = tetrahedral_index_lookup[i-1] * grid_points[num_inputs-1]
+		}
+	}
+	return &interpolation_data{
+		num_inputs: num_inputs, num_outputs: num_outputs, grid_points: grid_points, max_grid_points: max_grid_points,
+		tetrahedral_index_lookup: tetrahedral_index_lookup, samples: samples,
+	}
+}
+
+func (c *interpolation_data) tetrahedral_interpolation(r, g, b unit_float, output []unit_float) {
+	r, g, b = clamp01(r), clamp01(g), clamp01(b)
+	px := r * unit_float(c.max_grid_points[0])
+	py := g * unit_float(c.max_grid_points[1])
+	pz := b * unit_float(c.max_grid_points[2])
+	x0, y0, z0 := int(px), int(py), int(pz)
+	rx, ry, rz := px-unit_float(x0), py-unit_float(y0), pz-unit_float(z0)
+
+	X0 := c.tetrahedral_index_lookup[2] * x0
+	X1 := X0
+	if r < 1 {
+		X1 += c.tetrahedral_index_lookup[2]
+	}
+	Y0 := c.tetrahedral_index_lookup[1] * y0
+	Y1 := Y0
+	if g < 1 {
+		Y1 += c.tetrahedral_index_lookup[1]
+	}
+	Z0 := c.tetrahedral_index_lookup[0] * z0
+	Z1 := Z0
+	if b < 1 {
+		Z1 += c.tetrahedral_index_lookup[0]
+	}
+
+	var c0, c1, c2, c3 unit_float // the weights for the four tetrahedron vertices
+
+	for o := range c.num_outputs {
+		v := c.samples[o:]
+		c0 = v[X0+Y0+Z0]
+		// The six tetrahedra
+		switch {
+		case rx >= ry && ry >= rz:
+			c1 = v[X1+Y0+Z0] - c0
+			c2 = v[X1+Y1+Z0] - v[X1+Y0+Z0]
+			c3 = v[X1+Y1+Z1] - v[X1+Y1+Z0]
+		case rx >= rz && rz >= ry:
+			c1 = v[X1+Y0+Z0] - c0
+			c2 = v[X1+Y1+Z1] - v[X1+Y0+Z1]
+			c3 = v[X1+Y0+Z1] - v[X1+Y0+Z0]
+		case rz >= rx && rx >= ry:
+			c1 = v[X1+Y0+Z1] - v[X0+Y0+Z1]
+			c2 = v[X1+Y1+Z1] - v[X1+Y0+Z1]
+			c3 = v[X0+Y0+Z1] - c0
+		case ry >= rx && rx >= rz:
+			c1 = v[X1+Y1+Z0] - v[X0+Y1+Z0]
+			c2 = v[X0+Y1+Z0] - c0
+			c3 = v[X1+Y1+Z1] - v[X1+Y1+Z0]
+		case ry >= rz && rz >= rx:
+			c1 = v[X1+Y1+Z1] - v[X0+Y1+Z1]
+			c2 = v[X0+Y1+Z0] - c0
+			c3 = v[X0+Y1+Z1] - v[X0+Y1+Z0]
+		case rz >= ry && ry >= rx:
+			c1 = v[X1+Y1+Z1] - v[X0+Y1+Z1]
+			c2 = v[X0+Y1+Z1] - v[X0+Y0+Z1]
+			c3 = v[X0+Y0+Z1] - c0
+		default:
+			c1, c2, c3 = 0, 0, 0
+		}
+		output[o] = c0 + c1*rx + c2*ry + c3*rz
+	}
+}
+
 func sampled_value(samples []unit_float, max_idx unit_float, x unit_float) unit_float {
 	idx := clamp01(x) * max_idx
 	lof := unit_float(math.Trunc(float64(idx)))
@@ -57,6 +145,8 @@ func trilinear_interpolate(input, values, output []unit_float, input_channels, o
 		tableIndex := 0
 		multiplier := unit_float(1)
 
+		// As per section 10.12.3 of ICC.1-2022-5.pdf spec the first input channel
+		// varies least rapidly and the last varies most rapidly
 		for j := input_channels - 1; j >= 0; j-- {
 			// Check the j-th bit of i to decide if we are at the lower or upper bound for this dimension
 			if (i>>j)&1 == 1 {

@@ -71,14 +71,13 @@ func TestCLUTDecoder(t *testing.T) {
 	t.Run("Success3D16bit", func(t *testing.T) {
 		val, err := embeddedClutDecoder(encode_clut16bit(), 3, 3, ColorSpaceXYZ)
 		require.NoError(t, err)
-		require.IsType(t, &CLUTTag{}, val)
-		clut := val.(*CLUTTag)
-		assert.Equal(t, (3), clut.InputChannels)
-		assert.Equal(t, (3), clut.OutputChannels)
-		assert.Equal(t, []int{2, 2, 2}, clut.GridPoints)
-		assert.Len(t, clut.Values, 8*3)
-		in_delta(t, 0.0, clut.Values[0], 0.001)
-		in_delta(t, 1.0, clut.Values[len(clut.Values)-1], 0.001) // <-- Now will pass!
+		require.IsType(t, &CLUT3D{}, val)
+		clut := val.(*CLUT3D)
+		assert.Equal(t, (3), clut.d.num_outputs)
+		assert.Equal(t, []int{2, 2, 2}, clut.d.grid_points)
+		assert.Len(t, clut.d.samples, 8*3)
+		in_delta(t, 0.0, clut.d.samples[0], 0.001)
+		in_delta(t, 1.0, clut.d.samples[len(clut.d.samples)-1], 0.001) // <-- Now will pass!
 	})
 	t.Run("Success3D8bit", func(t *testing.T) {
 		var buf bytes.Buffer
@@ -92,14 +91,13 @@ func TestCLUTDecoder(t *testing.T) {
 		buf.WriteByte(255)
 		val, err := embeddedClutDecoder(buf.Bytes(), 3, 3, ColorSpaceXYZ)
 		require.NoError(t, err)
-		require.IsType(t, &CLUTTag{}, val)
-		clut := val.(*CLUTTag)
-		assert.Equal(t, (3), clut.InputChannels)
-		assert.Equal(t, (3), clut.OutputChannels)
-		assert.Equal(t, []int{2, 2, 2}, clut.GridPoints)
-		assert.Len(t, clut.Values, 8*3)
-		in_delta(t, 0.0, clut.Values[0], 0.001)
-		in_delta(t, 1.0, clut.Values[len(clut.Values)-1], 1e-6)
+		require.IsType(t, &CLUT3D{}, val)
+		clut := val.(*CLUT3D)
+		assert.Equal(t, (3), clut.d.num_outputs)
+		assert.Equal(t, []int{2, 2, 2}, clut.d.grid_points)
+		assert.Len(t, clut.d.samples, 8*3)
+		in_delta(t, 0.0, clut.d.samples[0], 0.001)
+		in_delta(t, 1.0, clut.d.samples[len(clut.d.samples)-1], 1e-6)
 	})
 	t.Run("TooShort", func(t *testing.T) {
 		data := make([]byte, 19) // should be at least 20 bytes
@@ -112,7 +110,7 @@ func TestCLUTDecoder(t *testing.T) {
 		buf.Write(bytes.Repeat([]byte{0}, 13)) // rest of grid points unused
 		buf.WriteString("\x01\x00\x00\x00")    // bytes_per_channel
 		// 2x2x2 = 8 grid points, 3 outputs per point = 24 outputs
-		for i := 0; i < 8*3-1; i++ {
+		for i := range 8*3 - 1 {
 			buf.WriteByte(uint8(i))
 		}
 		_, err := embeddedClutDecoder(buf.Bytes(), 3, 3, ColorSpaceXYZ)
@@ -124,11 +122,8 @@ func TestCLUTTransform(t *testing.T) {
 	var output [16]unit_float
 	out := output[:]
 	t.Run("HappyPath_3D", func(t *testing.T) {
-		clut := &CLUTTag{
-			InputChannels:  3,
-			OutputChannels: 3,
-			GridPoints:     []int{2, 2, 2},
-			Values: []unit_float{
+		clut := &CLUT3D{make_interpolation_data(3, 3, []int{2, 2, 2},
+			[]unit_float{
 				0.0, 0.0, 0.0,
 				0.1, 0.1, 0.1,
 				0.2, 0.2, 0.2,
@@ -138,21 +133,18 @@ func TestCLUTTransform(t *testing.T) {
 				0.6, 0.6, 0.6,
 				1, 1, 1,
 			}, // 8 points per output
-		}
+		)}
 		out[0], out[1], out[2] = clut.Transform(0.0, 0.0, 0.0) // Should hit [0.0]
 		in_delta(t, 0.0, out[0], 1e-6)
 		out[0], out[1], out[2] = clut.Transform(1.0, 1.0, 1.0) // Should hit [1.0]
 		in_delta(t, 1.0, out[0], 1e-6)
 	})
 	t.Run("RGB->1-RGB", func(t *testing.T) {
-		clut := &CLUTTag{
-			InputChannels:  3,
-			OutputChannels: 3,
-			GridPoints:     []int{2, 2, 2},
+		clut := &CLUT3D{make_interpolation_data(3, 3, []int{2, 2, 2},
 			// The table below has the output on the left and input in the comment on the right.
 			// As per section 10.12.3 of of ICC.1-2022-5.pdf spec the first input channel (R)
 			// varies least rapidly and the last (B) varies most rapidly
-			Values: []unit_float{
+			[]unit_float{
 				// Output <-   Input
 				1, 1, 1, // <- R=0, G=0, B=0
 				1, 1, 0, // <- R=0, G=0, B=1
@@ -164,16 +156,19 @@ func TestCLUTTransform(t *testing.T) {
 				0, 0, 1, // <- R=1, G=1, B=0
 				0, 0, 0, // <- R=1, G=1, B=1
 			}, // 8 points per output
-		}
+		)}
 		type u = [3]unit_float
 		for _, c := range []u{
 			{0, 0, 0}, {1, 1, 1}, {1, 0, 0}, {0, 1, 0}, {0, 0, 1}, {0.5, 0.5, 0.5},
 			{0.5, 0, 0}, {0.5, 1, 1}, {0.25, 0.5, 0.75}, {0.75, 0.5, 0.25},
 		} {
 			expected := []unit_float{1 - c[0], 1 - c[1], 1 - c[2]}
-			r, g, b := clut.Transform(c[0], c[1], c[2])
+			r, g, b := clut.Trilinear_interpolate(c[0], c[1], c[2])
 			actual := []unit_float{r, g, b}
-			in_delta_slice(t, expected, actual, FLOAT_EQUALITY_THRESHOLD, fmt.Sprintf("%v -> %v != %v", c, actual, expected))
+			in_delta_slice(t, expected, actual, FLOAT_EQUALITY_THRESHOLD, fmt.Sprintf("trilinear: %v -> %v != %v", c, actual, expected))
+			r, g, b = clut.Tetrahedral_interpolate(c[0], c[1], c[2])
+			actual = []unit_float{r, g, b}
+			in_delta_slice(t, expected, actual, FLOAT_EQUALITY_THRESHOLD, fmt.Sprintf("tetrahedral: %v -> %v != %v", c, actual, expected))
 		}
 	})
 }
