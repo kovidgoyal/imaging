@@ -57,9 +57,11 @@ func (m *ModularTag) IsSuitableFor(num_input_channels, num_output_channels int) 
 	return m.num_input_channels == num_input_channels && m.num_output_channels == num_output_channels
 }
 func (m *ModularTag) Transform(r, g, b unit_float) (unit_float, unit_float, unit_float) {
-	for _, t := range m.transforms {
+	for i, t := range m.transforms {
+		fmt.Println(11111111, []unit_float{r, g, b}, "->", m.transform_objects[i])
 		r, g, b = t(r, g, b)
 	}
+	fmt.Println(2222222, r, g, b)
 	return r, g, b
 }
 

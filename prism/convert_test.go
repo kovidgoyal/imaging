@@ -5,7 +5,6 @@ package prism
 import (
 	"bytes"
 	"fmt"
-	"sync"
 	"testing"
 
 	"github.com/kovidgoyal/imaging/prism/meta/icc"
@@ -49,49 +48,52 @@ func TestCGOConversion(t *testing.T) {
 	}
 }
 
-var pts_for_lcms2 = sync.OnceValue(func() []float32 {
-	pts := icc.Points_for_transformer_comparison()
-	temp := make([]float32, 0, len(pts)*3)
-	for _, pt := range pts {
-		temp = append(temp, float32(pt.X), float32(pt.Y), float32(pt.Z))
-	}
-	return temp
-})
-
 func test_profile(t *testing.T, name string, profile_data []byte) {
 	t.Run(name, func(t *testing.T) {
 		t.Parallel()
 		p, err := icc.NewProfileReader(bytes.NewReader(profile_data)).ReadProfile()
 		require.NoError(t, err)
+		input_channels := icc.IfElse(p.Header.DataColorSpace == icc.ColorSpaceCMYK, 4, 3)
 		lcms, err := CreateCMSProfile(profile_data)
 		require.NoError(t, err)
-		tr, err := p.CreateTransformerToPCS(icc.PerceptualRenderingIntent)
+		tr, err := p.CreateDefaultTransformerToPCS(input_channels)
 		require.NoError(t, err)
-		inv, err := p.CreateTransformerToDevice(icc.PerceptualRenderingIntent)
+		inv, err := p.CreateDefaultTransformerToDevice()
 		require.NoError(t, err)
-		pts := icc.Points_for_transformer_comparison()
+		pts := icc.Points_for_transformer_comparison3()
 		actual := make([]float32, 0, len(pts)*3)
-		for _, pt := range pts {
-			r, g, b := tr.Transform(pt.X, pt.Y, pt.Z)
-			actual = append(actual, float32(r), float32(g), float32(b))
-			r, g, b = inv.Transform(r, g, b)
-			require.InDeltaSlice(
-				t, []float32{pt.X, pt.Y, pt.Z}, []float32{r, g, b}, icc.FLOAT_EQUALITY_THRESHOLD,
-				"b2a of a2b result differs from original color")
+		pos := pts
+		for range len(pts) / input_channels {
+			if input_channels == 3 {
+				sl := pos[0:3:3]
+				r, g, b := tr.Transform(sl[0], sl[1], sl[2])
+				actual = append(actual, float32(r), float32(g), float32(b))
+				r, g, b = inv.Transform(r, g, b)
+				require.InDeltaSlice(t, sl, []float32{r, g, b}, icc.FLOAT_EQUALITY_THRESHOLD,
+					"b2a of a2b result differs from original color")
+			} else {
+				panic("TODO: implement me")
+			}
+			pos = pos[input_channels:]
 		}
-		expected, err := lcms.TransformFloatToPCS(pts_for_lcms2(), icc.RelativeColorimetricRenderingIntent)
+		var expected []float32
+		if input_channels == 3 {
+			expected, err = lcms.TransformFloatToPCS(pts, p.Header.RenderingIntent)
+		} else {
+			panic("TODO: implement me")
+		}
 		require.NoError(t, err)
 		require.InDeltaSlice(t, expected, actual, icc.FLOAT_EQUALITY_THRESHOLD)
-		expected = pts_for_lcms2()
 	})
 }
 
 func TestDevelop(t *testing.T) {
 	p := icc.Srgb_lab_profile()
-	tr, err := p.CreateTransformerToPCS(icc.PerceptualRenderingIntent)
+	tr, err := p.CreateDefaultTransformerToPCS(3)
 	require.NoError(t, err)
 	r, g, b := tr.Transform(0.5, 0.25, 1)
 	fmt.Println(1111111, r, g, b, []float32{45.2933, 58.3075, -85.6426})
+	fmt.Println("labbed:", r*100, -128+(127+128)*g, -128+(127+128)*b)
 }
 
 func TestAgainstLCMS2(t *testing.T) {

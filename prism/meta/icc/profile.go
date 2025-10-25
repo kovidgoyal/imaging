@@ -4,7 +4,6 @@ import (
 	"bytes"
 	_ "embed"
 	"fmt"
-	"runtime"
 	"sync"
 )
 
@@ -122,7 +121,7 @@ func (p *Profile) WellKnownProfile() WellKnownProfile {
 
 func (p *Profile) get_effective_chromatic_adaption() (*Matrix3, error) {
 	pcs_whitepoint := p.Header.ParsedPCSIlluminant()
-	x, err := p.TagTable.get_parsed(MediaWhitePointTagSignature)
+	x, err := p.TagTable.get_parsed(MediaWhitePointTagSignature, p.Header.DataColorSpace, p.Header.ProfileConnectionSpace)
 	if err != nil {
 		return nil, err
 	}
@@ -234,7 +233,13 @@ func (p *Profile) find_conversion_tag(forward bool, rendering_intent RenderingIn
 	if !found_tag {
 		return nil, nil
 	}
-	c, err := p.TagTable.get_parsed(ans_sig)
+	// We rely on profile reader to error out if the PCS color space is not XYZ
+	// or LAB and the device colorspace is not RGB or CMYK
+	input_colorspace, output_colorspace := p.Header.DataColorSpace, p.Header.ProfileConnectionSpace
+	if !forward {
+		input_colorspace, output_colorspace = output_colorspace, input_colorspace
+	}
+	c, err := p.TagTable.get_parsed(ans_sig, input_colorspace, output_colorspace)
 	if err != nil {
 		return nil, err
 	}
@@ -260,6 +265,12 @@ func add_chromatic_adaptation(chad *Matrix3, tag ChannelTransformer, prepend boo
 }
 
 func (p *Profile) CreateTransformerToDevice(rendering_intent RenderingIntent) (ans ChannelTransformer, err error) {
+	defer func() {
+		if err == nil && !ans.IsSuitableFor(3, 3) {
+			err = fmt.Errorf("transformer to PCS %s not suitable for 3 output channels", ans.String())
+		}
+	}()
+
 	const forward = false
 	b2a, err := p.find_conversion_tag(forward, rendering_intent)
 	if err != nil {
@@ -275,7 +286,12 @@ func (p *Profile) CreateTransformerToDevice(rendering_intent RenderingIntent) (a
 	return p.create_matrix_trc_transformer(forward, chromatic_adaptation)
 }
 
-func (p *Profile) CreateTransformerToPCS(rendering_intent RenderingIntent) (ans ChannelTransformer, err error) {
+func (p *Profile) CreateTransformerToPCS(rendering_intent RenderingIntent, input_channels int) (ans ChannelTransformer, err error) {
+	defer func() {
+		if err == nil && !ans.IsSuitableFor(input_channels, 3) {
+			err = fmt.Errorf("transformer to PCS %s not suitable for %d input channels", ans.String(), input_channels)
+		}
+	}()
 	const forward = true
 	a2b, err := p.find_conversion_tag(forward, rendering_intent)
 	if err != nil {
@@ -291,56 +307,62 @@ func (p *Profile) CreateTransformerToPCS(rendering_intent RenderingIntent) (ans 
 	return p.create_matrix_trc_transformer(forward, chromatic_adaptation)
 }
 
+func (p *Profile) CreateDefaultTransformerToDevice() (ChannelTransformer, error) {
+	return p.CreateTransformerToDevice(p.Header.RenderingIntent)
+}
+
+func (p *Profile) CreateDefaultTransformerToPCS(input_channels int) (ChannelTransformer, error) {
+	return p.CreateTransformerToPCS(p.Header.RenderingIntent, input_channels)
+}
+
 func newProfile() *Profile {
 	return &Profile{
 		TagTable: emptyTagTable(),
 	}
 }
 
-var Points_for_transformer_comparison = sync.OnceValue(func() []XYZType {
-	const num = 16
-	ans := make([]XYZType, 0, num*num*num)
-	m := 1 / unit_float(num-1)
-	for a := range num {
-		aa := unit_float(a) * m
-		for b := range num {
-			bb := unit_float(b) * m
-			for c := range num {
-				cc := unit_float(c) * m
-				ans = append(ans, XYZType{aa, bb, cc})
-			}
+// Recursively generates all points in an m-dimensional hypercube.
+// currentPoint stores the coordinates of the current point being built.
+// dimension is the current dimension being processed (from 0 to m-1).
+// m is the total number of dimensions.
+// n is the number of points per dimension (0 to n-1).
+func iterate_hypercube(currentPoint []int, dimension, m, n int, callback func([]int)) {
+	// Base case: If all dimensions have been assigned, print the point.
+	if dimension == m {
+		callback(currentPoint)
+		return
+	}
+
+	// Recursive step: Iterate through all possible values for the current dimension.
+	for i := 0; i < n; i++ {
+		currentPoint[dimension] = i // Assign value to the current dimension
+		// Recursively call for the next dimension
+		iterate_hypercube(currentPoint, dimension+1, m, n, callback)
+	}
+}
+func points_for_transformer_comparison(input_channels, num_points_per_input_channel int) []unit_float {
+	m, n := input_channels, num_points_per_input_channel
+	sz := input_channels // n ** m * m
+	for range m {
+		sz *= n
+	}
+	ans := make([]unit_float, 0, sz)
+	current_point := make([]int, input_channels)
+	factor := 1 / unit_float(num_points_per_input_channel-1)
+	iterate_hypercube(current_point, 0, m, n, func(p []int) {
+		for _, x := range current_point {
+			ans = append(ans, unit_float(x)*factor)
 		}
+	})
+	if len(ans) != sz {
+		panic(fmt.Sprintf("insufficient points: wanted %d, got %d", sz, len(ans)))
 	}
 	return ans
-})
-
-func transformers_functionally_identical(a, b ChannelTransformer) bool {
-	pts := Points_for_transformer_comparison()
-	num := max(1, runtime.GOMAXPROCS(0))
-	c := make(chan bool)
-	defer func() { close(c) }()
-	start, limit := 0, len(pts)
-	chunk_sz := max(1, limit/num)
-	for start < limit {
-		end := min(start+chunk_sz, limit)
-		go func(start, end int) {
-			defer recover() // ignore panic on sending to closed channel
-			for i := start; i < end; i++ {
-				p := pts[i]
-				ar, ag, ab := a.Transform(p.X, p.Y, p.Z)
-				br, bg, bb := b.Transform(p.X, p.Y, p.Z)
-				if abs(ar-br) > FLOAT_EQUALITY_THRESHOLD || abs(ag-bg) > FLOAT_EQUALITY_THRESHOLD || abs(ab-bb) > FLOAT_EQUALITY_THRESHOLD {
-					c <- false
-				}
-			}
-			c <- true
-		}(start, end)
-		start = end
-	}
-	for val := range c {
-		if !val {
-			return false
-		}
-	}
-	return true
 }
+
+var Points_for_transformer_comparison3 = sync.OnceValue(func() []unit_float {
+	return points_for_transformer_comparison(3, 16)
+})
+var Points_for_transformer_comparison4 = sync.OnceValue(func() []unit_float {
+	return points_for_transformer_comparison(4, 16)
+})

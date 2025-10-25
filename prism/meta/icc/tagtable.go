@@ -46,7 +46,7 @@ func decode_array(data []byte) (ans any, err error) {
 	return a, nil
 }
 
-func parse_tag(sig Signature, data []byte) (result any, err error) {
+func parse_tag(sig Signature, data []byte, input_colorspace, output_colorspace ColorSpace) (result any, err error) {
 	if len(data) == 0 {
 		return nil, &not_found{sig}
 	}
@@ -107,7 +107,7 @@ func (t *TagTable) add(sig Signature, offset int, data []byte) {
 	t.entries[sig] = raw_tag_entry{offset, data}
 }
 
-func (t *TagTable) get_parsed(sig Signature) (ans any, err error) {
+func (t *TagTable) get_parsed(sig Signature, input_colorspace, output_colorspace ColorSpace) (ans any, err error) {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 	if t.parsed == nil {
@@ -131,11 +131,11 @@ func (t *TagTable) get_parsed(sig Signature) (ans any, err error) {
 	if cached, ok := t.parse_cache[key]; ok {
 		return cached.tag, cached.err
 	}
-	return parse_tag(sig, re.data)
+	return parse_tag(sig, re.data, input_colorspace, output_colorspace)
 }
 
 func (t *TagTable) getDescription(s Signature) (string, error) {
-	q, err := t.get_parsed(s)
+	q, err := t.get_parsed(s, ColorSpaceRGB, ColorSpaceXYZ)
 	if err != nil {
 		return "", fmt.Errorf("could not get description for %s with error: %w", s, err)
 	}
@@ -159,7 +159,7 @@ func (t *TagTable) getDeviceModelDescription() (string, error) {
 }
 
 func (t *TagTable) load_curve_tag(s Signature) (Curve1D, error) {
-	r, err := t.get_parsed(s)
+	r, err := t.get_parsed(s, ColorSpaceRGB, ColorSpaceXYZ)
 	if err != nil {
 		return nil, fmt.Errorf("could not load %s tag from profile with error: %w", s, err)
 	}
@@ -171,15 +171,15 @@ func (t *TagTable) load_curve_tag(s Signature) (Curve1D, error) {
 }
 
 func (t *TagTable) load_rgb_matrix() (*Matrix3, error) {
-	r, err := t.get_parsed(RedMatrixColumnTagSignature)
+	r, err := t.get_parsed(RedMatrixColumnTagSignature, ColorSpaceRGB, ColorSpaceXYZ)
 	if err != nil {
 		return nil, err
 	}
-	g, err := t.get_parsed(GreenMatrixColumnTagSignature)
+	g, err := t.get_parsed(GreenMatrixColumnTagSignature, ColorSpaceRGB, ColorSpaceXYZ)
 	if err != nil {
 		return nil, err
 	}
-	b, err := t.get_parsed(BlueMatrixColumnTagSignature)
+	b, err := t.get_parsed(BlueMatrixColumnTagSignature, ColorSpaceRGB, ColorSpaceXYZ)
 	if err != nil {
 		return nil, err
 	}
@@ -204,7 +204,7 @@ func array_to_matrix(a []unit_float) *Matrix3 {
 }
 
 func (p *TagTable) get_chromatic_adaption() (*Matrix3, error) {
-	x, err := p.get_parsed(ChromaticAdaptationTagSignature)
+	x, err := p.get_parsed(ChromaticAdaptationTagSignature, ColorSpaceRGB, ColorSpaceXYZ)
 	if err != nil {
 		return nil, err
 	}
