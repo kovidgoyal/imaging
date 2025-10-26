@@ -40,6 +40,7 @@ type CMSProfile struct {
 	error_messages                  []string
 	pcs_output_format               C.cmsUInt32Number
 	device8bit_format               C.cmsUInt32Number
+	device_float_format             C.cmsUInt32Number
 }
 
 func (c *CMSProfile) Close() {
@@ -127,6 +128,9 @@ func CreateCMSProfile(data []byte) (ans *CMSProfile, err error) {
 		if ans.device8bit_format, err = format_for_8bit(ans.DeviceColorSpace); err != nil {
 			return nil, err
 		}
+		if ans.device_float_format, err = format_for_float(ans.DeviceColorSpace); err != nil {
+			return nil, err
+		}
 	}
 	return
 }
@@ -185,6 +189,40 @@ func (p *CMSProfile) TransformFloatToPCS(data []float32, intent icc.RenderingInt
 	var t C.cmsHTRANSFORM
 	if err = p.call_func_with_error_handling(func() string {
 		if t = C.cmsCreateTransformTHR(p.ctx, p.p, C.TYPE_RGB_FLT, nil, p.pcs_output_format, C.cmsUInt32Number(intent), 0); t == nil {
+			return "failed to create transform"
+		}
+		return ""
+	}); err != nil {
+		return
+	}
+	defer C.cmsDeleteTransform(t)
+	ans = make([]float32, len(data))
+	C.cmsDoTransform(t, unsafe.Pointer(&data[0]), unsafe.Pointer(&ans[0]), C.cmsUInt32Number(len(data)/3))
+	return
+}
+
+func (p *CMSProfile) TransformFloatToDevice(data []float32, intent icc.RenderingIntent) (ans []float32, err error) {
+	if len(data) == 0 {
+		return nil, nil
+	}
+	if len(data)%3 != 0 {
+		return nil, fmt.Errorf("pixel data must be a multiple of 3")
+	}
+	var pcs C.cmsHPROFILE
+	switch p.PCSColorSpace {
+	case icc.XYZSignature:
+		pcs = C.cmsCreateXYZProfile()
+	case icc.LabSignature:
+		pcs = C.cmsCreateLab4Profile(nil)
+	default:
+		return nil, fmt.Errorf("unknown PCS color space: %s", p.PCSColorSpace)
+	}
+	defer func() {
+		C.cmsCloseProfile(pcs)
+	}()
+	var t C.cmsHTRANSFORM
+	if err = p.call_func_with_error_handling(func() string {
+		if t = C.cmsCreateTransformTHR(p.ctx, pcs, p.pcs_output_format, p.p, p.device_float_format, C.cmsUInt32Number(intent), 0); t == nil {
 			return "failed to create transform"
 		}
 		return ""
