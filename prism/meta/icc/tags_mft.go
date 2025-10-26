@@ -9,41 +9,45 @@ import (
 var _ = fmt.Print
 
 type MFT struct {
-	in_channels, out_channels   int
-	grid_points                 []int
-	input_curves, output_curves []Curve1D
-	clut                        CLUT
-	matrix                      ChannelTransformer
-	is8bit                      bool
+	in_channels, out_channels int
+	grid_points               []int
+	input_curve, output_curve Curves
+	clut                      CLUT
+	matrix                    ChannelTransformer
+	is8bit                    bool
 }
 
 func (c MFT) String() string {
-	return fmt.Sprintf("MFT{grid_points:%v, matrix:%v input:%v, clut:%v, output:%v }", c.grid_points, c.matrix, c.input_curves, c.clut, c.output_curves)
+	return fmt.Sprintf("MFT{grid_points:%v, matrix:%v input:%v, clut:%v, output:%v }", c.grid_points, c.matrix, c.input_curve, c.clut, c.output_curve)
 }
 
-func (c *MFT) IsSuitableFor(num_input_channels, num_output_channels int) bool {
-	return num_input_channels == int(c.in_channels) && num_output_channels == c.out_channels && num_input_channels <= 6
+func (c *MFT) IOSig() (int, int) { return c.in_channels, c.out_channels }
+func (c *MFT) Iter(f func(ChannelTransformer) bool) {
+	if !f(c.matrix) {
+		return
+	}
+	if !f(c.input_curve) {
+		return
+	}
+	if !f(c.clut) {
+		return
+	}
+	if !f(c.output_curve) {
+		return
+	}
 }
 
 var _ ChannelTransformer = (*MFT)(nil)
-
-func (m *MFT) TransformDebug(r, g, b unit_float, callback Debug_callback) (unit_float, unit_float, unit_float) {
-	return transform_debug(m, r, g, b, callback)
-}
 
 func (mft *MFT) Transform(r, g, b unit_float) (unit_float, unit_float, unit_float) {
 	// Apply matrix
 	r, g, b = mft.matrix.Transform(r, g, b)
 	// Apply input curves with linear interpolation
-	r = mft.input_curves[0].Transform(r)
-	g = mft.input_curves[1].Transform(g)
-	b = mft.input_curves[2].Transform(b)
+	r, g, b = mft.input_curve.Transform(r, g, b)
 	// Apply CLUT
 	r, g, b = mft.clut.Transform(r, g, b)
 	// Apply output curves with interpolation
-	r = mft.output_curves[0].Transform(r)
-	g = mft.output_curves[1].Transform(g)
-	b = mft.output_curves[2].Transform(b)
+	r, g, b = mft.output_curve.Transform(r, g, b)
 	return r, g, b
 }
 
@@ -94,17 +98,18 @@ func load_mft_header(raw []byte) (ans *MFT, leftover []byte, err error) {
 }
 
 func load_mft_body(a *MFT, raw []byte, load_table func([]byte, int) ([]unit_float, []byte, error), input_table_entries, output_table_entries int, output_colorspace ColorSpace, bytes_per_channel int) (err error) {
-	a.input_curves = make([]Curve1D, a.in_channels)
-	a.output_curves = make([]Curve1D, a.out_channels)
+	input_curves := make([]Curve1D, a.in_channels)
+	output_curves := make([]Curve1D, a.out_channels)
 	var fp []unit_float
 	for i := range a.in_channels {
 		if fp, raw, err = load_table(raw, input_table_entries); err != nil {
 			return err
 		}
-		if a.input_curves[i], err = load_points_curve(fp); err != nil {
+		if input_curves[i], err = load_points_curve(fp); err != nil {
 			return err
 		}
 	}
+	a.input_curve = NewCurveTransformer("Input", input_curves...)
 	fp, consumed, err := decode_clut_table(raw, int(bytes_per_channel), a.out_channels, a.grid_points, output_colorspace, true)
 	if err != nil {
 		return err
@@ -115,10 +120,11 @@ func load_mft_body(a *MFT, raw []byte, load_table func([]byte, int) ([]unit_floa
 		if fp, raw, err = load_table(raw, output_table_entries); err != nil {
 			return err
 		}
-		if a.output_curves[i], err = load_points_curve(fp); err != nil {
+		if output_curves[i], err = load_points_curve(fp); err != nil {
 			return err
 		}
 	}
+	a.output_curve = NewCurveTransformer("Output", output_curves...)
 	return nil
 }
 

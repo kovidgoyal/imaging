@@ -89,7 +89,7 @@ func test_profile(t *testing.T, name string, profile_data []byte, tolerance floa
 
 func debug_transform(r, g, b, x, y, z float32, t icc.ChannelTransformer) {
 	fmt.Printf("Transform: %s\n", t)
-	fmt.Printf("  %v -> %v\n", []float32{r, g, b}, []float32{x, y, z})
+	fmt.Printf("  %v → %v\n", []float32{r, g, b}, []float32{x, y, z})
 }
 
 func TestDevelop(t *testing.T) {
@@ -108,6 +108,6 @@ func TestDevelop(t *testing.T) {
 }
 
 func TestAgainstLCMS2(t *testing.T) {
-	test_profile(t, "srgb_lab", icc.Srgb_lab_profile_data, 1e-2, 0.3)
+	test_profile(t, "srgb_lab", icc.Srgb_lab_profile_data, 0.0022, 0.3)
 	test_profile(t, "srgb_xyz", icc.Srgb_xyz_profile_data, icc.FLOAT_EQUALITY_THRESHOLD, icc.FLOAT_EQUALITY_THRESHOLD)
 }

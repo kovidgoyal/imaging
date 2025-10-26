@@ -46,15 +46,15 @@ type InverseCurveTransformer struct {
 	name   string
 }
 
-func (c CurveTransformer) IsSuitableFor(num_input_channels, num_output_channels int) bool {
-	return len(c.curves) == num_input_channels && len(c.curves) == num_output_channels
+func (c CurveTransformer) IOSig() (int, int) {
+	return len(c.curves), len(c.curves)
 }
 func (c CurveTransformer) Transform(r, g, b unit_float) (unit_float, unit_float, unit_float) {
 	return c.curves[0].Transform(r), c.curves[1].Transform(g), c.curves[2].Transform(b)
 }
 
-func (c InverseCurveTransformer) IsSuitableFor(num_input_channels, num_output_channels int) bool {
-	return len(c.curves) == num_input_channels && len(c.curves) == num_output_channels
+func (c InverseCurveTransformer) IOSig() (int, int) {
+	return len(c.curves), len(c.curves)
 }
 func (c InverseCurveTransformer) Transform(r, g, b unit_float) (unit_float, unit_float, unit_float) {
 	// we need to clamp as per spec section F.3 of ICC.1-2202-05.pdf
@@ -66,9 +66,7 @@ type CurveTransformer3 struct {
 	name    string
 }
 
-func (c CurveTransformer3) IsSuitableFor(num_input_channels, num_output_channels int) bool {
-	return 3 == num_input_channels && 3 == num_output_channels
-}
+func (c CurveTransformer3) IOSig() (int, int) { return 3, 3 }
 func (c CurveTransformer3) Transform(r, g, b unit_float) (unit_float, unit_float, unit_float) {
 	return c.r.Transform(r), c.g.Transform(g), c.b.Transform(b)
 }
@@ -77,6 +75,15 @@ type InverseCurveTransformer3 struct {
 	r, g, b Curve1D
 	name    string
 }
+
+func (c *CurveTransformer) Iter(f func(ChannelTransformer) bool)         { f(c) }
+func (c *CurveTransformer3) Iter(f func(ChannelTransformer) bool)        { f(c) }
+func (c *InverseCurveTransformer) Iter(f func(ChannelTransformer) bool)  { f(c) }
+func (c *InverseCurveTransformer3) Iter(f func(ChannelTransformer) bool) { f(c) }
+func (c *CurveTransformer) Curves() []Curve1D                            { return c.curves }
+func (c *InverseCurveTransformer) Curves() []Curve1D                     { return c.curves }
+func (c *CurveTransformer3) Curves() []Curve1D                           { return []Curve1D{c.r, c.g, c.b} }
+func (c *InverseCurveTransformer3) Curves() []Curve1D                    { return []Curve1D{c.r, c.g, c.b} }
 
 func curve_string(name string, is_inverse bool, curves ...Curve1D) string {
 	var b strings.Builder
@@ -96,29 +103,18 @@ func (c CurveTransformer) String() string         { return curve_string(c.name, 
 func (c InverseCurveTransformer3) String() string { return curve_string(c.name, true, c.r, c.g, c.b) }
 func (c InverseCurveTransformer) String() string  { return curve_string(c.name, true, c.curves...) }
 
-func (c InverseCurveTransformer3) IsSuitableFor(num_input_channels, num_output_channels int) bool {
-	return 3 == num_input_channels && 3 == num_output_channels
-}
+func (c InverseCurveTransformer3) IOSig() (int, int) { return 3, 3 }
 func (c InverseCurveTransformer3) Transform(r, g, b unit_float) (unit_float, unit_float, unit_float) {
 	// we need to clamp as per spec section F.3 of ICC.1-2202-05.pdf
 	return c.r.InverseTransform(clamp01(r)), c.g.InverseTransform(clamp01(g)), c.b.InverseTransform(clamp01(b))
 }
 
-func (m *CurveTransformer) TransformDebug(r, g, b unit_float, callback Debug_callback) (unit_float, unit_float, unit_float) {
-	return transform_debug(m, r, g, b, callback)
-}
-func (m *InverseCurveTransformer) TransformDebug(r, g, b unit_float, callback Debug_callback) (unit_float, unit_float, unit_float) {
-	return transform_debug(m, r, g, b, callback)
-}
-func (m *CurveTransformer3) TransformDebug(r, g, b unit_float, callback Debug_callback) (unit_float, unit_float, unit_float) {
-	return transform_debug(m, r, g, b, callback)
+type Curves interface {
+	ChannelTransformer
+	Curves() []Curve1D
 }
 
-func (m *InverseCurveTransformer3) TransformDebug(r, g, b unit_float, callback Debug_callback) (unit_float, unit_float, unit_float) {
-	return transform_debug(m, r, g, b, callback)
-}
-
-func NewCurveTransformer(name string, curves ...Curve1D) ChannelTransformer {
+func NewCurveTransformer(name string, curves ...Curve1D) Curves {
 	for _, c := range curves {
 		if c == nil {
 			panic("curve must not be nil")
@@ -131,7 +127,7 @@ func NewCurveTransformer(name string, curves ...Curve1D) ChannelTransformer {
 		return &CurveTransformer{curves, name}
 	}
 }
-func NewInverseCurveTransformer(name string, curves ...Curve1D) ChannelTransformer {
+func NewInverseCurveTransformer(name string, curves ...Curve1D) Curves {
 	for _, c := range curves {
 		if c == nil {
 			panic("curve must not be nil")

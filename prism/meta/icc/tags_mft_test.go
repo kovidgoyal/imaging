@@ -55,23 +55,23 @@ func (m *MFT) as_bytes() []byte {
 	var writeclutval func(unit_float)
 	if m.is8bit {
 		writeval = func(x unit_float) { buf.WriteByte(uint8(x * 255)) }
-		for _, c := range m.input_curves {
+		for _, c := range m.input_curve.Curves() {
 			if curve_len(c) != 256 {
 				panic("mft1 must have curves of length 256")
 			}
 		}
-		for _, c := range m.output_curves {
+		for _, c := range m.output_curve.Curves() {
 			if curve_len(c) != 256 {
 				panic("mft1 must have curves of length 256")
 			}
 		}
 		writeclutval = writeval
 	} else {
-		binary.Write(&buf, binary.BigEndian, []uint16{uint16(curve_len(m.input_curves[0])), uint16(curve_len(m.output_curves[0]))})
+		binary.Write(&buf, binary.BigEndian, []uint16{uint16(curve_len(m.input_curve.Curves()[0])), uint16(curve_len(m.output_curve.Curves()[0]))})
 		writeval = func(x unit_float) { binary.Write(&buf, binary.BigEndian, uint16(x*65535)) }
 		writeclutval = func(x unit_float) { binary.Write(&buf, binary.BigEndian, uint16(x*(1<<15))) }
 	}
-	for _, curve := range m.input_curves {
+	for _, curve := range m.input_curve.Curves() {
 		for _, x := range curve_points(curve) {
 			writeval(x)
 		}
@@ -79,7 +79,7 @@ func (m *MFT) as_bytes() []byte {
 	for _, x := range m.clut.Samples() {
 		writeclutval(x)
 	}
-	for _, curve := range m.output_curves {
+	for _, curve := range m.output_curve.Curves() {
 		for _, x := range curve_points(curve) {
 			writeval(x)
 		}
@@ -91,16 +91,16 @@ func (a *MFT) require_equal(t *testing.T, b *MFT) {
 	require.Equal(t, a.in_channels, b.in_channels)
 	require.Equal(t, a.out_channels, b.out_channels)
 	require.Equal(t, a.grid_points, b.grid_points)
-	require.Equal(t, len(a.input_curves), len(b.input_curves))
+	require.Equal(t, len(a.input_curve.Curves()), len(b.input_curve.Curves()))
 	require.Equal(t, a.matrix, b.matrix)
 	require.Equal(t, a.is8bit, b.is8bit)
 	tolerance := IfElse(a.is8bit, 0.01, 0.0001)
-	for i := range a.input_curves {
-		in_delta_slice(t, curve_points(a.input_curves[i]), curve_points(b.input_curves[i]), tolerance)
+	for i := range a.input_curve.Curves() {
+		in_delta_slice(t, curve_points(a.input_curve.Curves()[i]), curve_points(b.input_curve.Curves()[i]), tolerance)
 	}
 	in_delta_slice(t, a.clut.Samples(), b.clut.Samples(), tolerance)
-	for i := range a.output_curves {
-		in_delta_slice(t, curve_points(a.output_curves[i]), curve_points(b.output_curves[i]), tolerance)
+	for i := range a.output_curve.Curves() {
+		in_delta_slice(t, curve_points(a.output_curve.Curves()[i]), curve_points(b.output_curve.Curves()[i]), tolerance)
 	}
 }
 
@@ -119,7 +119,7 @@ func TestMFTTag(t *testing.T) {
 	im := IdentityMatrix(0)
 	m := MFT{
 		in_channels: 3, out_channels: 3, grid_points: gp,
-		input_curves: []Curve1D{c, c, c}, output_curves: []Curve1D{c, c, c},
+		input_curve: NewCurveTransformer("test", c, c, c), output_curve: NewCurveTransformer("test", c, c, c),
 		clut: make_clut(gp, 3, 3, curve_points(make_curve(expectedValues(gp, 3)))), matrix: &im,
 	}
 
@@ -134,7 +134,7 @@ func TestMFTTag(t *testing.T) {
 	roundtrip()
 	m.is8bit = true
 	c = make_curve(256)
-	m.input_curves = []Curve1D{c, c, c}
-	m.output_curves = []Curve1D{c, c, c}
+	m.input_curve = NewCurveTransformer("test", c, c, c)
+	m.output_curve = NewCurveTransformer("test", c, c, c)
 	roundtrip()
 }

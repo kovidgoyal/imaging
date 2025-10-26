@@ -77,7 +77,7 @@ func TestModularDecoder(t *testing.T) {
 		assert.True(t, tag.is_a_to_b)
 		assert.Equal(t, 3, tag.num_input_channels)
 		assert.Equal(t, 3, tag.num_output_channels)
-		assert.Len(t, tag.transforms, 5)
+		assert.Len(t, tag.transform_objects, 5)
 	})
 	t.Run("TooShort", func(t *testing.T) {
 		data := []byte{1, 2, 3}

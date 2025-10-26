@@ -19,6 +19,9 @@ func (m MatrixWithOffset) String() string {
 }
 
 func is_identity_matrix(m *Matrix3) bool {
+	if m == nil {
+		return true
+	}
 	for r := range 3 {
 		for c := range 3 {
 			q := IfElse(r == c, unit_float(1), unit_float(0))
@@ -30,19 +33,13 @@ func is_identity_matrix(m *Matrix3) bool {
 	return true
 }
 
-func (c *Matrix3) IsSuitableFor(num_input_channels, num_output_channels int) bool {
-	return num_input_channels == 3 && num_output_channels == 3
-}
-
-func (c *MatrixWithOffset) IsSuitableFor(num_input_channels, num_output_channels int) bool {
-	return num_input_channels == 3 && num_output_channels == 3
-}
-
-func (c *IdentityMatrix) IsSuitableFor(num_input_channels, num_output_channels int) bool {
-	return num_input_channels == 3 && num_output_channels == 3
-}
-
-func (c IdentityMatrix) String() string { return "IdentityMatrix" }
+func (c *IdentityMatrix) String() string                         { return "IdentityMatrix" }
+func (c *IdentityMatrix) IOSig() (int, int)                      { return 3, 3 }
+func (c *MatrixWithOffset) IOSig() (int, int)                    { return 3, 3 }
+func (c *Matrix3) IOSig() (int, int)                             { return 3, 3 }
+func (c *IdentityMatrix) Iter(f func(ChannelTransformer) bool)   { f(c) }
+func (c *MatrixWithOffset) Iter(f func(ChannelTransformer) bool) { f(c) }
+func (c *Matrix3) Iter(f func(ChannelTransformer) bool)          { f(c) }
 
 var _ ChannelTransformer = (*MatrixWithOffset)(nil)
 
@@ -85,10 +82,6 @@ func (m *Matrix3) Transform(r, g, b unit_float) (unit_float, unit_float, unit_fl
 	return m[0][0]*r + m[0][1]*g + m[0][2]*b, m[1][0]*r + m[1][1]*g + m[1][2]*b, m[2][0]*r + m[2][1]*g + m[2][2]*b
 }
 
-func (m *Matrix3) TransformDebug(r, g, b unit_float, callback Debug_callback) (unit_float, unit_float, unit_float) {
-	return transform_debug(m, r, g, b, callback)
-}
-
 func (m Matrix3) Transpose() Matrix3 {
 	return Matrix3{
 		{m[0][0], m[1][0], m[2][0]},
@@ -101,12 +94,12 @@ func Dot(v1, v2 [3]unit_float) unit_float {
 	return v1[0]*v2[0] + v1[1]*v2[1] + v1[2]*v2[2]
 }
 
-func (m Matrix3) String() string {
+func (m *Matrix3) String() string {
 	return fmt.Sprintf("Matrix3{ %v, %v, %v }", m[0], m[1], m[2])
 }
 
 // Return m * o
-func (m Matrix3) Multiply(o Matrix3) Matrix3 {
+func (m *Matrix3) Multiply(o Matrix3) Matrix3 {
 	t := o.Transpose()
 	return Matrix3{
 		{Dot(t[0], m[0]), Dot(t[1], m[0]), Dot(t[2], m[0])},
@@ -115,7 +108,7 @@ func (m Matrix3) Multiply(o Matrix3) Matrix3 {
 	}
 }
 
-func (m Matrix3) Inverted() (ans Matrix3, err error) {
+func (m *Matrix3) Inverted() (ans Matrix3, err error) {
 	o := Matrix3{
 		{
 			m[1][1]*m[2][2] - m[2][1]*m[1][2],
@@ -154,14 +147,6 @@ func (m Matrix3) Inverted() (ans Matrix3, err error) {
 
 func (m IdentityMatrix) Transform(r, g, b unit_float) (unit_float, unit_float, unit_float) {
 	return r, g, b
-}
-
-func (m *IdentityMatrix) TransformDebug(r, g, b unit_float, callback Debug_callback) (unit_float, unit_float, unit_float) {
-	return transform_debug(m, r, g, b, callback)
-}
-
-func (m *MatrixWithOffset) TransformDebug(r, g, b unit_float, callback Debug_callback) (unit_float, unit_float, unit_float) {
-	return transform_debug(m, r, g, b, callback)
 }
 
 func (m *MatrixWithOffset) Transform(r, g, b unit_float) (unit_float, unit_float, unit_float) {

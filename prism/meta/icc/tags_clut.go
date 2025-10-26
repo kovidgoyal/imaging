@@ -179,13 +179,10 @@ func expectedValues(gridPoints []int, outputChannels int) int {
 	return expectedPoints * outputChannels
 }
 
-func (c *CLUTTag) IsSuitableFor(num_input_channels, num_output_channels int) bool {
-	return num_input_channels == int(c.d.num_inputs) && num_output_channels == c.d.num_outputs && num_input_channels <= 6
-}
-
-func (c *CLUT3D) IsSuitableFor(num_input_channels, num_output_channels int) bool {
-	return num_input_channels == 3 && num_output_channels == c.d.num_outputs
-}
+func (c *CLUTTag) IOSig() (int, int)                    { return c.d.num_inputs, c.d.num_outputs }
+func (c *CLUT3D) IOSig() (int, int)                     { return 3, c.d.num_outputs }
+func (c *CLUTTag) Iter(f func(ChannelTransformer) bool) { f(c) }
+func (c *CLUT3D) Iter(f func(ChannelTransformer) bool)  { f(c) }
 
 func (c *CLUTTag) Transform(r, g, b unit_float) (unit_float, unit_float, unit_float) {
 	var obuf [3]unit_float
@@ -213,12 +210,4 @@ func (c *CLUT3D) Transform(r, g, b unit_float) (unit_float, unit_float, unit_flo
 
 func clamp01(v unit_float) unit_float {
 	return max(0, min(v, 1))
-}
-
-func (m *CLUTTag) TransformDebug(r, g, b unit_float, callback Debug_callback) (unit_float, unit_float, unit_float) {
-	return transform_debug(m, r, g, b, callback)
-}
-
-func (m *CLUT3D) TransformDebug(r, g, b unit_float, callback Debug_callback) (unit_float, unit_float, unit_float) {
-	return transform_debug(m, r, g, b, callback)
 }

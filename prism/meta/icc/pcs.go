@@ -8,31 +8,29 @@ var _ = fmt.Println
 var D50 = XYZType{0.9642, 1.0, 0.82491}
 
 // A transformer to convert LAB colors to normalized [0,1] values
-type NormalizeLAB struct {
-	transform ChannelTransformer
-	tfunc     func(r, g, b unit_float) (unit_float, unit_float, unit_float)
-}
+type NormalizeLAB int
 
 var _ ChannelTransformer = (*NormalizeLAB)(nil)
 var _ ChannelTransformer = (*BlackPointCorrection)(nil)
 
-func (n NormalizeLAB) String() string              { return "NormalizeLAB" }
-func (n NormalizeLAB) IsSuitableFor(int, int) bool { return true }
+func (n NormalizeLAB) String() string                        { return "NormalizeLAB" }
+func (n NormalizeLAB) IOSig() (int, int)                     { return 3, 3 }
+func (n *NormalizeLAB) Iter(f func(ChannelTransformer) bool) { f(n) }
 func (m *NormalizeLAB) Transform(l, a, b unit_float) (unit_float, unit_float, unit_float) {
-	return m.tfunc(l/100, (a+128)/255, (b+128)/255)
+	return l / 100, (a + 128) / 255, (b + 128) / 255
 }
 
-func (m *NormalizeLAB) TransformDebug(l, a, b unit_float, callback Debug_callback) (unit_float, unit_float, unit_float) {
-	return transform_debug(m, l, a, b, callback)
-}
-
-func NewNormalizeLAB(t ChannelTransformer) ChannelTransformer {
-	return &NormalizeLAB{t, t.Transform}
+func NewNormalizeLAB() *NormalizeLAB {
+	x := NormalizeLAB(0)
+	return &x
 }
 
 type BlackPointCorrection struct {
 	scale, offset XYZType
 }
+
+func (n BlackPointCorrection) IOSig() (int, int)                     { return 3, 3 }
+func (n *BlackPointCorrection) Iter(f func(ChannelTransformer) bool) { f(n) }
 
 func NewBlackPointCorrection(in_blackpoint, out_blackpoint XYZType) *BlackPointCorrection {
 	tx := in_blackpoint.X - D50.X
@@ -58,9 +56,3 @@ func (c *BlackPointCorrection) String() string {
 func (c *BlackPointCorrection) Transform(r, g, b unit_float) (unit_float, unit_float, unit_float) {
 	return c.scale.X*r + c.offset.X, c.scale.Y*g + c.offset.Y, c.scale.Z*b + c.offset.Z
 }
-
-func (m *BlackPointCorrection) TransformDebug(r, g, b unit_float, callback Debug_callback) (unit_float, unit_float, unit_float) {
-	return transform_debug(m, r, g, b, callback)
-}
-
-func (n *BlackPointCorrection) IsSuitableFor(i int, o int) bool { return i == 3 && o == 3 }

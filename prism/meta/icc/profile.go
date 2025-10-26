@@ -119,7 +119,7 @@ func (p *Profile) WellKnownProfile() WellKnownProfile {
 	return UnknownProfile
 }
 
-func (p *Profile) get_effective_chromatic_adaption() (*Matrix3, error) {
+func (p *Profile) get_effective_chromatic_adaption(forward bool) (ans *Matrix3, err error) {
 	pcs_whitepoint := p.Header.ParsedPCSIlluminant()
 	x, err := p.TagTable.get_parsed(MediaWhitePointTagSignature, p.Header.DataColorSpace, p.Header.ProfileConnectionSpace)
 	if err != nil {
@@ -132,59 +132,44 @@ func (p *Profile) get_effective_chromatic_adaption() (*Matrix3, error) {
 	if pcs_whitepoint == *wtpt {
 		return nil, nil
 	}
+	defer func() {
+		if err == nil && ans != nil && !forward {
+			m, ierr := ans.Inverted()
+			if ierr == nil {
+				ans = &m
+			} else {
+				ans, err = nil, ierr
+			}
+		}
+	}()
 	return p.TagTable.get_chromatic_adaption()
 }
 
-func (p *Profile) create_matrix_trc_transformer(forward bool, chromatic_adaptation *Matrix3) (ans ChannelTransformer, err error) {
+func (p *Profile) create_matrix_trc_transformer(forward bool, chromatic_adaptation *Matrix3, pipeline *Pipeline) (err error) {
 	if p.Header.ProfileConnectionSpace != ColorSpaceXYZ {
-		return nil, fmt.Errorf("matrix/TRC based profile using non XYZ PCS color space: %v", p.Header.ProfileConnectionSpace)
+		return fmt.Errorf("matrix/TRC based profile using non XYZ PCS color space: %v", p.Header.ProfileConnectionSpace)
 	}
 	// See section F.3 of ICC.1-2202-5.pdf for how these transforms are composed
 	var rc, gc, bc Curve1D
 	if rc, err = p.TagTable.load_curve_tag(RedTRCTagSignature); err != nil {
-		return nil, err
+		return err
 	}
 	if gc, err = p.TagTable.load_curve_tag(GreenTRCTagSignature); err != nil {
-		return nil, err
+		return err
 	}
 	if bc, err = p.TagTable.load_curve_tag(BlueTRCTagSignature); err != nil {
-		return nil, err
+		return err
 	}
-	m, err := p.TagTable.load_rgb_matrix()
+	m, err := p.TagTable.load_rgb_matrix(forward)
 	if err != nil {
-		return nil, err
-	}
-	if is_identity_matrix(m) {
-		m = chromatic_adaptation
-		chromatic_adaptation = nil
+		return err
 	}
 	if forward {
-		ct := NewCurveTransformer("TRC", rc, gc, bc)
-		if chromatic_adaptation != nil {
-			combined := chromatic_adaptation.Multiply(*m)
-			m = &combined
-		}
-		if m == nil {
-			return ct, nil
-		}
-		return NewCombinedTransformer(ct, m), nil
+		pipeline.Append(NewCurveTransformer("TRC", rc, gc, bc), m, chromatic_adaptation)
 	} else {
-		ct := NewInverseCurveTransformer("TRC", rc, gc, bc)
-		inv, err := m.Inverted()
-		if err != nil {
-			return nil, fmt.Errorf("the colorspace conversion matrix is not invertible: %w", err)
-		}
-		m = &inv
-		if chromatic_adaptation != nil {
-			minv, err := chromatic_adaptation.Inverted()
-			if err != nil {
-				return nil, fmt.Errorf("the chromatic_adaptation matrix is not invertible: %w", err)
-			}
-			combined := m.Multiply(minv)
-			m = &combined
-		}
-		return NewCombinedTransformer(m, ct), nil
+		pipeline.Append(chromatic_adaptation, m, NewInverseCurveTransformer("TRC", rc, gc, bc))
 	}
+	return nil
 }
 
 // See section 8.10.2 of ICC.1-2202-05.pdf for tag selection algorithm
@@ -250,78 +235,68 @@ func (p *Profile) find_conversion_tag(forward bool, rendering_intent RenderingIn
 	return ans, nil
 }
 
-func add_chromatic_adaptation(chad *Matrix3, tag ChannelTransformer, prepend bool) ChannelTransformer {
-	if chad == nil {
-		return tag
-	}
-	if mod, ok := tag.(*ModularTag); ok {
-		mod.AddTransform(chad, prepend)
-		return mod
-	}
-	if prepend {
-		return NewCombinedTransformer(chad, tag)
-	}
-	return NewCombinedTransformer(tag, chad)
-}
-
-func (p *Profile) CreateTransformerToDevice(rendering_intent RenderingIntent) (ans ChannelTransformer, err error) {
+func (p *Profile) CreateTransformerToDevice(rendering_intent RenderingIntent) (ans *Pipeline, err error) {
 	defer func() {
 		if err == nil && !ans.IsSuitableFor(3, 3) {
 			err = fmt.Errorf("transformer to PCS %s not suitable for 3 output channels", ans.String())
 		}
 	}()
+	ans = &Pipeline{}
 
 	const forward = false
 	b2a, err := p.find_conversion_tag(forward, rendering_intent)
 	if err != nil {
 		return nil, err
 	}
-	chromatic_adaptation, err := p.get_effective_chromatic_adaption()
+	chromatic_adaptation, err := p.get_effective_chromatic_adaption(forward)
 	if err != nil {
 		return nil, err
 	}
 	if b2a != nil {
-		defer func() {
-			if err == nil && p.Header.ProfileConnectionSpace == ColorSpaceLab {
-				ans = NewNormalizeLAB(ans)
-			}
-		}()
-		return add_chromatic_adaptation(chromatic_adaptation, b2a, !forward), nil
+		if p.Header.ProfileConnectionSpace == ColorSpaceLab {
+			ans.Append(NewNormalizeLAB())
+		}
+		ans.Append(b2a)
+		ans.Append(chromatic_adaptation)
+	} else {
+		err = p.create_matrix_trc_transformer(forward, chromatic_adaptation, ans)
 	}
-	return p.create_matrix_trc_transformer(forward, chromatic_adaptation)
+	return
 }
 
-func (p *Profile) CreateTransformerToPCS(rendering_intent RenderingIntent, input_channels int) (ans ChannelTransformer, err error) {
+func (p *Profile) CreateTransformerToPCS(rendering_intent RenderingIntent, input_channels int) (ans *Pipeline, err error) {
 	defer func() {
 		if err == nil && !ans.IsSuitableFor(input_channels, 3) {
 			err = fmt.Errorf("transformer to PCS %s not suitable for %d input channels", ans.String(), input_channels)
 		}
 	}()
+	ans = &Pipeline{}
 	const forward = true
 	a2b, err := p.find_conversion_tag(forward, rendering_intent)
 	if err != nil {
 		return nil, err
 	}
-	chromatic_adaptation, err := p.get_effective_chromatic_adaption()
+	chromatic_adaptation, err := p.get_effective_chromatic_adaption(forward)
 	if err != nil {
 		return nil, err
 	}
 	if a2b != nil {
-		defer func() {
-			if err == nil && p.Header.DataColorSpace == ColorSpaceLab {
-				ans = NewNormalizeLAB(ans)
-			}
-		}()
-		return add_chromatic_adaptation(chromatic_adaptation, a2b, !forward), nil
+		if p.Header.DataColorSpace == ColorSpaceLab {
+			ans.Append(NewNormalizeLAB())
+		}
+		ans.Append(a2b)
+		ans.Append(chromatic_adaptation)
+	} else {
+		err = p.create_matrix_trc_transformer(forward, chromatic_adaptation, ans)
 	}
-	return p.create_matrix_trc_transformer(forward, chromatic_adaptation)
+	return
 }
 
-func (p *Profile) CreateDefaultTransformerToDevice() (ChannelTransformer, error) {
+func (p *Profile) CreateDefaultTransformerToDevice() (*Pipeline, error) {
 	return p.CreateTransformerToDevice(p.Header.RenderingIntent)
 }
 
-func (p *Profile) CreateDefaultTransformerToPCS(input_channels int) (ChannelTransformer, error) {
+func (p *Profile) CreateDefaultTransformerToPCS(input_channels int) (*Pipeline, error) {
 	return p.CreateTransformerToPCS(p.Header.RenderingIntent, input_channels)
 }
 

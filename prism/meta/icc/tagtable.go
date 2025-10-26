@@ -2,7 +2,6 @@ package icc
 
 import (
 	"fmt"
-	"strings"
 	"sync"
 )
 
@@ -170,7 +169,7 @@ func (t *TagTable) load_curve_tag(s Signature) (Curve1D, error) {
 	}
 }
 
-func (t *TagTable) load_rgb_matrix() (*Matrix3, error) {
+func (t *TagTable) load_rgb_matrix(forward bool) (*Matrix3, error) {
 	r, err := t.get_parsed(RedMatrixColumnTagSignature, ColorSpaceRGB, ColorSpaceXYZ)
 	if err != nil {
 		return nil, err
@@ -188,7 +187,17 @@ func (t *TagTable) load_rgb_matrix() (*Matrix3, error) {
 	m[0][0], m[0][1], m[0][2] = rc.X, bc.X, gc.X
 	m[1][0], m[1][1], m[1][2] = rc.Y, bc.Y, gc.Y
 	m[2][0], m[2][1], m[2][2] = rc.Z, bc.Z, gc.Z
-	return &m, nil
+	if is_identity_matrix(&m) {
+		return nil, nil
+	}
+	if forward {
+		return &m, nil
+	}
+	inv, err := m.Inverted()
+	if err != nil {
+		return nil, fmt.Errorf("the colorspace conversion matrix is not invertible: %w", err)
+	}
+	return &inv, nil
 }
 
 func array_to_matrix(a []unit_float) *Matrix3 {
@@ -223,137 +232,10 @@ func emptyTagTable() TagTable {
 
 type Debug_callback = func(r, g, b, x, y, z unit_float, t ChannelTransformer)
 
-func transform_debug(m ChannelTransformer, r, g, b unit_float, f Debug_callback) (unit_float, unit_float, unit_float) {
-	x, y, z := m.Transform(r, g, b)
-	f(r, g, b, x, y, z, m)
-	return x, y, z
-}
-
 type ChannelTransformer interface {
-	Transform(r, g, b unit_float) (unit_float, unit_float, unit_float)
-	TransformDebug(r, g, b unit_float, callback Debug_callback) (unit_float, unit_float, unit_float)
-	IsSuitableFor(num_input_channels int, num_output_channels int) bool
+	Transform(r, g, b unit_float) (x, y, z unit_float)
+	IOSig() (num_inputs, num_outputs int)
+	// Should yield only itself unless it is a container, in which case it should yield its contained transforms
+	Iter(func(ChannelTransformer) bool)
 	String() string
-}
-
-type TwoTransformers struct {
-	a, b         func(r, g, b unit_float) (unit_float, unit_float, unit_float)
-	transformers []ChannelTransformer
-}
-
-func (t *TwoTransformers) IsSuitableFor(i, o int) bool {
-	for _, x := range t.transformers {
-		if !x.IsSuitableFor(i, o) {
-			return false
-		}
-	}
-	return true
-}
-
-func (t *TwoTransformers) Transform(r, g, b unit_float) (unit_float, unit_float, unit_float) {
-	r, g, b = t.a(r, g, b)
-	r, g, b = t.b(r, g, b)
-	return r, g, b
-}
-
-func (t *TwoTransformers) TransformDebug(r, g, b unit_float, f Debug_callback) (unit_float, unit_float, unit_float) {
-	for _, x := range t.transformers {
-		r, g, b = x.TransformDebug(r, g, b, f)
-	}
-	return r, g, b
-}
-
-func (t TwoTransformers) String() string {
-	return fmt.Sprintf("TwoTransformers{ %v %v }", t.transformers[0], t.transformers[1])
-}
-
-type ThreeTransformers struct {
-	a, b, c      func(r, g, b unit_float) (unit_float, unit_float, unit_float)
-	transformers []ChannelTransformer
-}
-
-func (t *ThreeTransformers) IsSuitableFor(i, o int) bool {
-	for _, x := range t.transformers {
-		if !x.IsSuitableFor(i, o) {
-			return false
-		}
-	}
-	return true
-}
-
-func (t *ThreeTransformers) Transform(r, g, b unit_float) (unit_float, unit_float, unit_float) {
-	r, g, b = t.a(r, g, b)
-	r, g, b = t.b(r, g, b)
-	r, g, b = t.c(r, g, b)
-	return r, g, b
-}
-
-func (t *ThreeTransformers) TransformDebug(r, g, b unit_float, f Debug_callback) (unit_float, unit_float, unit_float) {
-	for _, x := range t.transformers {
-		r, g, b = x.TransformDebug(r, g, b, f)
-	}
-	return r, g, b
-}
-
-func (t ThreeTransformers) String() string {
-	return fmt.Sprintf("ThreeTransformers{ %v %v %v }", t.transformers[0], t.transformers[1], t.transformers[2])
-}
-
-type MultipleTransformers struct {
-	transformers []ChannelTransformer
-}
-
-func (t *MultipleTransformers) IsSuitableFor(i, o int) bool {
-	for _, x := range t.transformers {
-		if !x.IsSuitableFor(i, o) {
-			return false
-		}
-	}
-	return true
-}
-
-func (t *MultipleTransformers) Transform(r, g, b unit_float) (unit_float, unit_float, unit_float) {
-	for _, x := range t.transformers {
-		r, g, b = x.Transform(r, g, b)
-	}
-	return r, g, b
-}
-
-func (t *MultipleTransformers) TransformDebug(r, g, b unit_float, f Debug_callback) (unit_float, unit_float, unit_float) {
-	for _, x := range t.transformers {
-		r, g, b = x.TransformDebug(r, g, b, f)
-	}
-	return r, g, b
-}
-
-func transformers_as_string(t ...ChannelTransformer) string {
-	b := strings.Builder{}
-	for _, x := range t {
-		b.WriteString(fmt.Sprintf("%v ", x))
-	}
-	return b.String()
-}
-
-func (t MultipleTransformers) String() string {
-	b := strings.Builder{}
-	for _, x := range t.transformers {
-		b.WriteString(fmt.Sprintf("%v ", x))
-	}
-	return fmt.Sprintf("MultipleTransformers{ %s }", transformers_as_string(t.transformers...))
-}
-
-func NewCombinedTransformer(t ...ChannelTransformer) ChannelTransformer {
-	switch len(t) {
-	case 0:
-		m := IdentityMatrix(0)
-		return &m
-	case 1:
-		return t[0]
-	case 2:
-		return &TwoTransformers{t[0].Transform, t[1].Transform, t}
-	case 3:
-		return &ThreeTransformers{t[0].Transform, t[1].Transform, t[2].Transform, t}
-	default:
-		return &MultipleTransformers{t}
-	}
 }

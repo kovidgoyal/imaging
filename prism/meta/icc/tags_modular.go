@@ -12,7 +12,6 @@ type ModularTag struct {
 	num_input_channels, num_output_channels int
 	a_curves, m_curves, b_curves            []Curve1D
 	clut, matrix                            ChannelTransformer
-	transforms                              []func(r, g, b unit_float) (unit_float, unit_float, unit_float)
 	transform_objects                       []ChannelTransformer
 	is_a_to_b                               bool
 }
@@ -23,49 +22,26 @@ func (m ModularTag) String() string {
 
 var _ ChannelTransformer = (*ModularTag)(nil)
 
-func (m *ModularTag) AddTransform(c ChannelTransformer, prepend bool) {
-	if len(m.transforms) == 0 {
-		m.transform_objects = append(m.transform_objects, c)
-		m.transforms = append(m.transforms, c.Transform)
-		return
-	}
-	if cm, ok := c.(*Matrix3); ok {
-		idx := IfElse(prepend, 0, len(m.transform_objects)-1)
-		q := m.transform_objects[idx]
-		if mat, ok := q.(*Matrix3); ok {
-			var combined Matrix3
-			if prepend {
-				combined = mat.Multiply(*cm)
-			} else {
-				combined = cm.Multiply(*mat)
-			}
-			m.transform_objects[idx] = &combined
-			m.transforms[idx] = combined.Transform
-			return
+func (m *ModularTag) Iter(f func(ChannelTransformer) bool) {
+	for _, c := range m.transform_objects {
+		if !f(c) {
+			break
 		}
 	}
-	if prepend {
-		m.transform_objects = slices.Insert(m.transform_objects, 0, c)
-		m.transforms = slices.Insert(m.transforms, 0, c.Transform)
-	} else {
-		m.transform_objects = append(m.transform_objects, c)
-		m.transforms = append(m.transforms, c.Transform)
-	}
+}
+
+func (m *ModularTag) IOSig() (i int, o int) {
+	i, _ = m.transform_objects[0].IOSig()
+	_, o = m.transform_objects[len(m.transform_objects)-1].IOSig()
+	return
 }
 
 func (m *ModularTag) IsSuitableFor(num_input_channels, num_output_channels int) bool {
 	return m.num_input_channels == num_input_channels && m.num_output_channels == num_output_channels
 }
 func (m *ModularTag) Transform(r, g, b unit_float) (unit_float, unit_float, unit_float) {
-	for _, t := range m.transforms {
-		r, g, b = t(r, g, b)
-	}
-	return r, g, b
-}
-
-func (m *ModularTag) TransformDebug(r, g, b unit_float, callback Debug_callback) (unit_float, unit_float, unit_float) {
 	for _, t := range m.transform_objects {
-		r, g, b = t.TransformDebug(r, g, b, callback)
+		r, g, b = t.Transform(r, g, b)
 	}
 	return r, g, b
 }
@@ -169,24 +145,20 @@ func modularDecoder(raw []byte, _, output_colorspace ColorSpace) (ans any, err e
 			}
 			if has_non_identity {
 				nc := NewCurveTransformer(name, c...)
-				mt.transforms = append(mt.transforms, nc.Transform)
 				mt.transform_objects = append(mt.transform_objects, nc)
 			}
 		}
 	}
 	add_curves("A", mt.a_curves)
 	if mt.clut != nil {
-		mt.transforms = append(mt.transforms, mt.clut.Transform)
 		mt.transform_objects = append(mt.transform_objects, mt.clut)
 	}
 	add_curves("M", mt.m_curves)
 	if mt.matrix != nil {
-		mt.transforms = append(mt.transforms, mt.matrix.Transform)
 		mt.transform_objects = append(mt.transform_objects, mt.matrix)
 	}
 	add_curves("B", mt.b_curves)
 	if !is_a_to_b {
-		slices.Reverse(mt.transforms)
 		slices.Reverse(mt.transform_objects)
 	}
 	return
