@@ -220,7 +220,7 @@ func curve_inverse(t *testing.T, c Curve1D, delta float64) {
 	})
 }
 
-func generate_sampled_curve(c Curve1D) Curve1D {
+func generate_sampled_curve(c Curve1D) *PointsCurve {
 	const num = 256 * 16
 	points := make([]unit_float, num)
 	for i := range num {
@@ -256,6 +256,11 @@ func TestCurveInverse(t *testing.T) {
 	curve_inverse(t, &ComplexCurve{a: 1, b: 2, c: 3, d: 4, e: 5, f: 6, g: 2}, delta)
 	curve_inverse(t, generate_sampled_curve(&GammaCurve{gamma: 2}), 5e-3)
 	curve_inverse(t, srgb_sampled_curve(), 1e-3)
+	identity := make([]unit_float, 256)
+	for i := range identity {
+		identity[i] = unit_float(i) / 255
+	}
+	curve_inverse(t, &PointsCurve{points: identity}, 1e-5)
 }
 
 func srgb_to_linear(v unit_float) unit_float {
