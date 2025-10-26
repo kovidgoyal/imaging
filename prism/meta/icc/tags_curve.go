@@ -145,18 +145,33 @@ func fixed88ToFloat(raw []byte) unit_float {
 }
 
 func samples_to_analytic(points []unit_float) Curve1D {
+	const threshold = 1e-3
 	if len(points) < 64 {
 		return nil
 	}
 	n := 1 / unit_float(len(points)-1)
 	srgb := SRGBCurve().Transform
+	is_srgb, is_identity := true, true
 	for i, y := range points {
 		x := unit_float(i) * n
-		if math.Abs(float64(y-srgb(x))) > 1e-3 {
-			return nil
+		if is_srgb {
+			is_srgb = math.Abs(float64(y-srgb(x))) <= threshold
+		}
+		if is_identity {
+			is_identity = math.Abs(float64(y-x)) <= threshold
+		}
+		if !is_identity && !is_srgb {
+			break
 		}
 	}
-	return SRGBCurve()
+	if is_identity {
+		ans := IdentityCurve(0)
+		return &ans
+	}
+	if is_srgb {
+		return SRGBCurve()
+	}
+	return nil
 }
 
 func load_points_curve(fp []unit_float) (Curve1D, error) {
