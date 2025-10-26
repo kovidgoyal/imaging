@@ -36,9 +36,9 @@ func TestCGOConversion(t *testing.T) {
 	pcs, err = xyz.TransformFloatToPCS([]float32{128 / 255., 64 / 255., 255 / 255.}, icc.RelativeColorimetricRenderingIntent)
 	require.NoError(t, err)
 	assert.InDeltaSlice(t, pcs, expected, 0.001)
-	pcs, err = lab.TransformRGB8bitToPCS([]byte{128, 64, 255}, icc.RelativeColorimetricRenderingIntent)
+	pcs, err = lab.TransformRGB8bitToPCS([]byte{128, 64, 255}, icc.PerceptualRenderingIntent)
 	require.NoError(t, err)
-	assert.InDeltaSlice(t, pcs, []float32{45.2933, 58.3075, -85.6426}, 0.001)
+	assert.InDeltaSlice(t, pcs, []float32{43.643852, 46.361866, -73.44747}, 0.001)
 
 	for _, p := range []*CMSProfile{xyz, lab} {
 		inp := []byte{128, 64, 255}
@@ -48,7 +48,7 @@ func TestCGOConversion(t *testing.T) {
 	}
 }
 
-func test_profile(t *testing.T, name string, profile_data []byte) {
+func test_profile(t *testing.T, name string, profile_data []byte, tolerance float64, inverse_tolerance float64) {
 	t.Run(name, func(t *testing.T) {
 		t.Parallel()
 		p, err := icc.NewProfileReader(bytes.NewReader(profile_data)).ReadProfile()
@@ -69,8 +69,8 @@ func test_profile(t *testing.T, name string, profile_data []byte) {
 				r, g, b := tr.Transform(sl[0], sl[1], sl[2])
 				actual = append(actual, float32(r), float32(g), float32(b))
 				r, g, b = inv.Transform(r, g, b)
-				require.InDeltaSlice(t, sl, []float32{r, g, b}, icc.FLOAT_EQUALITY_THRESHOLD,
-					"b2a of a2b result differs from original color")
+				require.InDeltaSlice(t, sl, []float32{r, g, b}, inverse_tolerance,
+					fmt.Sprintf("b2a of a2b result for %v differs from original color: got %v want %v", sl, []float32{r, g, b}, sl))
 			} else {
 				panic("TODO: implement me")
 			}
@@ -83,7 +83,7 @@ func test_profile(t *testing.T, name string, profile_data []byte) {
 			panic("TODO: implement me")
 		}
 		require.NoError(t, err)
-		require.InDeltaSlice(t, expected, actual, icc.FLOAT_EQUALITY_THRESHOLD)
+		require.InDeltaSlice(t, expected, actual, tolerance)
 	})
 }
 
@@ -96,13 +96,18 @@ func TestDevelop(t *testing.T) {
 	p := icc.Srgb_lab_profile()
 	tr, err := p.CreateDefaultTransformerToPCS(3)
 	require.NoError(t, err)
-	r, g, b := tr.TransformDebug(0.5, 0.25, 1, debug_transform)
-	expected := []float32{45.2933, 58.3075, -85.6426}
+	orig := []float32{128 / 255., 64 / 255., 1.}
+	r, g, b := tr.TransformDebug(orig[0], orig[1], orig[2], debug_transform)
+	expected := []float32{43.643852, 46.361866, -73.44747}
 	actual := []float32{r, g, b}
-	fmt.Printf("%v != %v\n", actual, expected)
+	require.InDeltaSlice(t, expected, actual, 1e-2)
+	tr, err = p.CreateDefaultTransformerToDevice()
+	require.NoError(t, err)
+	r, g, b = tr.TransformDebug(r, g, b, debug_transform)
+	require.InDeltaSlice(t, orig, []float32{r, g, b}, 0.1, fmt.Sprintf("%v != %v", orig, []float32{r, g, b}))
 }
 
 func TestAgainstLCMS2(t *testing.T) {
-	// test_profile(t, "srgb_lab", icc.Srgb_lab_profile_data)
-	test_profile(t, "srgb_xyz", icc.Srgb_xyz_profile_data)
+	test_profile(t, "srgb_lab", icc.Srgb_lab_profile_data, 1e-2, 0.3)
+	test_profile(t, "srgb_xyz", icc.Srgb_xyz_profile_data, icc.FLOAT_EQUALITY_THRESHOLD, icc.FLOAT_EQUALITY_THRESHOLD)
 }
