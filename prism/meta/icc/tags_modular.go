@@ -23,6 +23,10 @@ func (m ModularTag) String() string {
 
 var _ ChannelTransformer = (*ModularTag)(nil)
 
+func (m *ModularTag) TransformDebug(r, g, b unit_float, callback Debug_callback) (unit_float, unit_float, unit_float) {
+	return transform_debug(m, r, g, b, callback)
+}
+
 func (m *ModularTag) AddTransform(c ChannelTransformer, prepend bool) {
 	if len(m.transforms) == 0 {
 		m.transform_objects = append(m.transform_objects, c)

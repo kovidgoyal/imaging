@@ -27,6 +27,10 @@ func (c *MFT) IsSuitableFor(num_input_channels, num_output_channels int) bool {
 
 var _ ChannelTransformer = (*MFT)(nil)
 
+func (m *MFT) TransformDebug(r, g, b unit_float, callback Debug_callback) (unit_float, unit_float, unit_float) {
+	return transform_debug(m, r, g, b, callback)
+}
+
 func (mft *MFT) Transform(r, g, b unit_float) (unit_float, unit_float, unit_float) {
 	// Apply matrix
 	r, g, b = mft.matrix.Transform(r, g, b)

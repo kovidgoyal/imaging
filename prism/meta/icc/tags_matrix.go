@@ -85,6 +85,10 @@ func (m *Matrix3) Transform(r, g, b unit_float) (unit_float, unit_float, unit_fl
 	return m[0][0]*r + m[0][1]*g + m[0][2]*b, m[1][0]*r + m[1][1]*g + m[1][2]*b, m[2][0]*r + m[2][1]*g + m[2][2]*b
 }
 
+func (m *Matrix3) TransformDebug(r, g, b unit_float, callback Debug_callback) (unit_float, unit_float, unit_float) {
+	return transform_debug(m, r, g, b, callback)
+}
+
 func (m Matrix3) Transpose() Matrix3 {
 	return Matrix3{
 		{m[0][0], m[1][0], m[2][0]},
@@ -150,6 +154,14 @@ func (m Matrix3) Inverted() (ans Matrix3, err error) {
 
 func (m IdentityMatrix) Transform(r, g, b unit_float) (unit_float, unit_float, unit_float) {
 	return r, g, b
+}
+
+func (m *IdentityMatrix) TransformDebug(r, g, b unit_float, callback Debug_callback) (unit_float, unit_float, unit_float) {
+	return transform_debug(m, r, g, b, callback)
+}
+
+func (m *MatrixWithOffset) TransformDebug(r, g, b unit_float, callback Debug_callback) (unit_float, unit_float, unit_float) {
+	return transform_debug(m, r, g, b, callback)
 }
 
 func (m *MatrixWithOffset) Transform(r, g, b unit_float) (unit_float, unit_float, unit_float) {

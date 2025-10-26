@@ -214,3 +214,11 @@ func (c *CLUT3D) Transform(r, g, b unit_float) (unit_float, unit_float, unit_flo
 func clamp01(v unit_float) unit_float {
 	return max(0, min(v, 1))
 }
+
+func (m *CLUTTag) TransformDebug(r, g, b unit_float, callback Debug_callback) (unit_float, unit_float, unit_float) {
+	return transform_debug(m, r, g, b, callback)
+}
+
+func (m *CLUT3D) TransformDebug(r, g, b unit_float, callback Debug_callback) (unit_float, unit_float, unit_float) {
+	return transform_debug(m, r, g, b, callback)
+}

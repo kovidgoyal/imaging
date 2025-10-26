@@ -87,12 +87,19 @@ func test_profile(t *testing.T, name string, profile_data []byte) {
 	})
 }
 
+func debug_transform(r, g, b, x, y, z float32, t icc.ChannelTransformer) {
+	fmt.Printf("Transform: %s\n", t)
+	fmt.Printf("  %v -> %v\n", []float32{r, g, b}, []float32{x, y, z})
+}
+
 func TestDevelop(t *testing.T) {
 	p := icc.Srgb_lab_profile()
 	tr, err := p.CreateDefaultTransformerToPCS(3)
 	require.NoError(t, err)
-	r, g, b := tr.Transform(0.5, 0.25, 1)
-	fmt.Println(1111111, r, g, b, []float32{45.2933, 58.3075, -85.6426})
+	r, g, b := tr.TransformDebug(0.5, 0.25, 1, debug_transform)
+	expected := []float32{45.2933, 58.3075, -85.6426}
+	actual := []float32{r, g, b}
+	require.InDeltaSlice(t, expected, actual, 1e-3, fmt.Sprintf("%v != %v", expected, actual))
 }
 
 func TestAgainstLCMS2(t *testing.T) {

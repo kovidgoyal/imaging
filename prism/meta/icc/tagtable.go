@@ -221,8 +221,17 @@ func emptyTagTable() TagTable {
 	}
 }
 
+type Debug_callback = func(r, g, b, x, y, z unit_float, t ChannelTransformer)
+
+func transform_debug(m ChannelTransformer, r, g, b unit_float, f Debug_callback) (unit_float, unit_float, unit_float) {
+	x, y, z := m.Transform(r, g, b)
+	f(r, g, b, x, y, z, m)
+	return x, y, z
+}
+
 type ChannelTransformer interface {
 	Transform(r, g, b unit_float) (unit_float, unit_float, unit_float)
+	TransformDebug(r, g, b unit_float, callback Debug_callback) (unit_float, unit_float, unit_float)
 	IsSuitableFor(num_input_channels int, num_output_channels int) bool
 	String() string
 }
@@ -244,6 +253,13 @@ func (t *TwoTransformers) IsSuitableFor(i, o int) bool {
 func (t *TwoTransformers) Transform(r, g, b unit_float) (unit_float, unit_float, unit_float) {
 	r, g, b = t.a(r, g, b)
 	r, g, b = t.b(r, g, b)
+	return r, g, b
+}
+
+func (t *TwoTransformers) TransformDebug(r, g, b unit_float, f Debug_callback) (unit_float, unit_float, unit_float) {
+	for _, x := range t.transformers {
+		r, g, b = x.TransformDebug(r, g, b, f)
+	}
 	return r, g, b
 }
 
@@ -272,6 +288,13 @@ func (t *ThreeTransformers) Transform(r, g, b unit_float) (unit_float, unit_floa
 	return r, g, b
 }
 
+func (t *ThreeTransformers) TransformDebug(r, g, b unit_float, f Debug_callback) (unit_float, unit_float, unit_float) {
+	for _, x := range t.transformers {
+		r, g, b = x.TransformDebug(r, g, b, f)
+	}
+	return r, g, b
+}
+
 func (t ThreeTransformers) String() string {
 	return fmt.Sprintf("ThreeTransformers{ %v %v %v }", t.transformers[0], t.transformers[1], t.transformers[2])
 }
@@ -292,6 +315,13 @@ func (t *MultipleTransformers) IsSuitableFor(i, o int) bool {
 func (t *MultipleTransformers) Transform(r, g, b unit_float) (unit_float, unit_float, unit_float) {
 	for _, x := range t.transformers {
 		r, g, b = x.Transform(r, g, b)
+	}
+	return r, g, b
+}
+
+func (t *MultipleTransformers) TransformDebug(r, g, b unit_float, f Debug_callback) (unit_float, unit_float, unit_float) {
+	for _, x := range t.transformers {
+		r, g, b = x.TransformDebug(r, g, b, f)
 	}
 	return r, g, b
 }

@@ -82,6 +82,20 @@ func (c InverseCurveTransformer3) Transform(r, g, b unit_float) (unit_float, uni
 	return c.r.InverseTransform(clamp01(r)), c.g.InverseTransform(clamp01(g)), c.b.InverseTransform(clamp01(b))
 }
 
+func (m *CurveTransformer) TransformDebug(r, g, b unit_float, callback Debug_callback) (unit_float, unit_float, unit_float) {
+	return transform_debug(m, r, g, b, callback)
+}
+func (m *InverseCurveTransformer) TransformDebug(r, g, b unit_float, callback Debug_callback) (unit_float, unit_float, unit_float) {
+	return transform_debug(m, r, g, b, callback)
+}
+func (m *CurveTransformer3) TransformDebug(r, g, b unit_float, callback Debug_callback) (unit_float, unit_float, unit_float) {
+	return transform_debug(m, r, g, b, callback)
+}
+
+func (m *InverseCurveTransformer3) TransformDebug(r, g, b unit_float, callback Debug_callback) (unit_float, unit_float, unit_float) {
+	return transform_debug(m, r, g, b, callback)
+}
+
 func NewCurveTransformer(curves ...Curve1D) ChannelTransformer {
 	for _, c := range curves {
 		if c == nil {
