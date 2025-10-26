@@ -56,3 +56,42 @@ func (c *BlackPointCorrection) String() string {
 func (c *BlackPointCorrection) Transform(r, g, b unit_float) (unit_float, unit_float, unit_float) {
 	return c.scale.X*r + c.offset.X, c.scale.Y*g + c.offset.Y, c.scale.Z*b + c.offset.Z
 }
+
+type LabToXYZ XYZType
+
+func NewLabToXYZ(illuminant XYZType) *LabToXYZ {
+	x := LabToXYZ(illuminant)
+	return &x
+}
+
+func NewLabToXYZStandard() *LabToXYZ {
+	x := LabToXYZ(D50)
+	return &x
+}
+
+func (x LabToXYZ) String() string                        { return fmt.Sprintf("LabToXYZ{ %v }", XYZType(x)) }
+func (x LabToXYZ) IOSig() (int, int)                     { return 3, 3 }
+func (x *LabToXYZ) Iter(f func(ChannelTransformer) bool) { f(x) }
+func (wt *LabToXYZ) Transform(l, a, b unit_float) (x, y, z unit_float) {
+	return Lab_to_XYZ(wt.X, wt.Y, wt.Z, l, a, b)
+}
+
+func f_1(t unit_float) unit_float {
+	const limit = (24.0 / 116.0)
+	if t <= limit {
+		return (108.0 / 841.0) * (t - (16.0 / 116.0))
+	}
+	return t * t * t
+}
+
+// Standard Lab to XYZ. It can return negative XYZ in some cases
+func Lab_to_XYZ(wt_x, wt_y, wt_z, l, a, b unit_float) (x, y, z unit_float) {
+	y = (l + 16.0) / 116.0
+	x = y + 0.002*a
+	z = y - 0.005*b
+
+	x = f_1(x) * wt_x
+	y = f_1(y) * wt_y
+	z = f_1(z) * wt_z
+	return
+}
