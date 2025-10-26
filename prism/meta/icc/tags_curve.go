@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"strings"
 	"sync"
 )
 
@@ -38,8 +39,12 @@ var _ Curve1D = (*ComplexCurve)(nil)
 
 type CurveTransformer struct {
 	curves []Curve1D
+	name   string
 }
-type InverseCurveTransformer struct{ curves []Curve1D }
+type InverseCurveTransformer struct {
+	curves []Curve1D
+	name   string
+}
 
 func (c CurveTransformer) IsSuitableFor(num_input_channels, num_output_channels int) bool {
 	return len(c.curves) == num_input_channels && len(c.curves) == num_output_channels
@@ -58,6 +63,7 @@ func (c InverseCurveTransformer) Transform(r, g, b unit_float) (unit_float, unit
 
 type CurveTransformer3 struct {
 	r, g, b Curve1D
+	name    string
 }
 
 func (c CurveTransformer3) IsSuitableFor(num_input_channels, num_output_channels int) bool {
@@ -67,12 +73,28 @@ func (c CurveTransformer3) Transform(r, g, b unit_float) (unit_float, unit_float
 	return c.r.Transform(r), c.g.Transform(g), c.b.Transform(b)
 }
 
-type InverseCurveTransformer3 struct{ r, g, b Curve1D }
+type InverseCurveTransformer3 struct {
+	r, g, b Curve1D
+	name    string
+}
 
-func (c CurveTransformer3) String() string        { return c.r.String() }
-func (c CurveTransformer) String() string         { return c.curves[0].String() }
-func (c InverseCurveTransformer3) String() string { return "Inverse" + c.r.String() }
-func (c InverseCurveTransformer) String() string  { return "Inverse" + c.curves[0].String() }
+func curve_string(name string, is_inverse bool, curves ...Curve1D) string {
+	var b strings.Builder
+	if is_inverse {
+		name += "Inverted"
+	}
+	b.WriteString(name + "{")
+	for i, c := range curves {
+		b.WriteString(fmt.Sprintf("[%d]%s ", i, c.String()))
+	}
+	b.WriteString("}")
+	return b.String()
+}
+
+func (c CurveTransformer3) String() string        { return curve_string(c.name, false, c.r, c.g, c.b) }
+func (c CurveTransformer) String() string         { return curve_string(c.name, false, c.curves...) }
+func (c InverseCurveTransformer3) String() string { return curve_string(c.name, true, c.r, c.g, c.b) }
+func (c InverseCurveTransformer) String() string  { return curve_string(c.name, true, c.curves...) }
 
 func (c InverseCurveTransformer3) IsSuitableFor(num_input_channels, num_output_channels int) bool {
 	return 3 == num_input_channels && 3 == num_output_channels
@@ -96,7 +118,7 @@ func (m *InverseCurveTransformer3) TransformDebug(r, g, b unit_float, callback D
 	return transform_debug(m, r, g, b, callback)
 }
 
-func NewCurveTransformer(curves ...Curve1D) ChannelTransformer {
+func NewCurveTransformer(name string, curves ...Curve1D) ChannelTransformer {
 	for _, c := range curves {
 		if c == nil {
 			panic("curve must not be nil")
@@ -104,12 +126,12 @@ func NewCurveTransformer(curves ...Curve1D) ChannelTransformer {
 	}
 	switch len(curves) {
 	case 3:
-		return &CurveTransformer3{curves[0], curves[1], curves[2]}
+		return &CurveTransformer3{curves[0], curves[1], curves[2], name}
 	default:
-		return &CurveTransformer{curves}
+		return &CurveTransformer{curves, name}
 	}
 }
-func NewInverseCurveTransformer(curves ...Curve1D) ChannelTransformer {
+func NewInverseCurveTransformer(name string, curves ...Curve1D) ChannelTransformer {
 	for _, c := range curves {
 		if c == nil {
 			panic("curve must not be nil")
@@ -117,9 +139,9 @@ func NewInverseCurveTransformer(curves ...Curve1D) ChannelTransformer {
 	}
 	switch len(curves) {
 	case 3:
-		return &InverseCurveTransformer3{curves[0], curves[1], curves[2]}
+		return &InverseCurveTransformer3{curves[0], curves[1], curves[2], name}
 	default:
-		return &InverseCurveTransformer{curves}
+		return &InverseCurveTransformer{curves, name}
 	}
 }
 

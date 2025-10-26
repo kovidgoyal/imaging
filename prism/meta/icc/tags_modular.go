@@ -23,10 +23,6 @@ func (m ModularTag) String() string {
 
 var _ ChannelTransformer = (*ModularTag)(nil)
 
-func (m *ModularTag) TransformDebug(r, g, b unit_float, callback Debug_callback) (unit_float, unit_float, unit_float) {
-	return transform_debug(m, r, g, b, callback)
-}
-
 func (m *ModularTag) AddTransform(c ChannelTransformer, prepend bool) {
 	if len(m.transforms) == 0 {
 		m.transform_objects = append(m.transform_objects, c)
@@ -63,6 +59,13 @@ func (m *ModularTag) IsSuitableFor(num_input_channels, num_output_channels int) 
 func (m *ModularTag) Transform(r, g, b unit_float) (unit_float, unit_float, unit_float) {
 	for _, t := range m.transforms {
 		r, g, b = t(r, g, b)
+	}
+	return r, g, b
+}
+
+func (m *ModularTag) TransformDebug(r, g, b unit_float, callback Debug_callback) (unit_float, unit_float, unit_float) {
+	for _, t := range m.transform_objects {
+		r, g, b = t.TransformDebug(r, g, b, callback)
 	}
 	return r, g, b
 }
@@ -155,7 +158,7 @@ func modularDecoder(raw []byte, _, output_colorspace ColorSpace) (ans any, err e
 		}
 	}
 	ans = mt
-	add_curves := func(c []Curve1D) {
+	add_curves := func(name string, c []Curve1D) {
 		if len(c) > 0 {
 			has_non_identity := false
 			for _, x := range c {
@@ -165,23 +168,23 @@ func modularDecoder(raw []byte, _, output_colorspace ColorSpace) (ans any, err e
 				}
 			}
 			if has_non_identity {
-				nc := NewCurveTransformer(mt.a_curves...)
+				nc := NewCurveTransformer(name, c...)
 				mt.transforms = append(mt.transforms, nc.Transform)
 				mt.transform_objects = append(mt.transform_objects, nc)
 			}
 		}
 	}
-	add_curves(mt.a_curves)
+	add_curves("A", mt.a_curves)
 	if mt.clut != nil {
 		mt.transforms = append(mt.transforms, mt.clut.Transform)
 		mt.transform_objects = append(mt.transform_objects, mt.clut)
 	}
-	add_curves(mt.m_curves)
+	add_curves("M", mt.m_curves)
 	if mt.matrix != nil {
 		mt.transforms = append(mt.transforms, mt.matrix.Transform)
 		mt.transform_objects = append(mt.transform_objects, mt.matrix)
 	}
-	add_curves(mt.b_curves)
+	add_curves("B", mt.b_curves)
 	if !is_a_to_b {
 		slices.Reverse(mt.transforms)
 		slices.Reverse(mt.transform_objects)

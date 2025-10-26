@@ -159,7 +159,7 @@ func (p *Profile) create_matrix_trc_transformer(forward bool, chromatic_adaptati
 		chromatic_adaptation = nil
 	}
 	if forward {
-		ct := NewCurveTransformer(rc, gc, bc)
+		ct := NewCurveTransformer("TRC", rc, gc, bc)
 		if chromatic_adaptation != nil {
 			combined := chromatic_adaptation.Multiply(*m)
 			m = &combined
@@ -169,7 +169,7 @@ func (p *Profile) create_matrix_trc_transformer(forward bool, chromatic_adaptati
 		}
 		return NewCombinedTransformer(ct, m), nil
 	} else {
-		ct := NewInverseCurveTransformer(rc, gc, bc)
+		ct := NewInverseCurveTransformer("TRC", rc, gc, bc)
 		inv, err := m.Inverted()
 		if err != nil {
 			return nil, fmt.Errorf("the colorspace conversion matrix is not invertible: %w", err)
@@ -281,6 +281,11 @@ func (p *Profile) CreateTransformerToDevice(rendering_intent RenderingIntent) (a
 		return nil, err
 	}
 	if b2a != nil {
+		defer func() {
+			if err == nil && p.Header.ProfileConnectionSpace == ColorSpaceLab {
+				ans = NewNormalizeLAB(ans)
+			}
+		}()
 		return add_chromatic_adaptation(chromatic_adaptation, b2a, !forward), nil
 	}
 	return p.create_matrix_trc_transformer(forward, chromatic_adaptation)
@@ -302,6 +307,11 @@ func (p *Profile) CreateTransformerToPCS(rendering_intent RenderingIntent, input
 		return nil, err
 	}
 	if a2b != nil {
+		defer func() {
+			if err == nil && p.Header.DataColorSpace == ColorSpaceLab {
+				ans = NewNormalizeLAB(ans)
+			}
+		}()
 		return add_chromatic_adaptation(chromatic_adaptation, a2b, !forward), nil
 	}
 	return p.create_matrix_trc_transformer(forward, chromatic_adaptation)
@@ -334,12 +344,13 @@ func iterate_hypercube(currentPoint []int, dimension, m, n int, callback func([]
 	}
 
 	// Recursive step: Iterate through all possible values for the current dimension.
-	for i := 0; i < n; i++ {
+	for i := range n {
 		currentPoint[dimension] = i // Assign value to the current dimension
 		// Recursively call for the next dimension
 		iterate_hypercube(currentPoint, dimension+1, m, n, callback)
 	}
 }
+
 func points_for_transformer_comparison(input_channels, num_points_per_input_channel int) []unit_float {
 	m, n := input_channels, num_points_per_input_channel
 	sz := input_channels // n ** m * m
