@@ -45,8 +45,8 @@ func (m *ModularTag) AddTransform(c ChannelTransformer, prepend bool) {
 		}
 	}
 	if prepend {
-		slices.Insert(m.transform_objects, 0, c)
-		slices.Insert(m.transforms, 0, c.Transform)
+		m.transform_objects = slices.Insert(m.transform_objects, 0, c)
+		m.transforms = slices.Insert(m.transforms, 0, c.Transform)
 	} else {
 		m.transform_objects = append(m.transform_objects, c)
 		m.transforms = append(m.transforms, c.Transform)
@@ -57,11 +57,9 @@ func (m *ModularTag) IsSuitableFor(num_input_channels, num_output_channels int) 
 	return m.num_input_channels == num_input_channels && m.num_output_channels == num_output_channels
 }
 func (m *ModularTag) Transform(r, g, b unit_float) (unit_float, unit_float, unit_float) {
-	for i, t := range m.transforms {
-		fmt.Println(11111111, []unit_float{r, g, b}, "->", m.transform_objects[i])
+	for _, t := range m.transforms {
 		r, g, b = t(r, g, b)
 	}
-	fmt.Println(2222222, r, g, b)
 	return r, g, b
 }
 
@@ -72,7 +70,7 @@ func IfElse[T any](condition bool, if_val T, else_val T) T {
 	return else_val
 }
 
-func modularDecoder(raw []byte, input_colorspace, output_colorspace ColorSpace) (ans any, err error) {
+func modularDecoder(raw []byte, _, output_colorspace ColorSpace) (ans any, err error) {
 	if len(raw) < 40 {
 		return nil, errors.New("modular (mAB/mBA) tag too short")
 	}
