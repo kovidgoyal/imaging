@@ -208,10 +208,9 @@ func linearToSRGBComp(c float64) float64 {
 	}
 }
 
-// inGamut checks whether r,g,b are all inside [0,1] (with a small epsilon)
+// inGamut checks whether r,g,b are all inside [0,1]
 func inGamut(r, g, b float64) bool {
-	const eps = 1e-12
-	return r >= -eps && g >= -eps && b >= -eps && r <= 1+eps && g <= 1+eps && b <= 1+eps
+	return 0 <= r && r <= 1 && 0 <= g && g <= 1 && 0 <= b && b <= 1
 }
 
 // gamutMapChromaScale reduces chroma (a,b) by scaling factor s in [0,1] to bring the
