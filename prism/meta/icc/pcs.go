@@ -108,3 +108,20 @@ func (c LABtoXYZ) Transform(l, a, b unit_float) (unit_float, unit_float, unit_fl
 func (n LABtoXYZ) IOSig() (int, int)                    { return 3, 3 }
 func (n LABtoXYZ) String() string                       { return fmt.Sprintf("%T%s", n, n.c.String()) }
 func (n LABtoXYZ) Iter(f func(ChannelTransformer) bool) { f(n) }
+
+type XYZtoLAB struct {
+	c *colorconv.ConvertColor
+	t func(l, a, b unit_float) (x, y, z unit_float)
+}
+
+func NewXYZtoLAB(whitepoint XYZType) XYZtoLAB {
+	c := colorconv.NewConvertColor(whitepoint.X, whitepoint.Y, whitepoint.Z)
+	return XYZtoLAB{c, c.XYZToLab}
+}
+
+func (c XYZtoLAB) Transform(l, a, b unit_float) (unit_float, unit_float, unit_float) {
+	return c.t(l, a, b)
+}
+func (n XYZtoLAB) IOSig() (int, int)                    { return 3, 3 }
+func (n XYZtoLAB) String() string                       { return fmt.Sprintf("%T%s", n, n.c.String()) }
+func (n XYZtoLAB) Iter(f func(ChannelTransformer) bool) { f(n) }

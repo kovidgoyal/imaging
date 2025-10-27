@@ -69,7 +69,7 @@ type Profile struct {
 	Header        Header
 	TagTable      TagTable
 	PCSIlluminant XYZType
-	blackpoint    XYZType
+	blackpoints   map[RenderingIntent]*XYZType
 }
 
 func (p *Profile) Description() (string, error) {
@@ -237,8 +237,12 @@ func (p *Profile) find_conversion_tag(forward bool, rendering_intent RenderingIn
 }
 
 func (p *Profile) CreateTransformerToDevice(rendering_intent RenderingIntent) (ans *Pipeline, err error) {
+	num_output_channels := len(p.Header.DataColorSpace.BlackPoint())
+	if num_output_channels == 0 {
+		return nil, fmt.Errorf("unsupported device color space: %s", p.Header.DataColorSpace)
+	}
 	defer func() {
-		if err == nil && !ans.IsSuitableFor(3, 3) {
+		if err == nil && !ans.IsSuitableFor(3, num_output_channels) {
 			err = fmt.Errorf("transformer to PCS %s not suitable for 3 output channels", ans.String())
 		}
 	}()
@@ -293,18 +297,12 @@ func (p *Profile) CreateTransformerToPCS(rendering_intent RenderingIntent, input
 	return
 }
 
-func (p *Profile) BlackPoint() XYZType {
-	// TODO: Implement this
-	return p.blackpoint
-
-}
-
 func (p *Profile) CreateTransformerToSRGB(rendering_intent RenderingIntent, input_channels int) (ans *Pipeline, err error) {
 	if ans, err = p.CreateTransformerToPCS(rendering_intent, input_channels); err != nil {
 		return
 	}
 	var sRGB_blackpoint XYZType // 0, 0, 0
-	input_blackpoint := p.BlackPoint()
+	input_blackpoint := p.BlackPoint(rendering_intent)
 	input_colorspace := p.Header.ProfileConnectionSpace
 	if input_blackpoint != sRGB_blackpoint {
 		if input_colorspace == ColorSpaceLab {
