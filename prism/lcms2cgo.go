@@ -75,13 +75,13 @@ func (p *CMSProfile) call_func_with_error_handling(f func() string) error {
 func format_for_float(s icc.Signature) (ans C.cmsUInt32Number, err error) {
 	switch s {
 	case icc.XYZSignature:
-		ans = C.TYPE_XYZ_FLT
+		ans = C.TYPE_XYZ_DBL
 	case icc.LabSignature:
-		ans = C.TYPE_Lab_FLT
+		ans = C.TYPE_Lab_DBL
 	case icc.GraySignature:
-		ans = C.TYPE_GRAY_FLT
+		ans = C.TYPE_GRAY_DBL
 	case icc.RGBSignature:
-		ans = C.TYPE_RGB_FLT
+		ans = C.TYPE_RGB_DBL
 	default:
 		err = fmt.Errorf("unknown format: %s", s)
 	}
@@ -157,7 +157,7 @@ func (p *CMSProfile) TransformRGB8(data []uint8, output_profile *CMSProfile, int
 	return
 }
 
-func (p *CMSProfile) TransformRGB8bitToPCS(data []uint8, intent icc.RenderingIntent) (ans []float32, err error) {
+func (p *CMSProfile) TransformRGB8bitToPCS(data []uint8, intent icc.RenderingIntent) (ans []float64, err error) {
 	if len(data) == 0 {
 		return nil, nil
 	}
@@ -174,12 +174,12 @@ func (p *CMSProfile) TransformRGB8bitToPCS(data []uint8, intent icc.RenderingInt
 		return
 	}
 	defer C.cmsDeleteTransform(t)
-	ans = make([]float32, len(data))
+	ans = make([]float64, len(data))
 	C.cmsDoTransform(t, unsafe.Pointer(&data[0]), unsafe.Pointer(&ans[0]), C.cmsUInt32Number(len(data)/3))
 	return
 }
 
-func (p *CMSProfile) TransformFloatToPCS(data []float32, intent icc.RenderingIntent) (ans []float32, err error) {
+func (p *CMSProfile) TransformFloatToPCS(data []float64, intent icc.RenderingIntent) (ans []float64, err error) {
 	if len(data) == 0 {
 		return nil, nil
 	}
@@ -188,7 +188,7 @@ func (p *CMSProfile) TransformFloatToPCS(data []float32, intent icc.RenderingInt
 	}
 	var t C.cmsHTRANSFORM
 	if err = p.call_func_with_error_handling(func() string {
-		if t = C.cmsCreateTransformTHR(p.ctx, p.p, C.TYPE_RGB_FLT, nil, p.pcs_output_format, C.cmsUInt32Number(intent), 0); t == nil {
+		if t = C.cmsCreateTransformTHR(p.ctx, p.p, C.TYPE_RGB_DBL, nil, p.pcs_output_format, C.cmsUInt32Number(intent), 0); t == nil {
 			return "failed to create transform"
 		}
 		return ""
@@ -196,12 +196,12 @@ func (p *CMSProfile) TransformFloatToPCS(data []float32, intent icc.RenderingInt
 		return
 	}
 	defer C.cmsDeleteTransform(t)
-	ans = make([]float32, len(data))
+	ans = make([]float64, len(data))
 	C.cmsDoTransform(t, unsafe.Pointer(&data[0]), unsafe.Pointer(&ans[0]), C.cmsUInt32Number(len(data)/3))
 	return
 }
 
-func (p *CMSProfile) TransformFloatToDevice(data []float32, intent icc.RenderingIntent) (ans []float32, err error) {
+func (p *CMSProfile) TransformFloatToDevice(data []float64, intent icc.RenderingIntent) (ans []float64, err error) {
 	if len(data) == 0 {
 		return nil, nil
 	}
@@ -230,7 +230,7 @@ func (p *CMSProfile) TransformFloatToDevice(data []float32, intent icc.Rendering
 		return
 	}
 	defer C.cmsDeleteTransform(t)
-	ans = make([]float32, len(data))
+	ans = make([]float64, len(data))
 	C.cmsDoTransform(t, unsafe.Pointer(&data[0]), unsafe.Pointer(&ans[0]), C.cmsUInt32Number(len(data)/3))
 	return
 }

@@ -29,16 +29,16 @@ func TestCGOConversion(t *testing.T) {
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "Got 15 bytes, block should be")
 
-	expected := []float32{0.2569, 0.1454, 0.7221}
+	expected := []float64{0.2569, 0.1454, 0.7221}
 	pcs, err := xyz.TransformRGB8bitToPCS([]byte{128, 64, 255}, icc.RelativeColorimetricRenderingIntent)
 	require.NoError(t, err)
 	assert.InDeltaSlice(t, pcs, expected, 0.001)
-	pcs, err = xyz.TransformFloatToPCS([]float32{128 / 255., 64 / 255., 255 / 255.}, icc.RelativeColorimetricRenderingIntent)
+	pcs, err = xyz.TransformFloatToPCS([]float64{128 / 255., 64 / 255., 255 / 255.}, icc.RelativeColorimetricRenderingIntent)
 	require.NoError(t, err)
 	assert.InDeltaSlice(t, pcs, expected, 0.001)
 	pcs, err = lab.TransformRGB8bitToPCS([]byte{128, 64, 255}, icc.PerceptualRenderingIntent)
 	require.NoError(t, err)
-	assert.InDeltaSlice(t, pcs, []float32{43.643852, 46.361866, -73.44747}, 0.001)
+	assert.InDeltaSlice(t, pcs, []float64{43.643852, 46.361866, -73.44747}, 0.001)
 
 	for _, p := range []*CMSProfile{xyz, lab} {
 		inp := []byte{128, 64, 255}
@@ -61,22 +61,22 @@ func test_profile(t *testing.T, name string, profile_data []byte, tolerance floa
 		inv, err := p.CreateDefaultTransformerToDevice()
 		require.NoError(t, err)
 		pts := icc.Points_for_transformer_comparison3()
-		actual := make([]float32, 0, len(pts)*3)
+		actual := make([]float64, 0, len(pts)*3)
 		pos := pts
 		for range len(pts) / input_channels {
 			if input_channels == 3 {
 				sl := pos[0:3:3]
 				r, g, b := tr.Transform(sl[0], sl[1], sl[2])
-				actual = append(actual, float32(r), float32(g), float32(b))
+				actual = append(actual, r, g, b)
 				r, g, b = inv.Transform(r, g, b)
-				require.InDeltaSlice(t, sl, []float32{r, g, b}, inverse_tolerance,
-					fmt.Sprintf("b2a of a2b result for %v differs from original color: got %v want %v", sl, []float32{r, g, b}, sl))
+				require.InDeltaSlice(t, sl, []float64{r, g, b}, inverse_tolerance,
+					fmt.Sprintf("b2a of a2b result for %v differs from original color: got %v want %v", sl, []float64{r, g, b}, sl))
 			} else {
 				panic("TODO: implement me")
 			}
 			pos = pos[input_channels:]
 		}
-		var expected []float32
+		var expected []float64
 		if input_channels == 3 {
 			expected, err = lcms.TransformFloatToPCS(pts, p.Header.RenderingIntent)
 		} else {
@@ -87,24 +87,24 @@ func test_profile(t *testing.T, name string, profile_data []byte, tolerance floa
 	})
 }
 
-func debug_transform(r, g, b, x, y, z float32, t icc.ChannelTransformer) {
+func debug_transform(r, g, b, x, y, z float64, t icc.ChannelTransformer) {
 	fmt.Printf("Transform: %s\n", t)
-	fmt.Printf("  %v → %v\n", []float32{r, g, b}, []float32{x, y, z})
+	fmt.Printf("  %v → %v\n", []float64{r, g, b}, []float64{x, y, z})
 }
 
 func TestDevelop(t *testing.T) {
 	p := icc.Srgb_lab_profile()
 	tr, err := p.CreateDefaultTransformerToPCS(3)
 	require.NoError(t, err)
-	orig := []float32{128 / 255., 64 / 255., 1.}
+	orig := []float64{128 / 255., 64 / 255., 1.}
 	r, g, b := tr.TransformDebug(orig[0], orig[1], orig[2], debug_transform)
-	expected := []float32{43.643852, 46.361866, -73.44747}
-	actual := []float32{r, g, b}
+	expected := []float64{43.643852, 46.361866, -73.44747}
+	actual := []float64{r, g, b}
 	require.InDeltaSlice(t, expected, actual, 1e-2)
 	tr, err = p.CreateDefaultTransformerToDevice()
 	require.NoError(t, err)
 	r, g, b = tr.TransformDebug(r, g, b, debug_transform)
-	require.InDeltaSlice(t, orig, []float32{r, g, b}, 0.1, fmt.Sprintf("%v != %v", orig, []float32{r, g, b}))
+	require.InDeltaSlice(t, orig, []float64{r, g, b}, 0.1, fmt.Sprintf("%v != %v", orig, []float64{r, g, b}))
 }
 
 func TestAgainstLCMS2(t *testing.T) {

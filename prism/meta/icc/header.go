@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-type unit_float = float32
+type unit_float = float64
 
 const FLOAT_EQUALITY_THRESHOLD = 1e-5
 
