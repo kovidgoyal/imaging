@@ -23,8 +23,9 @@ type Vec3 [3]float64
 type Mat3 [3][3]float64
 
 // Standard reference whites (CIE XYZ) normalized so Y = 1.0
+// Note that whiteD50 uses Z value from ICC spec rather that CIE spec.
 var (
-	whiteD50 = Vec3{0.96422, 1.00000, 0.82521}
+	whiteD50 = Vec3{0.96422, 1.00000, 0.82491}
 	whiteD65 = Vec3{0.95047, 1.00000, 1.08883}
 )
 
