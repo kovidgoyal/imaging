@@ -93,18 +93,18 @@ func debug_transform(r, g, b, x, y, z float64, t icc.ChannelTransformer) {
 }
 
 func TestDevelop(t *testing.T) {
-	p := icc.Srgb_lab_profile()
-	tr, err := p.CreateDefaultTransformerToPCS(3)
+	lab, err := CreateCMSProfile(icc.Srgb_lab_profile_data)
 	require.NoError(t, err)
-	orig := []float64{128 / 255., 64 / 255., 1.}
-	r, g, b := tr.TransformDebug(orig[0], orig[1], orig[2], debug_transform)
-	expected := []float64{43.643852, 46.361866, -73.44747}
-	actual := []float64{r, g, b}
-	require.InDeltaSlice(t, expected, actual, 1e-2)
-	tr, err = p.CreateDefaultTransformerToDevice()
+	defer lab.Close()
+	bp, ok := lab.DetectBlackPoint(icc.PerceptualRenderingIntent)
+	require.True(t, ok)
+	fmt.Println(11111111111, bp)
+	xyz, err := CreateCMSProfile(icc.Srgb_xyz_profile_data)
 	require.NoError(t, err)
-	r, g, b = tr.TransformDebug(r, g, b, debug_transform)
-	require.InDeltaSlice(t, orig, []float64{r, g, b}, 0.1, fmt.Sprintf("%v != %v", orig, []float64{r, g, b}))
+	defer xyz.Close()
+	bp, ok = xyz.DetectBlackPoint(icc.PerceptualRenderingIntent)
+	require.True(t, ok)
+	fmt.Println(22222222222, bp)
 }
 
 func TestAgainstLCMS2(t *testing.T) {

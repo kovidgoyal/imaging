@@ -234,3 +234,13 @@ func (p *CMSProfile) TransformFloatToDevice(data []float64, intent icc.Rendering
 	C.cmsDoTransform(t, unsafe.Pointer(&data[0]), unsafe.Pointer(&ans[0]), C.cmsUInt32Number(len(data)/3))
 	return
 }
+
+func (p *CMSProfile) DetectBlackPoint(intent icc.RenderingIntent) (ans icc.XYZType, ok bool) {
+	var bp C.cmsCIEXYZ
+	cok := C.cmsDetectBlackPoint(&bp, p.p, C.cmsUInt32Number(intent), 0)
+	ok = cok != 0
+	if ok {
+		ans.X, ans.Y, ans.Z = float64(bp.X), float64(bp.Y), float64(bp.Z)
+	}
+	return
+}
