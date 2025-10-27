@@ -34,7 +34,7 @@ func TestPathConsistency_TableDriven(t *testing.T) {
 
 	for _, tc := range tableCases {
 		t.Run(tc.name+"/NoGamut_NoClamp", func(t *testing.T) {
-			X, Y, Z := c.labToXYZ(tc.L, tc.a, tc.b)
+			X, Y, Z := c.LabToXYZ(tc.L, tc.a, tc.b)
 
 			// no gamut map, clamped
 			rLab, gLab, bLab := c.LabToSRGBNoGamutMap(tc.L, tc.a, tc.b)
@@ -49,7 +49,7 @@ func TestPathConsistency_TableDriven(t *testing.T) {
 		})
 
 		t.Run(tc.name+"/GamutMapped", func(t *testing.T) {
-			X, Y, Z := c.labToXYZ(tc.L, tc.a, tc.b)
+			X, Y, Z := c.LabToXYZ(tc.L, tc.a, tc.b)
 
 			// via LabToSRGB (performs chroma-scaling gamut mapping if needed)
 			rLab, gLab, bLab := c.LabToSRGB(tc.L, tc.a, tc.b)
@@ -72,7 +72,7 @@ func TestLabXYZ_Roundtrip_TableDriven(t *testing.T) {
 
 	for _, tc := range tableCases {
 		t.Run(tc.name+"/Lab->XYZ->Lab", func(t *testing.T) {
-			X, Y, Z := c.labToXYZ(tc.L, tc.a, tc.b)
+			X, Y, Z := c.LabToXYZ(tc.L, tc.a, tc.b)
 			L2, a2, b2 := c.XYZToLab(X, Y, Z)
 
 			if !nearlyEqual(tc.L, L2, epsL) || !nearlyEqual(tc.a, a2, epsAB) || !nearlyEqual(tc.b, b2, epsAB) {

@@ -82,7 +82,7 @@ func (c *ConvertColor) LabToSRGBNoGamutMap(L, a, b float64) (r, g, bl float64) {
 // LabToLinearRGB converts Lab to linear RGB (not gamma-corrected), but still
 // with chromatic adaptation to D65 fused into the matrix. Output is linear sRGB.
 func (c *ConvertColor) LabToLinearRGB(L, a, b float64) (r, g, bl float64) {
-	X, Y, Z := c.labToXYZ(L, a, b)
+	X, Y, Z := c.LabToXYZ(L, a, b)
 	rv, gv, bv := mulMat3Vec(c.combined_XYZ_to_linear_SRGB, Vec3{X, Y, Z})
 	return rv, gv, bv
 }
@@ -140,8 +140,8 @@ func finv(t float64) float64 {
 	return 3 * delta * delta * (t - 4.0/29.0)
 }
 
-// labToXYZ_D50 converts Lab (whitepoint) to CIE XYZ values relative to the whitepoint (Y=1).
-func (c *ConvertColor) labToXYZ(L, a, b float64) (X, Y, Z float64) {
+// LabToXYZ converts Lab (whitepoint) to CIE XYZ values relative to the whitepoint (Y=1).
+func (c *ConvertColor) LabToXYZ(L, a, b float64) (X, Y, Z float64) {
 	// Inverse of the CIELAB f function
 	var fy = (L + 16.0) / 116.0
 	var fx = fy + (a / 500.0)

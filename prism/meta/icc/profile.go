@@ -69,6 +69,7 @@ type Profile struct {
 	Header        Header
 	TagTable      TagTable
 	PCSIlluminant XYZType
+	blackpoint    XYZType
 }
 
 func (p *Profile) Description() (string, error) {
@@ -288,6 +289,37 @@ func (p *Profile) CreateTransformerToPCS(rendering_intent RenderingIntent, input
 		ans.Append(chromatic_adaptation)
 	} else {
 		err = p.create_matrix_trc_transformer(forward, chromatic_adaptation, ans)
+	}
+	return
+}
+
+func (p *Profile) BlackPoint() XYZType {
+	// TODO: Implement this
+	return p.blackpoint
+
+}
+
+func (p *Profile) CreateTransformerToSRGB(rendering_intent RenderingIntent, input_channels int) (ans *Pipeline, err error) {
+	if ans, err = p.CreateTransformerToPCS(rendering_intent, input_channels); err != nil {
+		return
+	}
+	var sRGB_blackpoint XYZType // 0, 0, 0
+	input_blackpoint := p.BlackPoint()
+	input_colorspace := p.Header.ProfileConnectionSpace
+	if input_blackpoint != sRGB_blackpoint {
+		if input_colorspace == ColorSpaceLab {
+			ans.Append(NewLABtoXYZ(p.PCSIlluminant))
+			input_colorspace = ColorSpaceXYZ
+		}
+		ans.Append(NewBlackPointCorrection(p.PCSIlluminant, input_blackpoint, sRGB_blackpoint))
+	}
+	switch input_colorspace {
+	case ColorSpaceXYZ:
+		ans.Append(NewXYZtosRGB(p.PCSIlluminant))
+	case ColorSpaceLab:
+		ans.Append(NewLABtosRGB(p.PCSIlluminant))
+	default:
+		return nil, fmt.Errorf("unknown PCS colorspace: %s", input_colorspace)
 	}
 	return
 }
