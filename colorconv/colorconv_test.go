@@ -36,11 +36,11 @@ func TestPathConsistency_TableDriven(t *testing.T) {
 		t.Run(tc.name+"/NoGamut_NoClamp", func(t *testing.T) {
 			X, Y, Z := c.labToXYZ(tc.L, tc.a, tc.b)
 
-			// via Lab path (no gamut map, companded, no clamp)
-			rLab, gLab, bLab := c.labToSRGBNoGamutMap(tc.L, tc.a, tc.b)
+			// no gamut map, clamped
+			rLab, gLab, bLab := c.LabToSRGBNoGamutMap(tc.L, tc.a, tc.b)
 
-			// via XYZ direct (no clamp)
-			rXYZ, gXYZ, bXYZ := c.XYZToSRGB_NoClamp(X, Y, Z)
+			// no gamut map, no clamp
+			rXYZ, gXYZ, bXYZ := c.XYZToSRGBNoClamp(X, Y, Z)
 
 			if !nearlyEqual(rLab, rXYZ, eps) || !nearlyEqual(gLab, gXYZ, eps) || !nearlyEqual(bLab, bXYZ, eps) {
 				t.Fatalf("No-gamut mismatch for %s: labPath=(%.12f,%.12f,%.12f) xyzPath=(%.12f,%.12f,%.12f)",
@@ -55,7 +55,7 @@ func TestPathConsistency_TableDriven(t *testing.T) {
 			rLab, gLab, bLab := c.LabToSRGB(tc.L, tc.a, tc.b)
 
 			// via XYZ path projecting to Lab and reusing LabToSRGB
-			rXYZ, gXYZ, bXYZ := c.XYZToSRGB_GamutMap(X, Y, Z)
+			rXYZ, gXYZ, bXYZ := c.XYZToSRGB(X, Y, Z)
 
 			if !nearlyEqual(rLab, rXYZ, eps) || !nearlyEqual(gLab, gXYZ, eps) || !nearlyEqual(bLab, bXYZ, eps) {
 				t.Fatalf("Gamut-mapped mismatch for %s: labPath=(%.12f,%.12f,%.12f) xyzPath=(%.12f,%.12f,%.12f)",
