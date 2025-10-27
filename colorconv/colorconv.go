@@ -24,31 +24,7 @@ type Mat3 [3][3]float64
 
 // Standard reference whites (CIE XYZ) normalized so Y = 1.0
 // Note that WhiteD50 uses Z value from ICC spec rather that CIE spec.
-var (
-	WhiteD50 = Vec3{0.96422, 1.00000, 0.82491}
-	whiteD65 = Vec3{0.95047, 1.00000, 1.08883}
-)
-
-// Bradford transform matrices (forward and inverse)
-var (
-	bradford = Mat3{
-		{0.8951, 0.2664, -0.1614},
-		{-0.7502, 1.7135, 0.0367},
-		{0.0389, -0.0685, 1.0296},
-	}
-	invBradford = Mat3{
-		{0.9869929, -0.1470543, 0.1599627},
-		{0.4323053, 0.5183603, 0.0492912},
-		{-0.0085287, 0.0400428, 0.9684867},
-	}
-)
-
-// sRGB (linear) transform matrix from CIE XYZ (D65)
-var srgbFromXYZ = Mat3{
-	{3.2406, -1.5372, -0.4986},
-	{-0.9689, 1.8758, 0.0415},
-	{0.0557, -0.2040, 1.0570},
-}
+var WhiteD50 = Vec3{0.96422, 1.00000, 0.82491}
 
 type ConvertColor struct {
 	whitepoint Vec3
@@ -58,8 +34,15 @@ type ConvertColor struct {
 }
 
 func NewConvertColor(whitepoint_x, whitepoint_y, whitepoint_z float64) (ans *ConvertColor) {
+	var whiteD65 = Vec3{0.95047, 1.00000, 1.08883}
 	ans = &ConvertColor{whitepoint: Vec3{whitepoint_x, whitepoint_y, whitepoint_z}}
 	adapt := chromaticAdaptationMatrix(ans.whitepoint, whiteD65)
+	// sRGB (linear) transform matrix from CIE XYZ (D65)
+	var srgbFromXYZ = Mat3{
+		{3.2406, -1.5372, -0.4986},
+		{-0.9689, 1.8758, 0.0415},
+		{0.0557, -0.2040, 1.0570},
+	}
 	ans.combined_XYZ_to_linear_SRGB = mulMat3(srgbFromXYZ, adapt)
 	return
 }
@@ -281,6 +264,20 @@ func mulMat3Vec(m Mat3, v Vec3) (x, y, z float64) {
 // chromaticAdaptationMatrix constructs a 3x3 matrix that adapts XYZ values
 // from sourceWhite to targetWhite using the Bradford method.
 func chromaticAdaptationMatrix(sourceWhite, targetWhite Vec3) Mat3 {
+	// Bradford transform matrices (forward and inverse)
+	var (
+		bradford = Mat3{
+			{0.8951, 0.2664, -0.1614},
+			{-0.7502, 1.7135, 0.0367},
+			{0.0389, -0.0685, 1.0296},
+		}
+		invBradford = Mat3{
+			{0.9869929, -0.1470543, 0.1599627},
+			{0.4323053, 0.5183603, 0.0492912},
+			{-0.0085287, 0.0400428, 0.9684867},
+		}
+	)
+
 	// Convert whites to LMS using Bradford
 	srcL, srcM, srcS := mulMat3Vec(bradford, sourceWhite)
 	tgtL, tgtM, tgtS := mulMat3Vec(bradford, targetWhite)
