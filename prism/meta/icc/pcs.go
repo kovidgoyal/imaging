@@ -21,6 +21,17 @@ func (m *NormalizeLAB) Transform(l, a, b unit_float) (unit_float, unit_float, un
 	return l / 100, (a + 128) / 255, (b + 128) / 255
 }
 
+func tg33(t func(r, g, b unit_float) (x, y, z unit_float), o, i []unit_float) {
+	_ = o[len(i)-1]
+	limit := len(i) / 3
+	for range limit {
+		o[0], o[1], o[2] = t(i[0], i[1], i[2])
+		i, o = i[3:], o[3:]
+	}
+}
+
+func (m *NormalizeLAB) TransformGeneral(o, i []unit_float) { tg33(m.Transform, o, i) }
+
 func NewNormalizeLAB() *NormalizeLAB {
 	x := NormalizeLAB(0)
 	return &x
@@ -57,6 +68,7 @@ func (c *BlackPointCorrection) String() string {
 func (c *BlackPointCorrection) Transform(r, g, b unit_float) (unit_float, unit_float, unit_float) {
 	return c.scale.X*r + c.offset.X, c.scale.Y*g + c.offset.Y, c.scale.Z*b + c.offset.Z
 }
+func (m *BlackPointCorrection) TransformGeneral(o, i []unit_float) { tg33(m.Transform, o, i) }
 
 type LABtosRGB struct {
 	c *colorconv.ConvertColor
@@ -71,6 +83,7 @@ func NewLABtosRGB(whitepoint XYZType) LABtosRGB {
 func (c LABtosRGB) Transform(l, a, b unit_float) (unit_float, unit_float, unit_float) {
 	return c.t(l, a, b)
 }
+func (m LABtosRGB) TransformGeneral(o, i []unit_float)   { tg33(m.Transform, o, i) }
 func (n LABtosRGB) IOSig() (int, int)                    { return 3, 3 }
 func (n LABtosRGB) String() string                       { return fmt.Sprintf("%T%s", n, n.c.String()) }
 func (n LABtosRGB) Iter(f func(ChannelTransformer) bool) { f(n) }
@@ -88,6 +101,7 @@ func NewXYZtosRGB(whitepoint XYZType) XYZtosRGB {
 func (c XYZtosRGB) Transform(l, a, b unit_float) (unit_float, unit_float, unit_float) {
 	return c.t(l, a, b)
 }
+func (m XYZtosRGB) TransformGeneral(o, i []unit_float)   { tg33(m.Transform, o, i) }
 func (n XYZtosRGB) IOSig() (int, int)                    { return 3, 3 }
 func (n XYZtosRGB) String() string                       { return fmt.Sprintf("%T%s", n, n.c.String()) }
 func (n XYZtosRGB) Iter(f func(ChannelTransformer) bool) { f(n) }
@@ -105,6 +119,7 @@ func NewLABtoXYZ(whitepoint XYZType) LABtoXYZ {
 func (c LABtoXYZ) Transform(l, a, b unit_float) (unit_float, unit_float, unit_float) {
 	return c.t(l, a, b)
 }
+func (m LABtoXYZ) TransformGeneral(o, i []unit_float)   { tg33(m.Transform, o, i) }
 func (n LABtoXYZ) IOSig() (int, int)                    { return 3, 3 }
 func (n LABtoXYZ) String() string                       { return fmt.Sprintf("%T%s", n, n.c.String()) }
 func (n LABtoXYZ) Iter(f func(ChannelTransformer) bool) { f(n) }
@@ -122,6 +137,7 @@ func NewXYZtoLAB(whitepoint XYZType) XYZtoLAB {
 func (c XYZtoLAB) Transform(l, a, b unit_float) (unit_float, unit_float, unit_float) {
 	return c.t(l, a, b)
 }
+func (m XYZtoLAB) TransformGeneral(o, i []unit_float)   { tg33(m.Transform, o, i) }
 func (n XYZtoLAB) IOSig() (int, int)                    { return 3, 3 }
 func (n XYZtoLAB) String() string                       { return fmt.Sprintf("%T%s", n, n.c.String()) }
 func (n XYZtoLAB) Iter(f func(ChannelTransformer) bool) { f(n) }

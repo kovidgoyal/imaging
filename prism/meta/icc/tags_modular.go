@@ -46,6 +46,12 @@ func (m *ModularTag) Transform(r, g, b unit_float) (unit_float, unit_float, unit
 	return r, g, b
 }
 
+func (m *ModularTag) TransformGeneral(o, i []unit_float) {
+	for _, t := range m.transform_objects {
+		t.TransformGeneral(o, i)
+	}
+}
+
 func IfElse[T any](condition bool, if_val T, else_val T) T {
 	if condition {
 		return if_val

@@ -81,6 +81,7 @@ func matrixDecoder(raw []byte) (any, error) {
 func (m *Matrix3) Transform(r, g, b unit_float) (unit_float, unit_float, unit_float) {
 	return m[0][0]*r + m[0][1]*g + m[0][2]*b, m[1][0]*r + m[1][1]*g + m[1][2]*b, m[2][0]*r + m[2][1]*g + m[2][2]*b
 }
+func (m *Matrix3) TransformGeneral(o, i []unit_float) { tg33(m.Transform, o, i) }
 
 func (m Matrix3) Transpose() Matrix3 {
 	return Matrix3{
@@ -148,6 +149,7 @@ func (m *Matrix3) Inverted() (ans Matrix3, err error) {
 func (m IdentityMatrix) Transform(r, g, b unit_float) (unit_float, unit_float, unit_float) {
 	return r, g, b
 }
+func (m IdentityMatrix) TransformGeneral(o, i []unit_float) { tg33(m.Transform, o, i) }
 
 func (m *MatrixWithOffset) Transform(r, g, b unit_float) (unit_float, unit_float, unit_float) {
 	r, g, b = m.m.Transform(r, g, b)
@@ -156,3 +158,4 @@ func (m *MatrixWithOffset) Transform(r, g, b unit_float) (unit_float, unit_float
 	b += m.offset3
 	return r, g, b
 }
+func (m *MatrixWithOffset) TransformGeneral(o, i []unit_float) { tg33(m.Transform, o, i) }

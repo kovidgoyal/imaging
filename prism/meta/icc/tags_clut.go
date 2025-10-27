@@ -184,11 +184,23 @@ func (c *CLUT3D) IOSig() (int, int)                     { return 3, c.d.num_outp
 func (c *CLUTTag) Iter(f func(ChannelTransformer) bool) { f(c) }
 func (c *CLUT3D) Iter(f func(ChannelTransformer) bool)  { f(c) }
 
+func tgg(num_in, num_out int, f func(inbuf, outbuf []unit_float), o, i []unit_float) {
+	limit := len(i) / num_in
+	_ = o[num_out*limit-1]
+	for range limit {
+		f(i[0:num_in:num_in], o[0:num_out:num_out])
+		i, o = i[num_in:], o[num_out:]
+	}
+}
+
 func (c *CLUTTag) Transform(r, g, b unit_float) (unit_float, unit_float, unit_float) {
 	var obuf [3]unit_float
 	var ibuf = [3]unit_float{r, g, b}
 	c.d.trilinear_interpolate(ibuf[:], obuf[:])
 	return obuf[0], obuf[1], obuf[2]
+}
+func (m *CLUTTag) TransformGeneral(o, i []unit_float) {
+	tgg(m.d.num_inputs, m.d.num_outputs, m.d.trilinear_interpolate, o, i)
 }
 
 func (c *CLUT3D) Trilinear_interpolate(r, g, b unit_float) (unit_float, unit_float, unit_float) {
@@ -204,8 +216,15 @@ func (c *CLUT3D) Tetrahedral_interpolate(r, g, b unit_float) (unit_float, unit_f
 	return obuf[0], obuf[1], obuf[2]
 }
 
+func (c *CLUT3D) Tetrahedral_interpolate_g(i, o []unit_float) {
+	c.d.tetrahedral_interpolation(i[0], i[1], i[2], o)
+}
+
 func (c *CLUT3D) Transform(r, g, b unit_float) (unit_float, unit_float, unit_float) {
 	return c.Tetrahedral_interpolate(r, g, b)
+}
+func (m *CLUT3D) TransformGeneral(o, i []unit_float) {
+	tgg(m.d.num_inputs, m.d.num_outputs, m.Tetrahedral_interpolate_g, o, i)
 }
 
 func clamp01(v unit_float) unit_float {

@@ -100,8 +100,10 @@ func (p *Pipeline) TransformDebug(r, g, b unit_float, f Debug_callback) (unit_fl
 	return r, g, b
 }
 
-func (p *Pipeline) TransformGeneral([]unit_float) []unit_float {
-	panic("TODO: Implement me!")
+func (p *Pipeline) TransformGeneral(out, in []unit_float) {
+	for _, t := range p.transformers {
+		t.TransformGeneral(out, in)
+	}
 }
 
 func (p *Pipeline) Len() int { return len(p.transformers) }

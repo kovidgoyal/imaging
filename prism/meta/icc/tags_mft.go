@@ -51,6 +51,16 @@ func (mft *MFT) Transform(r, g, b unit_float) (unit_float, unit_float, unit_floa
 	return r, g, b
 }
 
+func (mft *MFT) TransformGeneral(o, i []unit_float) {
+	mft.matrix.TransformGeneral(o, i)
+	// Apply input curves with linear interpolation
+	mft.input_curve.TransformGeneral(o, i)
+	// Apply CLUT
+	mft.clut.TransformGeneral(o, i)
+	// Apply output curves with interpolation
+	mft.output_curve.TransformGeneral(o, i)
+}
+
 func load_8bit_table(raw []byte, n int) (output []unit_float, leftover []byte, err error) {
 	if len(raw) < n {
 		return nil, raw, fmt.Errorf("mft2 tag too short")

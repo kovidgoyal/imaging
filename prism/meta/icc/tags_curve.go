@@ -49,9 +49,34 @@ type InverseCurveTransformer struct {
 func (c CurveTransformer) IOSig() (int, int) {
 	return len(c.curves), len(c.curves)
 }
+func tgc(t []Curve1D, o, i []unit_float) {
+	_ = o[len(i)-1]
+	num := len(t)
+	limit := len(i) / num
+	for range limit {
+		for idx := range num {
+			o[idx] = t[idx].Transform(i[idx])
+		}
+		o, i = o[num:], i[num:]
+	}
+}
+
+func tgic(t []Curve1D, o, i []unit_float) {
+	_ = o[len(i)-1]
+	num := len(t)
+	limit := len(i) / num
+	for range limit {
+		for idx := range num {
+			o[idx] = t[idx].InverseTransform(clamp01(i[idx]))
+		}
+		o, i = o[num:], i[num:]
+	}
+}
+
 func (c CurveTransformer) Transform(r, g, b unit_float) (unit_float, unit_float, unit_float) {
 	return c.curves[0].Transform(r), c.curves[1].Transform(g), c.curves[2].Transform(b)
 }
+func (c CurveTransformer) TransformGeneral(o, i []unit_float) { tgc(c.curves, o, i) }
 
 func (c InverseCurveTransformer) IOSig() (int, int) {
 	return len(c.curves), len(c.curves)
@@ -60,6 +85,7 @@ func (c InverseCurveTransformer) Transform(r, g, b unit_float) (unit_float, unit
 	// we need to clamp as per spec section F.3 of ICC.1-2202-05.pdf
 	return c.curves[0].InverseTransform(clamp01(r)), c.curves[1].InverseTransform(clamp01(g)), c.curves[2].InverseTransform(clamp01(b))
 }
+func (c InverseCurveTransformer) TransformGeneral(o, i []unit_float) { tgic(c.curves, o, i) }
 
 type CurveTransformer3 struct {
 	r, g, b Curve1D
@@ -70,6 +96,7 @@ func (c CurveTransformer3) IOSig() (int, int) { return 3, 3 }
 func (c CurveTransformer3) Transform(r, g, b unit_float) (unit_float, unit_float, unit_float) {
 	return c.r.Transform(r), c.g.Transform(g), c.b.Transform(b)
 }
+func (m CurveTransformer3) TransformGeneral(o, i []unit_float) { tg33(m.Transform, o, i) }
 
 type InverseCurveTransformer3 struct {
 	r, g, b Curve1D
@@ -108,6 +135,7 @@ func (c InverseCurveTransformer3) Transform(r, g, b unit_float) (unit_float, uni
 	// we need to clamp as per spec section F.3 of ICC.1-2202-05.pdf
 	return c.r.InverseTransform(clamp01(r)), c.g.InverseTransform(clamp01(g)), c.b.InverseTransform(clamp01(b))
 }
+func (m InverseCurveTransformer3) TransformGeneral(o, i []unit_float) { tg33(m.Transform, o, i) }
 
 type Curves interface {
 	ChannelTransformer

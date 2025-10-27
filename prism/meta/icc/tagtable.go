@@ -234,6 +234,7 @@ type Debug_callback = func(r, g, b, x, y, z unit_float, t ChannelTransformer)
 
 type ChannelTransformer interface {
 	Transform(r, g, b unit_float) (x, y, z unit_float)
+	TransformGeneral(out, in []unit_float)
 	IOSig() (num_inputs, num_outputs int)
 	// Should yield only itself unless it is a container, in which case it should yield its contained transforms
 	Iter(func(ChannelTransformer) bool)
