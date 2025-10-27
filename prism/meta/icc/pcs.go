@@ -2,6 +2,7 @@ package icc
 
 import (
 	"fmt"
+	"math"
 )
 
 var _ = fmt.Println
@@ -55,6 +56,44 @@ func (c *BlackPointCorrection) String() string {
 
 func (c *BlackPointCorrection) Transform(r, g, b unit_float) (unit_float, unit_float, unit_float) {
 	return c.scale.X*r + c.offset.X, c.scale.Y*g + c.offset.Y, c.scale.Z*b + c.offset.Z
+}
+
+type XYZToLAB XYZType
+
+func NewXYZToLAB(illuminant XYZType) *XYZToLAB {
+	x := XYZToLAB(illuminant)
+	return &x
+}
+
+func NewXYZToLABStandard() *XYZToLAB {
+	x := XYZToLAB(D50)
+	return &x
+}
+
+func (x XYZToLAB) String() string                        { return fmt.Sprintf("LabToXYZ{ %v }", XYZType(x)) }
+func (x XYZToLAB) IOSig() (int, int)                     { return 3, 3 }
+func (x *XYZToLAB) Iter(f func(ChannelTransformer) bool) { f(x) }
+func (wt *XYZToLAB) Transform(l, a, b unit_float) (x, y, z unit_float) {
+	return XYZ_to_LAB(wt.X, wt.Y, wt.Z, l, a, b)
+}
+
+func f(t unit_float) unit_float {
+	const limit = (24.0 / 116.0) * (24.0 / 116.0) * (24.0 / 116.0)
+	if t <= limit {
+		return (841.0/108.0)*t + (16.0 / 116.0)
+	}
+	return unit_float(math.Pow(float64(t), 1.0/3.0))
+}
+
+// Standard XYZ to LAB. It can handle negative XYZ in some cases
+func XYZ_to_LAB(wt_x, wt_y, wt_z, x, y, z unit_float) (l, a, b unit_float) {
+	fx := f(x / wt_x)
+	fy := f(y / wt_y)
+	fz := f(z / wt_z)
+	l = 116.0*fy - 16.0
+	a = 500.0 * (fx - fy)
+	b = 200.0 * (fy - fz)
+	return
 }
 
 type LabToXYZ XYZType
