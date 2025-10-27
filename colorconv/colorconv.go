@@ -23,9 +23,9 @@ type Vec3 [3]float64
 type Mat3 [3][3]float64
 
 // Standard reference whites (CIE XYZ) normalized so Y = 1.0
-// Note that whiteD50 uses Z value from ICC spec rather that CIE spec.
+// Note that WhiteD50 uses Z value from ICC spec rather that CIE spec.
 var (
-	whiteD50 = Vec3{0.96422, 1.00000, 0.82491}
+	WhiteD50 = Vec3{0.96422, 1.00000, 0.82491}
 	whiteD65 = Vec3{0.95047, 1.00000, 1.08883}
 )
 
@@ -50,52 +50,58 @@ var srgbFromXYZ = Mat3{
 	{0.0557, -0.2040, 1.0570},
 }
 
-// Precomputed combined matrix from XYZ(D50) directly to linear sRGB (D65).
-// Combined = srgbFromXYZ * adaptMatrix (where adaptMatrix adapts XYZ D50 -> XYZ D65).
-var combinedXYZD50ToLinearSRGB Mat3
-
-func init() {
-	// compute adaptation matrix once and fuse with srgbFromXYZ
-	adapt := chromaticAdaptationMatrix(whiteD50, whiteD65)
-	combinedXYZD50ToLinearSRGB = mulMat3(srgbFromXYZ, adapt)
+type ConvertColor struct {
+	whitepoint Vec3
+	// Precomputed combined matrix from XYZ(whitepoint) directly to linear sRGB (D65).
+	// Combined = srgbFromXYZ * adaptMatrix (where adaptMatrix adapts XYZ D50 -> XYZ D65).
+	combined_XYZ_to_linear_SRGB Mat3
 }
 
-// Public API
+func NewConvertColor(whitepoint_x, whitepoint_y, whitepoint_z float64) (ans *ConvertColor) {
+	ans = &ConvertColor{whitepoint: Vec3{whitepoint_x, whitepoint_y, whitepoint_z}}
+	adapt := chromaticAdaptationMatrix(ans.whitepoint, whiteD65)
+	ans.combined_XYZ_to_linear_SRGB = mulMat3(srgbFromXYZ, adapt)
+	return
+}
 
-// LabToSRGB converts a Lab color (assumed D50) into sRGB (D65) with gamut mapping.
+func NewStandardConvertColor() (ans *ConvertColor) {
+	return NewConvertColor(WhiteD50[0], WhiteD50[1], WhiteD50[2])
+}
+
+// LabToSRGB converts a Lab color (at the specified whitepoint) into sRGB (D65) with gamut mapping.
 // Returned components are in [0,1].
-func LabToSRGB(L, a, b float64) (r, g, bl float64) {
+func (c *ConvertColor) LabToSRGB(L, a, b float64) (r, g, bl float64) {
 	// fast path: try direct conversion and only do gamut mapping if out of gamut
-	r0, g0, b0 := labToSRGBNoGamutMap(L, a, b)
+	r0, g0, b0 := c.labToSRGBNoGamutMap(L, a, b)
 	if inGamut(r0, g0, b0) {
 		return r0, g0, b0
 	}
 	// gamut map by scaling chroma (a,b) toward 0 while keeping L constant.
-	rm, gm, bm := gamutMapChromaScale(L, a, b)
+	rm, gm, bm := c.gamutMapChromaScale(L, a, b)
 	return rm, gm, bm
 }
 
-// LabToLinearRGB converts Lab (D50) to linear RGB (not gamma-corrected), but still
+// LabToLinearRGB converts Lab to linear RGB (not gamma-corrected), but still
 // with chromatic adaptation to D65 fused into the matrix. Output is linear sRGB.
-func LabToLinearRGB(L, a, b float64) (r, g, bl float64) {
-	X, Y, Z := labToXYZ_D50(L, a, b)
-	rv, gv, bv := mulMat3Vec(combinedXYZD50ToLinearSRGB, Vec3{X, Y, Z})
+func (c *ConvertColor) LabToLinearRGB(L, a, b float64) (r, g, bl float64) {
+	X, Y, Z := c.labToXYZ(L, a, b)
+	rv, gv, bv := mulMat3Vec(c.combined_XYZ_to_linear_SRGB, Vec3{X, Y, Z})
 	return rv, gv, bv
 }
 
-// XYZToLinearRGB_D50 converts XYZ expressed relative to the D50 whitepoint
+// XYZToLinearRGB converts XYZ expressed relative to the specified whitepoint
 // directly to linear sRGB values (D65) using the precomputed fused matrix.
 // The output is linear RGB and may be outside the [0,1] range.
-func XYZToLinearRGB_D50(X, Y, Z float64) (r, g, b float64) {
-	r, g, b = mulMat3Vec(combinedXYZD50ToLinearSRGB, Vec3{X, Y, Z})
+func (c *ConvertColor) XYZToLinearRGB(X, Y, Z float64) (r, g, b float64) {
+	r, g, b = mulMat3Vec(c.combined_XYZ_to_linear_SRGB, Vec3{X, Y, Z})
 	return
 }
 
-// XYZToSRGB_D50 converts XYZ expressed relative to the D50 whitepoint directly to
+// XYZToSRGB converts XYZ expressed relative to the whitepoint directly to
 // gamma-corrected sRGB values (D65). The outputs are clamped to [0,1].
 // This function re-uses the precomputed combined matrix and the existing companding function.
-func XYZToSRGB_D50(X, Y, Z float64) (r, g, b float64) {
-	rl, gl, bl := XYZToLinearRGB_D50(X, Y, Z)
+func (c *ConvertColor) XYZToSRGB(X, Y, Z float64) (r, g, b float64) {
+	rl, gl, bl := c.XYZToLinearRGB(X, Y, Z)
 	// Apply sRGB companding and clamp
 	r = clamp01(linearToSRGBComp(rl))
 	g = clamp01(linearToSRGBComp(gl))
@@ -105,28 +111,28 @@ func XYZToSRGB_D50(X, Y, Z float64) (r, g, b float64) {
 
 // If you need the non-clamped gamma-corrected values (for checking out-of-gamut)
 // you can use this helper which only compands but doesn't clamp.
-func XYZToSRGB_D50NoClamp(X, Y, Z float64) (r, g, b float64) {
-	rl, gl, bl := XYZToLinearRGB_D50(X, Y, Z)
+func (c *ConvertColor) XYZToSRGB_NoClamp(X, Y, Z float64) (r, g, b float64) {
+	rl, gl, bl := c.XYZToLinearRGB(X, Y, Z)
 	r = linearToSRGBComp(rl)
 	g = linearToSRGBComp(gl)
 	b = linearToSRGBComp(bl)
 	return
 }
 
-// XYZToSRGB_D50GamutMap converts XYZ (D50) to sRGB (D65) using the Lab-projection
-// + chroma-scaling gamut mapping. It projects XYZ into CIELAB (D50), reuses the
+// XYZToSRGB_GamutMap converts XYZ (whitepoint) to sRGB (D65) using the Lab-projection
+// + chroma-scaling gamut mapping. It projects XYZ into CIELAB (whitepoint), reuses the
 // existing LabToSRGB (which performs chroma-scaling if needed), and returns final sRGB.
-func XYZToSRGB_D50GamutMap(X, Y, Z float64) (r, g, b float64) {
-	L, a, bb := XYZToLab_D50(X, Y, Z)
-	return LabToSRGB(L, a, bb)
+func (c *ConvertColor) XYZToSRGB_GamutMap(X, Y, Z float64) (r, g, b float64) {
+	L, a, bb := c.XYZToLab(X, Y, Z)
+	return c.LabToSRGB(L, a, bb)
 }
 
 // Helpers: core conversions
 
-// labToSRGBNoGamutMap converts Lab(D50) to sRGB(D65) without doing any gamut mapping.
+// labToSRGBNoGamutMap converts Lab(whitepoint) to sRGB(D65) without doing any gamut mapping.
 // Values may be out of [0,1].
-func labToSRGBNoGamutMap(L, a, b float64) (r, g, bl float64) {
-	rLin, gLin, bLin := LabToLinearRGB(L, a, b)
+func (c *ConvertColor) labToSRGBNoGamutMap(L, a, b float64) (r, g, bl float64) {
+	rLin, gLin, bLin := c.LabToLinearRGB(L, a, b)
 	r = linearToSRGBComp(rLin)
 	g = linearToSRGBComp(gLin)
 	bl = linearToSRGBComp(bLin)
@@ -142,8 +148,8 @@ func finv(t float64) float64 {
 	return 3 * delta * delta * (t - 4.0/29.0)
 }
 
-// labToXYZ_D50 converts Lab (D50) to CIE XYZ values relative to the D50 whitepoint (Y=1).
-func labToXYZ_D50(L, a, b float64) (X, Y, Z float64) {
+// labToXYZ_D50 converts Lab (whitepoint) to CIE XYZ values relative to the whitepoint (Y=1).
+func (c *ConvertColor) labToXYZ(L, a, b float64) (X, Y, Z float64) {
 	// Inverse of the CIELAB f function
 	var fy = (L + 16.0) / 116.0
 	var fx = fy + (a / 500.0)
@@ -153,9 +159,9 @@ func labToXYZ_D50(L, a, b float64) (X, Y, Z float64) {
 	yr := finv(fy)
 	zr := finv(fz)
 
-	X = xr * whiteD50[0]
-	Y = yr * whiteD50[1]
-	Z = zr * whiteD50[2]
+	X = xr * c.whitepoint[0]
+	Y = yr * c.whitepoint[1]
+	Z = zr * c.whitepoint[2]
 	return
 }
 
@@ -168,12 +174,12 @@ func ff(t float64) float64 {
 	return t/(3*delta*delta) + 4.0/29.0
 }
 
-// XYZToLab_D50 converts XYZ (relative to D50, Y=1) into CIELAB (D50).
-func XYZToLab_D50(X, Y, Z float64) (L, a, b float64) {
-	// Normalize by D50 white
-	xr := X / whiteD50[0]
-	yr := Y / whiteD50[1]
-	zr := Z / whiteD50[2]
+// XYZToLab converts XYZ (relative to whitepoint, Y=1) into CIELAB (whitepoint).
+func (c *ConvertColor) XYZToLab(X, Y, Z float64) (L, a, b float64) {
+	// Normalize by white
+	xr := X / c.whitepoint[0]
+	yr := Y / c.whitepoint[1]
+	zr := Z / c.whitepoint[2]
 
 	fx := ff(xr)
 	fy := ff(yr)
@@ -188,13 +194,14 @@ func XYZToLab_D50(X, Y, Z float64) (L, a, b float64) {
 // linearToSRGBComp applies the sRGB (gamma) companding function to a linear component.
 func linearToSRGBComp(c float64) float64 {
 	// clip small negative rounding noise at this stage for stability
-	if c <= 0 {
+	switch {
+	case c <= 0:
 		return 0.0
-	}
-	if c <= 0.0031308 {
+	case c <= 0.0031308:
 		return 12.92 * c
+	default:
+		return 1.055*math.Pow(c, 1.0/2.4) - 0.055
 	}
-	return 1.055*math.Pow(c, 1.0/2.4) - 0.055
 }
 
 // inGamut checks whether r,g,b are all inside [0,1] (with a small epsilon)
@@ -206,10 +213,10 @@ func inGamut(r, g, b float64) bool {
 // gamutMapChromaScale reduces chroma (a,b) by scaling factor s in [0,1] to bring the
 // color into gamut. Binary search is used to find the maximum s such that the color
 // is in gamut. L is preserved.
-func gamutMapChromaScale(L, a, b float64) (r, g, bl float64) {
+func (c *ConvertColor) gamutMapChromaScale(L, a, b float64) (r, g, bl float64) {
 	// If a==0 && b==0 we can't scale; just clip after conversion
 	if a == 0 && b == 0 {
-		r0, g0, b0 := labToSRGBNoGamutMap(L, a, b)
+		r0, g0, b0 := c.labToSRGBNoGamutMap(L, a, b)
 		return clamp01(r0), clamp01(g0), clamp01(b0)
 	}
 	// Binary search scale factor in [0,1]
@@ -222,7 +229,7 @@ func gamutMapChromaScale(L, a, b float64) (r, g, bl float64) {
 		mid = (lo + hi) / 2.0
 		a2 := a * mid
 		b2 := b * mid
-		r0, g0, b0 := labToSRGBNoGamutMap(L, a2, b2)
+		r0, g0, b0 := c.labToSRGBNoGamutMap(L, a2, b2)
 		if inGamut(r0, g0, b0) {
 			foundR, foundG, foundB = r0, g0, b0
 			// can try to keep more chroma
@@ -233,7 +240,7 @@ func gamutMapChromaScale(L, a, b float64) (r, g, bl float64) {
 	}
 	// If we never found a valid in-gamut during binary search, try a= b =0
 	if !(inGamut(foundR, foundG, foundB)) {
-		r0, g0, b0 := labToSRGBNoGamutMap(L, 0, 0)
+		r0, g0, b0 := c.labToSRGBNoGamutMap(L, 0, 0)
 		// if still out-of-gamut (very unlikely), clip
 		return clamp01(r0), clamp01(g0), clamp01(b0)
 	}

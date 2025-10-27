@@ -30,16 +30,17 @@ var tableCases = []struct {
 func TestPathConsistency_TableDriven(t *testing.T) {
 	// Verify consistency between Lab->SRGB and XYZ->SRGB paths (both no-gamut and with gamut mapping)
 	eps := 1e-9
+	c := NewStandardConvertColor()
 
 	for _, tc := range tableCases {
 		t.Run(tc.name+"/NoGamut_NoClamp", func(t *testing.T) {
-			X, Y, Z := labToXYZ_D50(tc.L, tc.a, tc.b)
+			X, Y, Z := c.labToXYZ(tc.L, tc.a, tc.b)
 
 			// via Lab path (no gamut map, companded, no clamp)
-			rLab, gLab, bLab := labToSRGBNoGamutMap(tc.L, tc.a, tc.b)
+			rLab, gLab, bLab := c.labToSRGBNoGamutMap(tc.L, tc.a, tc.b)
 
 			// via XYZ direct (no clamp)
-			rXYZ, gXYZ, bXYZ := XYZToSRGB_D50NoClamp(X, Y, Z)
+			rXYZ, gXYZ, bXYZ := c.XYZToSRGB_NoClamp(X, Y, Z)
 
 			if !nearlyEqual(rLab, rXYZ, eps) || !nearlyEqual(gLab, gXYZ, eps) || !nearlyEqual(bLab, bXYZ, eps) {
 				t.Fatalf("No-gamut mismatch for %s: labPath=(%.12f,%.12f,%.12f) xyzPath=(%.12f,%.12f,%.12f)",
@@ -48,13 +49,13 @@ func TestPathConsistency_TableDriven(t *testing.T) {
 		})
 
 		t.Run(tc.name+"/GamutMapped", func(t *testing.T) {
-			X, Y, Z := labToXYZ_D50(tc.L, tc.a, tc.b)
+			X, Y, Z := c.labToXYZ(tc.L, tc.a, tc.b)
 
 			// via LabToSRGB (performs chroma-scaling gamut mapping if needed)
-			rLab, gLab, bLab := LabToSRGB(tc.L, tc.a, tc.b)
+			rLab, gLab, bLab := c.LabToSRGB(tc.L, tc.a, tc.b)
 
 			// via XYZ path projecting to Lab and reusing LabToSRGB
-			rXYZ, gXYZ, bXYZ := XYZToSRGB_D50GamutMap(X, Y, Z)
+			rXYZ, gXYZ, bXYZ := c.XYZToSRGB_GamutMap(X, Y, Z)
 
 			if !nearlyEqual(rLab, rXYZ, eps) || !nearlyEqual(gLab, gXYZ, eps) || !nearlyEqual(bLab, bXYZ, eps) {
 				t.Fatalf("Gamut-mapped mismatch for %s: labPath=(%.12f,%.12f,%.12f) xyzPath=(%.12f,%.12f,%.12f)",
@@ -67,11 +68,12 @@ func TestPathConsistency_TableDriven(t *testing.T) {
 func TestLabXYZ_Roundtrip_TableDriven(t *testing.T) {
 	epsL := 1e-9
 	epsAB := 1e-8 // a,b can be slightly more sensitive
+	c := NewStandardConvertColor()
 
 	for _, tc := range tableCases {
 		t.Run(tc.name+"/Lab->XYZ->Lab", func(t *testing.T) {
-			X, Y, Z := labToXYZ_D50(tc.L, tc.a, tc.b)
-			L2, a2, b2 := XYZToLab_D50(X, Y, Z)
+			X, Y, Z := c.labToXYZ(tc.L, tc.a, tc.b)
+			L2, a2, b2 := c.XYZToLab(X, Y, Z)
 
 			if !nearlyEqual(tc.L, L2, epsL) || !nearlyEqual(tc.a, a2, epsAB) || !nearlyEqual(tc.b, b2, epsAB) {
 				t.Fatalf("Roundtrip mismatch for %s: in Lab=(%.9f,%.9f,%.9f) out Lab=(%.9f,%.9f,%.9f)",
@@ -83,9 +85,10 @@ func TestLabXYZ_Roundtrip_TableDriven(t *testing.T) {
 
 func TestGamutMapping_Ensures_InGamut_TableDriven(t *testing.T) {
 	// Ensure that gamut mapping (LabToSRGB) always returns values inside [0,1]
+	c := NewStandardConvertColor()
 	for _, tc := range tableCases {
 		t.Run(tc.name+"/InGamutAfterMapping", func(t *testing.T) {
-			r, g, b := LabToSRGB(tc.L, tc.a, tc.b)
+			r, g, b := c.LabToSRGB(tc.L, tc.a, tc.b)
 			if !inGamut(r, g, b) {
 				t.Fatalf("Gamut mapping failed to produce in-gamut RGB for %s: got (%.12f,%.12f,%.12f)", tc.name, r, g, b)
 			}
@@ -94,8 +97,9 @@ func TestGamutMapping_Ensures_InGamut_TableDriven(t *testing.T) {
 }
 
 func TestAdaptedWhite_IsNearOne(t *testing.T) {
+	c := NewStandardConvertColor()
 	// Sanity: for neutral D50 white, after adaptation+matrix multiply and companding we should be near sRGB white.
-	rl, gl, bl := XYZToLinearRGB_D50(whiteD50[0], whiteD50[1], whiteD50[2])
+	rl, gl, bl := c.XYZToLinearRGB(WhiteD50[0], WhiteD50[1], WhiteD50[2])
 	rg := linearToSRGBComp(rl)
 	gg := linearToSRGBComp(gl)
 	bg := linearToSRGBComp(bl)
@@ -108,10 +112,11 @@ func TestAdaptedWhite_IsNearOne(t *testing.T) {
 func TestGoldenRegression(t *testing.T) {
 	// Use a tight epsilon for regression comparisons.
 	const eps = 1e-9
+	c := NewStandardConvertColor()
 
 	for _, tc := range tableCases {
 		// Compute current outputs via LabToSRGB (which applies gamut mapping)
-		gotR, gotG, gotB := LabToSRGB(tc.L, tc.a, tc.b)
+		gotR, gotG, gotB := c.LabToSRGB(tc.L, tc.a, tc.b)
 
 		if !nearlyEqual(tc.R, gotR, eps) || !nearlyEqual(tc.G, gotG, eps) || !nearlyEqual(tc.B, gotB, eps) {
 			t.Fatalf("golden mismatch for %s:\n  expected R,G,B = (%.12f, %.12f, %.12f)\n  got      R,G,B = (%.12f, %.12f, %.12f)\n\nIf this change is intentional, update the table of test cases",
@@ -119,4 +124,3 @@ func TestGoldenRegression(t *testing.T) {
 		}
 	}
 }
-
