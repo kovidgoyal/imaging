@@ -67,6 +67,19 @@ func NewLABtosRGB(whitepoint XYZType) LABtosRGB {
 func (c LABtosRGB) Transform(l, a, b unit_float) (unit_float, unit_float, unit_float) {
 	return c.c.LabToSRGB(l, a, b)
 }
-func (n LABtosRGB) IOSig() (int, int)                     { return 3, 3 }
-func (n LABtosRGB) String() string                        { return "LABtosRGB" }
-func (n *LABtosRGB) Iter(f func(ChannelTransformer) bool) { f(n) }
+func (n LABtosRGB) IOSig() (int, int)                    { return 3, 3 }
+func (n LABtosRGB) String() string                       { return fmt.Sprintf("%T%s", n, n.c.String()) }
+func (n LABtosRGB) Iter(f func(ChannelTransformer) bool) { f(n) }
+
+type XYZtosRGB struct{ c *colorconv.ConvertColor }
+
+func NewXYZtosRGB(whitepoint XYZType) XYZtosRGB {
+	return XYZtosRGB{colorconv.NewConvertColor(whitepoint.X, whitepoint.Y, whitepoint.Z)}
+}
+
+func (c XYZtosRGB) Transform(l, a, b unit_float) (unit_float, unit_float, unit_float) {
+	return c.c.XYZToSRGB(l, a, b)
+}
+func (n XYZtosRGB) IOSig() (int, int)                    { return 3, 3 }
+func (n XYZtosRGB) String() string                       { return fmt.Sprintf("%T%s", n, n.c.String()) }
+func (n XYZtosRGB) Iter(f func(ChannelTransformer) bool) { f(n) }

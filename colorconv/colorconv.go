@@ -1,6 +1,7 @@
 package colorconv
 
 import (
+	"fmt"
 	"math"
 )
 
@@ -31,6 +32,10 @@ type ConvertColor struct {
 	// Precomputed combined matrix from XYZ(whitepoint) directly to linear sRGB (D65).
 	// Combined = srgbFromXYZ * adaptMatrix (where adaptMatrix adapts XYZ D50 -> XYZ D65).
 	combined_XYZ_to_linear_SRGB Mat3
+}
+
+func (c ConvertColor) String() string {
+	return fmt.Sprintf("{whitepoint:%v}", c.whitepoint)
 }
 
 func NewConvertColor(whitepoint_x, whitepoint_y, whitepoint_z float64) (ans *ConvertColor) {
@@ -294,4 +299,3 @@ func chromaticAdaptationMatrix(sourceWhite, targetWhite Vec3) Mat3 {
 	adapt := mulMat3(invBradford, tmp) // invB * (diag*B)
 	return adapt
 }
-
