@@ -161,7 +161,16 @@ func modularDecoder(raw []byte, _, output_colorspace ColorSpace) (ans any, err e
 	}
 	add_curves("M", mt.m_curves)
 	if mt.matrix != nil {
-		mt.transform_objects = append(mt.transform_objects, mt.matrix)
+		if mo, ok := mt.matrix.(*MatrixWithOffset); ok {
+			if _, ok := mo.m.(*IdentityMatrix); !ok {
+				mt.transform_objects = append(mt.transform_objects, mo.m)
+			}
+			if tt := mo.Translation(); tt != nil {
+				mt.transform_objects = append(mt.transform_objects, tt)
+			}
+		} else {
+			mt.transform_objects = append(mt.transform_objects, mt.matrix)
+		}
 	}
 	add_curves("B", mt.b_curves)
 	if !is_a_to_b {

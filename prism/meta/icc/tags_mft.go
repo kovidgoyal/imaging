@@ -23,7 +23,19 @@ func (c MFT) String() string {
 
 func (c *MFT) IOSig() (int, int) { return c.in_channels, c.out_channels }
 func (c *MFT) Iter(f func(ChannelTransformer) bool) {
-	if !f(c.matrix) {
+	if mo, ok := c.matrix.(*MatrixWithOffset); ok {
+		if _, ok := mo.m.(*IdentityMatrix); !ok {
+			if !f(mo.m) {
+				return
+			}
+		}
+		if tt := mo.Translation(); tt != nil {
+			if !f(tt) {
+				return
+			}
+		}
+
+	} else if !f(c.matrix) {
 		return
 	}
 	if !f(c.input_curve) {

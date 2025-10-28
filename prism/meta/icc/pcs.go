@@ -80,8 +80,19 @@ type BlackPointCorrection struct {
 	scale, offset XYZType
 }
 
-func (n BlackPointCorrection) IOSig() (int, int)                     { return 3, 3 }
-func (n *BlackPointCorrection) Iter(f func(ChannelTransformer) bool) { f(n) }
+func (n BlackPointCorrection) IOSig() (int, int) { return 3, 3 }
+func (n *BlackPointCorrection) Iter(f func(ChannelTransformer) bool) {
+	m := &Matrix3{{n.scale.X, 0, 0}, {0, n.scale.Y, 0}, {0, 0, n.scale.Z}}
+	if !is_identity_matrix(m) {
+		if !f(m) {
+			return
+		}
+	}
+	t := &Translation{n.offset.X, n.offset.Y, n.offset.Z}
+	if !t.Empty() {
+		f(t)
+	}
+}
 
 func NewBlackPointCorrection(in_whitepoint, in_blackpoint, out_blackpoint XYZType) *BlackPointCorrection {
 	tx := in_blackpoint.X - in_whitepoint.X
@@ -147,10 +158,16 @@ func (n *XYZtosRGB) AddPreviousMatrix(m Matrix3) {
 func (c XYZtosRGB) Transform(l, a, b unit_float) (unit_float, unit_float, unit_float) {
 	return c.t(l, a, b)
 }
-func (m XYZtosRGB) TransformGeneral(o, i []unit_float)   { tg33(m.Transform, o, i) }
-func (n XYZtosRGB) IOSig() (int, int)                    { return 3, 3 }
-func (n XYZtosRGB) String() string                       { return fmt.Sprintf("%T%s", n, n.c.String()) }
-func (n XYZtosRGB) Iter(f func(ChannelTransformer) bool) { f(n) }
+func (m XYZtosRGB) TransformGeneral(o, i []unit_float) { tg33(m.Transform, o, i) }
+func (n XYZtosRGB) IOSig() (int, int)                  { return 3, 3 }
+func (n XYZtosRGB) String() string                     { return fmt.Sprintf("%T%s", n, n.c.String()) }
+func (n XYZtosRGB) Iter(f func(ChannelTransformer) bool) {
+	m := Matrix3(n.c.Matrix())
+	if !f(&m) {
+		return
+	}
+	f(SRGBCurveInverseTransformer())
+}
 
 type LABtoXYZ struct {
 	c *colorconv.ConvertColor

@@ -637,3 +637,10 @@ var SRGBCurve = sync.OnceValue(func() *SplitCurve {
 	ans.Prepare()
 	return ans
 })
+
+var SRGBCurveTransformer = sync.OnceValue(func() Curves {
+	return NewCurveTransformer("sRGB curve", SRGBCurve(), SRGBCurve(), SRGBCurve())
+})
+var SRGBCurveInverseTransformer = sync.OnceValue(func() Curves {
+	return NewInverseCurveTransformer("TRC", SRGBCurve(), SRGBCurve(), SRGBCurve())
+})

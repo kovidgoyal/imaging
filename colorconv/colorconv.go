@@ -104,6 +104,10 @@ func (c *ConvertColor) XYZToLinearRGB(X, Y, Z float64) (r, g, b float64) {
 	return
 }
 
+func (c *ConvertColor) Matrix() Mat3 {
+	return c.combined_XYZ_to_linear_SRGB
+}
+
 // XYZToSRGBNoGamutMap converts XYZ expressed relative to the whitepoint directly to
 // gamma-corrected sRGB values (D65). The outputs are clamped to [0,1].
 // This function re-uses the precomputed combined matrix and the existing companding function.

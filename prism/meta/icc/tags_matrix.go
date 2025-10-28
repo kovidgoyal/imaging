@@ -6,6 +6,7 @@ import (
 	"math"
 )
 
+type Translation [3]unit_float
 type Matrix3 [3][3]unit_float
 type IdentityMatrix int
 
@@ -33,6 +34,10 @@ func is_identity_matrix(m *Matrix3) bool {
 	return true
 }
 
+func (c Translation) String() string                             { return fmt.Sprintf("Translation{%.6v}", [3]unit_float(c)) }
+func (c *Translation) IOSig() (int, int)                         { return 3, 3 }
+func (c *Translation) Empty() bool                               { return c[0] == 0 && c[1] == 0 && c[2] == 0 }
+func (c *Translation) Iter(f func(ChannelTransformer) bool)      { f(c) }
 func (c *IdentityMatrix) String() string                         { return "IdentityMatrix" }
 func (c *IdentityMatrix) IOSig() (int, int)                      { return 3, 3 }
 func (c *MatrixWithOffset) IOSig() (int, int)                    { return 3, 3 }
@@ -152,10 +157,23 @@ func (m *Matrix3) Inverted() (ans Matrix3, err error) {
 	return o, nil
 }
 
+func (m *Translation) Transform(r, g, b unit_float) (unit_float, unit_float, unit_float) {
+	return r + m[0], g + m[1], b + m[2]
+}
+
+func (m *Translation) TransformGeneral(o, i []unit_float) { tg33(m.Transform, o, i) }
+
 func (m IdentityMatrix) Transform(r, g, b unit_float) (unit_float, unit_float, unit_float) {
 	return r, g, b
 }
 func (m IdentityMatrix) TransformGeneral(o, i []unit_float) { tg33(m.Transform, o, i) }
+
+func (m *MatrixWithOffset) Translation() *Translation {
+	if m.offset1 == 0 && m.offset2 == 0 && m.offset3 == 0 {
+		return nil
+	}
+	return &Translation{m.offset1, m.offset2, m.offset3}
+}
 
 func (m *MatrixWithOffset) Transform(r, g, b unit_float) (unit_float, unit_float, unit_float) {
 	r, g, b = m.m.Transform(r, g, b)
