@@ -332,7 +332,8 @@ func (p *Profile) CreateDefaultTransformerToPCS(input_channels int) (*Pipeline, 
 
 func newProfile() *Profile {
 	return &Profile{
-		TagTable: emptyTagTable(),
+		TagTable:    emptyTagTable(),
+		blackpoints: make(map[RenderingIntent]*XYZType),
 	}
 }
 

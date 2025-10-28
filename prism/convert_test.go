@@ -55,6 +55,10 @@ func test_profile(t *testing.T, name string, profile_data []byte, tolerance floa
 		require.NoError(t, err)
 		input_channels := icc.IfElse(p.Header.DataColorSpace == icc.ColorSpaceCMYK, 4, 3)
 		lcms, err := CreateCMSProfile(profile_data)
+		actual_bp := p.BlackPoint(p.Header.RenderingIntent)
+		expected_bp, ok := lcms.DetectBlackPoint(p.Header.RenderingIntent)
+		require.True(t, ok)
+		require.Equal(t, expected_bp, actual_bp)
 		require.NoError(t, err)
 		tr, err := p.CreateDefaultTransformerToPCS(input_channels)
 		require.NoError(t, err)
@@ -85,11 +89,6 @@ func test_profile(t *testing.T, name string, profile_data []byte, tolerance floa
 		require.NoError(t, err)
 		require.InDeltaSlice(t, expected, actual, tolerance)
 	})
-}
-
-func debug_transform(r, g, b, x, y, z float64, t icc.ChannelTransformer) {
-	fmt.Printf("Transform: %s\n", t)
-	fmt.Printf("  %v → %v\n", []float64{r, g, b}, []float64{x, y, z})
 }
 
 func TestDevelop(t *testing.T) {
