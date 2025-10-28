@@ -308,9 +308,6 @@ func (p *Profile) CreateTransformerToSRGB(rendering_intent RenderingIntent, inpu
 	switch input_colorspace {
 	case ColorSpaceXYZ:
 		t := NewXYZtosRGB(p.PCSIlluminant)
-		if m := ans.RemoveLastMatrix3(); m != nil {
-			t.AddPreviousMatrix(*m)
-		}
 		ans.Append(t)
 	case ColorSpaceLab:
 		ans.Append(NewLABtosRGB(p.PCSIlluminant))

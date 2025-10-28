@@ -90,18 +90,6 @@ func (p *Pipeline) Append(c ...ChannelTransformer) {
 	}
 }
 
-func (p *Pipeline) RemoveLastMatrix3() (ans *Matrix3) {
-	if len(p.transformers) > 0 {
-		t := p.transformers[len(p.transformers)-1]
-		if m, ok := t.(*Matrix3); ok {
-			p.transformers = p.transformers[:len(p.transformers)-1]
-			p.tfuncs = p.tfuncs[:len(p.tfuncs)-1]
-			return m
-		}
-	}
-	return
-}
-
 func (p *Pipeline) Transform(r, g, b unit_float) (unit_float, unit_float, unit_float) {
 	for _, t := range p.tfuncs {
 		r, g, b = t(r, g, b)
