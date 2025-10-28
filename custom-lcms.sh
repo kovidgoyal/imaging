@@ -5,10 +5,14 @@
 #
 # Distributed under terms of the MIT license.
 #
+dist=`pwd`/lcms/dist
+libdir="$dist/lib"
 cd lcms
-dist=`pwd`/dist
 if [[ ! -d "$dist" ]]; then
     ./configure --prefix="$dist" || exit 1
 fi
-make -j8 && make install && cd - && \
-    LD_LIBRARY_PATH=`pwd`/lcms/dist go test -tags lcms2cgo -run Develop -v ./prism
+echo "Building lcms..." && \
+    make -j8 >/dev/null&& make install >/dev/null&& cd .. && \
+    echo "lcms in -- $libdir" && \
+    CGO_LDFLAGS="-L$libdir" go test -tags lcms2cgo -run Develop -v -c ./prism && \
+    LD_LIBRARY_PATH="$libdir" exec ./prism.test -test.run Develop
