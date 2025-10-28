@@ -160,8 +160,11 @@ func test_profile(t *testing.T, name string, tolerance float64) {
 }
 
 func TestAgainstLCMS2(t *testing.T) {
+	// simplest case: matrix/trc profile
 	test_profile(t, srgb_xyz_profile_name, icc.FLOAT_EQUALITY_THRESHOLD)
+	// LutAtoBType profile with PCS=XYZ
 	// test_profile(t, "jpegli.icc", icc.FLOAT_EQUALITY_THRESHOLD)
+	// LutAtoBType profile with PCS=LAB
 	// test_profile(t, srgb_lab_profile_name, 0.0005)
 }
 
