@@ -133,6 +133,6 @@ func TestDevelop(t *testing.T) {
 }
 
 func TestAgainstLCMS2(t *testing.T) {
-	test_profile(t, "srgb_lab", icc.Srgb_lab_profile_data, 0.0022, 0.3)
+	test_profile(t, "srgb_lab", icc.Srgb_lab_profile_data, 0.0005, 0.3)
 	test_profile(t, "srgb_xyz", icc.Srgb_xyz_profile_data, icc.FLOAT_EQUALITY_THRESHOLD, icc.FLOAT_EQUALITY_THRESHOLD)
 }
