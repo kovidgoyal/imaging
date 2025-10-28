@@ -498,11 +498,16 @@ func get_interval(lookup []unit_float, y unit_float) int {
 	return -1
 }
 
-func (c *ConditionalZeroCurve) Prepare() error {
-	if c.a == 0 || c.g == 0 {
-		return fmt.Errorf("conditional zero curve as zero parameter value: a=%f or g=%f", c.a, c.g)
+func safe_inverse(x, fallback unit_float) unit_float {
+	if x == 0 {
+		return fallback
 	}
-	c.threshold, c.inv_gamma, c.inv_a = -c.b/c.a, 1/c.g, 1/c.a
+	return 1 / x
+}
+
+func (c *ConditionalZeroCurve) Prepare() error {
+	c.inv_a = safe_inverse(c.a, 1)
+	c.threshold, c.inv_gamma = -c.b*c.inv_a, safe_inverse(c.g, 0)
 	return nil
 }
 
@@ -527,10 +532,8 @@ func (c *ConditionalZeroCurve) InverseTransform(y unit_float) unit_float {
 }
 
 func (c *ConditionalCCurve) Prepare() error {
-	if c.a == 0 || c.g == 0 {
-		return fmt.Errorf("conditional C curve as zero parameter value: a=%f or g=%f", c.a, c.g)
-	}
-	c.threshold, c.inv_gamma, c.inv_a = -c.b/c.a, 1/c.g, 1/c.a
+	c.inv_a = safe_inverse(c.a, 1)
+	c.threshold, c.inv_gamma = -c.b*c.inv_a, safe_inverse(c.g, 0)
 	return nil
 }
 
@@ -561,10 +564,7 @@ func (c *ConditionalCCurve) InverseTransform(y unit_float) unit_float {
 }
 
 func (c *SplitCurve) Prepare() error {
-	if c.a == 0 || c.g == 0 || c.c == 0 {
-		return fmt.Errorf("conditional C curve as zero parameter value: a=%f or g=%f or c=%f", c.a, c.g, c.c)
-	}
-	c.threshold, c.inv_g, c.inv_a, c.inv_c = pow(c.a*c.d+c.b, c.g), 1/c.g, 1/c.a, 1/c.c
+	c.threshold, c.inv_g, c.inv_a, c.inv_c = pow(c.a*c.d+c.b, c.g), safe_inverse(c.g, 0), safe_inverse(c.a, 1), safe_inverse(c.c, 1)
 	return nil
 }
 
@@ -601,10 +601,7 @@ func (c *SplitCurve) InverseTransform(y unit_float) unit_float {
 }
 
 func (c *ComplexCurve) Prepare() error {
-	if c.a == 0 || c.g == 0 || c.c == 0 {
-		return fmt.Errorf("conditional C curve as zero parameter value: a=%f or g=%f or c=%f", c.a, c.g, c.c)
-	}
-	c.threshold, c.inv_g, c.inv_a, c.inv_c = pow(c.a*c.d+c.b, c.g)+c.e, 1/c.g, 1/c.a, 1/c.c
+	c.threshold, c.inv_g, c.inv_a, c.inv_c = pow(c.a*c.d+c.b, c.g)+c.e, safe_inverse(c.g, 0), safe_inverse(c.a, 1), safe_inverse(c.c, 1)
 	return nil
 }
 

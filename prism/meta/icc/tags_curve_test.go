@@ -107,6 +107,7 @@ func TestCurveDecoder(t *testing.T) {
 
 func TestParametricCurveDecoder(t *testing.T) {
 	w := func(t *testing.T, q uint16, expect_error bool, params ...unit_float) any {
+		t.Helper()
 		val, err := parametricCurveDecoder(para_bytes(q, params...))
 		if expect_error {
 			require.Error(t, err)
@@ -123,7 +124,7 @@ func TestParametricCurveDecoder(t *testing.T) {
 		in_delta(t, 1.2, p.gamma, 0.0001)
 	})
 	t.Run("ConditionalZeroCurve", func(t *testing.T) {
-		w(t, 1, true, 3, 0, 7)
+		w(t, 1, false, 3, 0, 7)
 		val := w(t, 1, false, 3, 1, 2)
 		require.IsType(t, &ConditionalZeroCurve{}, val)
 		p := val.(*ConditionalZeroCurve)
@@ -132,7 +133,7 @@ func TestParametricCurveDecoder(t *testing.T) {
 		in_delta(t, 2.0, p.b, 0.0001)
 	})
 	t.Run("ConditionalCCurve", func(t *testing.T) {
-		w(t, 2, true, 3, 0, 1, 2, 3)
+		w(t, 2, false, 3, 0, 1, 2, 3)
 		val := w(t, 2, false, 7, 1, 2, 3, 4)
 		require.IsType(t, &ConditionalCCurve{}, val)
 		p := val.(*ConditionalCCurve)
