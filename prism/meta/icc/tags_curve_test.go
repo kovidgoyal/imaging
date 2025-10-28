@@ -2,14 +2,24 @@ package icc
 
 import (
 	"bytes"
+	_ "embed"
 	"encoding/binary"
 	"fmt"
 	"math"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+//go:embed test-profiles/sRGB2014.icc
+var Srgb_xyz_profile_data []byte
+
+var Srgb_xyz_profile = sync.OnceValue(func() *Profile {
+	p, _ := DecodeProfile(bytes.NewReader(Srgb_xyz_profile_data))
+	return p
+})
 
 func floatToFixed88(f unit_float) uint16 {
 	// Clamp the value to fit in 8.8 range

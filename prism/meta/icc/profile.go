@@ -2,8 +2,9 @@ package icc
 
 import (
 	"bytes"
-	_ "embed"
 	"fmt"
+	"io"
+	"os"
 	"sync"
 )
 
@@ -18,22 +19,6 @@ const (
 	PhotoProProfile
 	DisplayP3Profile
 )
-
-//go:embed test-profiles/sRGB2014.icc
-var Srgb_xyz_profile_data []byte
-
-//go:embed test-profiles/sRGB_ICC_v4_Appearance.icc
-var Srgb_lab_profile_data []byte
-
-var Srgb_xyz_profile = sync.OnceValue(func() *Profile {
-	p, _ := NewProfileReader(bytes.NewReader(Srgb_xyz_profile_data)).ReadProfile()
-	return p
-})
-
-var Srgb_lab_profile = sync.OnceValue(func() *Profile {
-	p, _ := NewProfileReader(bytes.NewReader(Srgb_lab_profile_data)).ReadProfile()
-	return p
-})
 
 func WellKnownProfileFromDescription(x string) WellKnownProfile {
 	switch x {
@@ -383,3 +368,15 @@ var Points_for_transformer_comparison3 = sync.OnceValue(func() []unit_float {
 var Points_for_transformer_comparison4 = sync.OnceValue(func() []unit_float {
 	return points_for_transformer_comparison(4, 16)
 })
+
+func DecodeProfile(r io.Reader) (ans *Profile, err error) {
+	return NewProfileReader(r).ReadProfile()
+}
+
+func ReadProfile(path string) (ans *Profile, err error) {
+	data, err := os.ReadFile(path)
+	if err == nil {
+		ans, err = NewProfileReader(bytes.NewReader(data)).ReadProfile()
+	}
+	return
+}
