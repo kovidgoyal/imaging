@@ -48,6 +48,13 @@ func TestCGOConversion(t *testing.T) {
 	}
 }
 
+func in_delta_rgb(t *testing.T, desc string, expected, actual []float64, tolerance float64) {
+	t.Helper()
+	for i := range len(actual) / 3 {
+		require.InDeltaSlice(t, expected[:3], actual[:3], tolerance, fmt.Sprintf("%s: the %dth pixel does not match. Want %v got %v", desc, i, expected[:3], actual[:3]))
+	}
+}
+
 func test_profile(t *testing.T, name string, profile_data []byte, tolerance float64, inverse_tolerance float64) {
 	t.Run(name, func(t *testing.T) {
 		t.Parallel()
@@ -64,30 +71,49 @@ func test_profile(t *testing.T, name string, profile_data []byte, tolerance floa
 		require.NoError(t, err)
 		inv, err := p.CreateDefaultTransformerToDevice()
 		require.NoError(t, err)
-		pts := icc.Points_for_transformer_comparison3()
-		actual := make([]float64, 0, len(pts)*3)
-		pos := pts
-		for range len(pts) / input_channels {
-			if input_channels == 3 {
+		var pts []float64
+		if input_channels == 3 {
+			pts = icc.Points_for_transformer_comparison3()
+		} else {
+			pts = icc.Points_for_transformer_comparison4()
+		}
+		num_pixels := len(pts) / input_channels
+		actual := make([]float64, 0, len(pts))
+		if input_channels == 3 {
+			pos := pts
+			for range num_pixels {
 				sl := pos[0:3:3]
 				r, g, b := tr.Transform(sl[0], sl[1], sl[2])
 				actual = append(actual, r, g, b)
 				r, g, b = inv.Transform(r, g, b)
-				require.InDeltaSlice(t, sl, []float64{r, g, b}, inverse_tolerance,
-					fmt.Sprintf("b2a of a2b result for %v differs from original color: got %v want %v", sl, []float64{r, g, b}, sl))
-			} else {
-				panic("TODO: implement me")
+				in_delta_rgb(t, "a2b + b2a roundtrip", sl, []float64{r, g, b}, inverse_tolerance)
+				pos = pos[input_channels:]
 			}
-			pos = pos[input_channels:]
-		}
-		var expected []float64
-		if input_channels == 3 {
-			expected, err = lcms.TransformFloatToPCS(pts, p.Header.RenderingIntent)
 		} else {
-			panic("TODO: implement me")
+			actual = actual[:3*num_pixels]
+			tr.TransformGeneral(actual, pts)
 		}
+		expected, err := lcms.TransformFloatToPCS(pts, p.Header.RenderingIntent)
 		require.NoError(t, err)
-		require.InDeltaSlice(t, expected, actual, tolerance)
+		in_delta_rgb(t, "to pcs", expected, actual, tolerance)
+		tr, err = p.CreateTransformerToSRGB(p.Header.RenderingIntent, input_channels)
+		require.NoError(t, err)
+		expected, err = lcms.TransformFloatToSRGB(pts, p.Header.RenderingIntent)
+		require.NoError(t, err)
+		if input_channels == 3 {
+			actual := actual[:0]
+			pos := pts
+			for range num_pixels {
+				sl := pos[0:3:3]
+				r, g, b := tr.Transform(sl[0], sl[1], sl[2])
+				actual = append(actual, r, g, b)
+				pos = pos[3:]
+			}
+		} else {
+			actual = actual[:3*num_pixels]
+			tr.TransformGeneral(actual, pts)
+		}
+		in_delta_rgb(t, "to sRGB", expected, actual, tolerance)
 	})
 }
 

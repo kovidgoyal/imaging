@@ -82,6 +82,8 @@ func format_for_float(s icc.Signature) (ans C.cmsUInt32Number, err error) {
 		ans = C.TYPE_GRAY_DBL
 	case icc.RGBSignature:
 		ans = C.TYPE_RGB_DBL
+	case icc.CMYKSignature:
+		ans = C.TYPE_CMYK_DBL
 	default:
 		err = fmt.Errorf("unknown format: %s", s)
 	}
@@ -183,9 +185,6 @@ func (p *CMSProfile) TransformFloatToPCS(data []float64, intent icc.RenderingInt
 	if len(data) == 0 {
 		return nil, nil
 	}
-	if len(data)%3 != 0 {
-		return nil, fmt.Errorf("pixel data must be a multiple of 3")
-	}
 	var t C.cmsHTRANSFORM
 	if err = p.call_func_with_error_handling(func() string {
 		if t = C.cmsCreateTransformTHR(p.ctx, p.p, C.TYPE_RGB_DBL, nil, p.pcs_output_format, C.cmsUInt32Number(intent), 0); t == nil {
@@ -223,6 +222,29 @@ func (p *CMSProfile) TransformFloatToDevice(data []float64, intent icc.Rendering
 	var t C.cmsHTRANSFORM
 	if err = p.call_func_with_error_handling(func() string {
 		if t = C.cmsCreateTransformTHR(p.ctx, pcs, p.pcs_output_format, p.p, p.device_float_format, C.cmsUInt32Number(intent), 0); t == nil {
+			return "failed to create transform"
+		}
+		return ""
+	}); err != nil {
+		return
+	}
+	defer C.cmsDeleteTransform(t)
+	ans = make([]float64, len(data))
+	C.cmsDoTransform(t, unsafe.Pointer(&data[0]), unsafe.Pointer(&ans[0]), C.cmsUInt32Number(len(data)/3))
+	return
+}
+
+func (p *CMSProfile) TransformFloatToSRGB(data []float64, intent icc.RenderingIntent) (ans []float64, err error) {
+	if len(data) == 0 {
+		return nil, nil
+	}
+	var output_profile C.cmsHPROFILE = C.cmsCreate_sRGBProfile()
+	defer func() {
+		C.cmsCloseProfile(output_profile)
+	}()
+	var t C.cmsHTRANSFORM
+	if err = p.call_func_with_error_handling(func() string {
+		if t = C.cmsCreateTransformTHR(p.ctx, p.p, p.device_float_format, output_profile, C.TYPE_RGB_DBL, C.cmsUInt32Number(intent), 0); t == nil {
 			return "failed to create transform"
 		}
 		return ""
