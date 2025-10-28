@@ -232,6 +232,9 @@ func (p *Profile) CreateTransformerToDevice(rendering_intent RenderingIntent) (a
 		}
 	}()
 	ans = &Pipeline{}
+	if p.Header.ProfileConnectionSpace == ColorSpaceXYZ {
+		ans.Append(NewICCtoXYZ())
+	}
 
 	const forward = false
 	b2a, err := p.find_conversion_tag(forward, rendering_intent)
@@ -258,6 +261,12 @@ func (p *Profile) CreateTransformerToPCS(rendering_intent RenderingIntent, input
 	defer func() {
 		if err == nil && !ans.IsSuitableFor(input_channels, 3) {
 			err = fmt.Errorf("transformer to PCS %s not suitable for %d input channels", ans.String(), input_channels)
+		}
+
+		if err == nil {
+			if p.Header.ProfileConnectionSpace == ColorSpaceXYZ {
+				ans.Append(NewXYZtoICC())
+			}
 		}
 	}()
 	ans = &Pipeline{}
@@ -286,9 +295,9 @@ func (p *Profile) CreateTransformerToSRGB(rendering_intent RenderingIntent, inpu
 	if ans, err = p.CreateTransformerToPCS(rendering_intent, input_channels); err != nil {
 		return
 	}
+	input_colorspace := p.Header.ProfileConnectionSpace
 	var sRGB_blackpoint XYZType // 0, 0, 0
 	input_blackpoint := p.BlackPoint(rendering_intent)
-	input_colorspace := p.Header.ProfileConnectionSpace
 	if input_blackpoint != sRGB_blackpoint {
 		if input_colorspace == ColorSpaceLab {
 			ans.Append(NewLABtoXYZ(p.PCSIlluminant))
@@ -298,7 +307,11 @@ func (p *Profile) CreateTransformerToSRGB(rendering_intent RenderingIntent, inpu
 	}
 	switch input_colorspace {
 	case ColorSpaceXYZ:
-		ans.Append(NewXYZtosRGB(p.PCSIlluminant))
+		t := NewXYZtosRGB(p.PCSIlluminant)
+		if m := ans.RemoveLastMatrix3(); m != nil {
+			t.AddPreviousMatrix(*m)
+		}
+		ans.Append(t)
 	case ColorSpaceLab:
 		ans.Append(NewLABtosRGB(p.PCSIlluminant))
 	default:

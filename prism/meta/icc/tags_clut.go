@@ -37,7 +37,7 @@ var _ CLUT = (*CLUT3D)(nil)
 
 func default8(x uint8) unit_float         { return unit_float(x) / math.MaxUint8 }
 func default16(x uint16) unit_float       { return unit_float(x) / math.MaxUint16 }
-func u1Fixed15Number(x uint16) unit_float { return unit_float(x) / unit_float(1<<15) }
+func u1Fixed15Number(x uint16) unit_float { return unit_float(x) / (1 << 15) }
 func lab_l8(x uint8) unit_float           { return (unit_float(x) / math.MaxUint8) * 100 }
 func lab_ab8(x uint8) unit_float          { return (unit_float(x)/math.MaxUint8)*(127+128) - 128 }
 func lab_l16(x uint16) unit_float         { return (unit_float(x) / math.MaxUint16) * 100 }
@@ -92,23 +92,19 @@ func decode_clut_table8(raw []byte, OutputChannels int, output_colorspace ColorS
 
 }
 
-func decode_clut_table16(raw []byte, OutputChannels int, output_colorspace ColorSpace, legacy bool, ans []unit_float) {
+func decode_clut_table16(raw []byte, output_colorspace ColorSpace, legacy bool, ans []unit_float) {
 	var d clut_decoder_func16
 	switch output_colorspace {
 	case ColorSpaceXYZ:
-		d = uniform_decoder16(u1Fixed15Number)
+		d = uniform_decoder16(default16)
 	case ColorSpaceLab:
 		d = IfElse(legacy, lab_decoder16_legacy, lab_decoder16)
 	default:
 		d = uniform_decoder16(default16)
 	}
-	temp := make([]uint16, OutputChannels)
-	for range len(ans) / OutputChannels {
-		n, _ := binary.Decode(raw, binary.BigEndian, temp)
-		d(temp, ans)
-		raw = raw[n:]
-		ans = ans[OutputChannels:]
-	}
+	temp := make([]uint16, len(ans))
+	_, _ = binary.Decode(raw, binary.BigEndian, temp)
+	d(temp, ans)
 }
 
 func decode_clut_table(raw []byte, bytes_per_channel, OutputChannels int, grid_points []int, output_colorspace ColorSpace, legacy bool) (ans []unit_float, consumed int, err error) {
@@ -129,7 +125,7 @@ func decode_clut_table(raw []byte, bytes_per_channel, OutputChannels int, grid_p
 	if bytes_per_channel == 1 {
 		decode_clut_table8(raw[:consumed], OutputChannels, output_colorspace, ans)
 	} else {
-		decode_clut_table16(raw[:consumed], OutputChannels, output_colorspace, legacy, ans)
+		decode_clut_table16(raw[:consumed], output_colorspace, legacy, ans)
 	}
 	return
 }

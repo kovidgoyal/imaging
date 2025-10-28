@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
+	"math"
 	"reflect"
 	"strings"
 	"testing"
@@ -47,10 +48,6 @@ func in_delta_slice(t *testing.T, expected, actual any, delta float64, msgAndArg
 	return true
 }
 
-func u1Fixed15NumberEncode(x unit_float) uint16 {
-	return uint16(x * (1 << 15))
-}
-
 func encode_clut16bit() []byte {
 	var buf bytes.Buffer
 	buf.Write([]byte{2, 2, 2})             // grid points for each input (2×2×2)
@@ -59,7 +56,7 @@ func encode_clut16bit() []byte {
 	// 2x2x2 = 8 grid points, 3 outputs per point = 24 outputs
 	for i := range 8 * 3 {
 		val := unit_float(i) / unit_float(8*3-1)
-		_ = binary.Write(&buf, binary.BigEndian, u1Fixed15NumberEncode(val))
+		_ = binary.Write(&buf, binary.BigEndian, uint16(val*math.MaxUint16))
 	}
 	if extra := buf.Len() % 4; extra > 0 {
 		buf.WriteString(strings.Repeat("\x00", 4-extra))

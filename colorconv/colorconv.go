@@ -23,6 +23,10 @@ import (
 type Vec3 [3]float64
 type Mat3 [3][3]float64
 
+func (m *Mat3) String() string {
+	return fmt.Sprintf("Matrix3{ %v %v %v }", m[0], m[1], m[2])
+}
+
 // Standard reference whites (CIE XYZ) normalized so Y = 1.0
 // Note that WhiteD50 uses Z value from ICC spec rather that CIE spec.
 var WhiteD50 = Vec3{0.96422, 1.00000, 0.82491}
@@ -35,25 +39,30 @@ type ConvertColor struct {
 }
 
 func (c ConvertColor) String() string {
-	return fmt.Sprintf("{whitepoint:%v}", c.whitepoint)
+	return fmt.Sprintf("{whitepoint:%v matrix:%v}", c.whitepoint, c.combined_XYZ_to_linear_SRGB)
 }
 
-func NewConvertColor(whitepoint_x, whitepoint_y, whitepoint_z float64) (ans *ConvertColor) {
+func (cc *ConvertColor) AddPreviousMatrix(a, b, c [3]float64) {
+	prev := Mat3{a, b, c}
+	cc.combined_XYZ_to_linear_SRGB = mulMat3(cc.combined_XYZ_to_linear_SRGB, prev)
+}
+
+func NewConvertColor(whitepoint_x, whitepoint_y, whitepoint_z, scale float64) (ans *ConvertColor) {
 	var whiteD65 = Vec3{0.95047, 1.00000, 1.08883}
 	ans = &ConvertColor{whitepoint: Vec3{whitepoint_x, whitepoint_y, whitepoint_z}}
 	adapt := chromaticAdaptationMatrix(ans.whitepoint, whiteD65)
 	// sRGB (linear) transform matrix from CIE XYZ (D65)
 	var srgbFromXYZ = Mat3{
-		{3.2406, -1.5372, -0.4986},
-		{-0.9689, 1.8758, 0.0415},
-		{0.0557, -0.2040, 1.0570},
+		{3.2406 * scale, -1.5372 * scale, -0.4986 * scale},
+		{-0.9689 * scale, 1.8758 * scale, 0.0415 * scale},
+		{0.0557 * scale, -0.2040 * scale, 1.0570 * scale},
 	}
 	ans.combined_XYZ_to_linear_SRGB = mulMat3(srgbFromXYZ, adapt)
 	return
 }
 
 func NewStandardConvertColor() (ans *ConvertColor) {
-	return NewConvertColor(WhiteD50[0], WhiteD50[1], WhiteD50[2])
+	return NewConvertColor(WhiteD50[0], WhiteD50[1], WhiteD50[2], 1)
 }
 
 // LabToSRGB converts a Lab color (at the specified whitepoint) into sRGB (D65) with gamut mapping.

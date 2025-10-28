@@ -15,7 +15,7 @@ type MatrixWithOffset struct {
 }
 
 func (m MatrixWithOffset) String() string {
-	return fmt.Sprintf("MatrixWithOffset{ %v %v }", m.m, []unit_float{m.offset1, m.offset2, m.offset3})
+	return fmt.Sprintf("MatrixWithOffset{ %.6v %.6v }", m.m, []unit_float{m.offset1, m.offset2, m.offset3})
 }
 
 func is_identity_matrix(m *Matrix3) bool {
@@ -96,7 +96,7 @@ func Dot(v1, v2 [3]unit_float) unit_float {
 }
 
 func (m *Matrix3) String() string {
-	return fmt.Sprintf("Matrix3{ %v, %v, %v }", m[0], m[1], m[2])
+	return fmt.Sprintf("Matrix3{ %.6v, %.6v, %.6v }", m[0], m[1], m[2])
 }
 
 // Return m * o

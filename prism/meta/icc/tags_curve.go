@@ -279,7 +279,7 @@ func curveDecoder(raw []byte) (any, error) {
 func readS15Fixed16BE(raw []byte) unit_float {
 	msb := int16(raw[0])<<8 | int16(raw[1])
 	lsb := uint16(raw[2])<<8 | uint16(raw[3])
-	return unit_float(msb) + unit_float(lsb)/65536
+	return unit_float(msb) + unit_float(lsb)/(1<<16)
 }
 
 func embeddedParametricCurveDecoder(raw []byte) (ans any, consumed int, err error) {

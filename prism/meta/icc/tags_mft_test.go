@@ -52,7 +52,6 @@ func (m *MFT) as_bytes() []byte {
 		panic(fmt.Sprintf("unknown type of matrix: %T", m))
 	}
 	var writeval func(unit_float)
-	var writeclutval func(unit_float)
 	if m.is8bit {
 		writeval = func(x unit_float) { buf.WriteByte(uint8(x * 255)) }
 		for _, c := range m.input_curve.Curves() {
@@ -65,11 +64,9 @@ func (m *MFT) as_bytes() []byte {
 				panic("mft1 must have curves of length 256")
 			}
 		}
-		writeclutval = writeval
 	} else {
 		binary.Write(&buf, binary.BigEndian, []uint16{uint16(curve_len(m.input_curve.Curves()[0])), uint16(curve_len(m.output_curve.Curves()[0]))})
 		writeval = func(x unit_float) { binary.Write(&buf, binary.BigEndian, uint16(x*65535)) }
-		writeclutval = func(x unit_float) { binary.Write(&buf, binary.BigEndian, uint16(x*(1<<15))) }
 	}
 	for _, curve := range m.input_curve.Curves() {
 		for _, x := range curve_points(curve) {
@@ -77,7 +74,7 @@ func (m *MFT) as_bytes() []byte {
 		}
 	}
 	for _, x := range m.clut.Samples() {
-		writeclutval(x)
+		writeval(x)
 	}
 	for _, curve := range m.output_curve.Curves() {
 		for _, x := range curve_points(curve) {

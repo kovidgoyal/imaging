@@ -146,7 +146,7 @@ func (p *CMSProfile) TransformRGB8(data []uint8, output_profile *CMSProfile, int
 	}
 	var t C.cmsHTRANSFORM
 	if err = p.call_func_with_error_handling(func() string {
-		if t = C.cmsCreateTransformTHR(p.ctx, p.p, C.TYPE_RGB_8, output_profile.p, output_profile.device8bit_format, C.cmsUInt32Number(intent), 0); t == nil {
+		if t = C.cmsCreateTransformTHR(p.ctx, p.p, C.TYPE_RGB_8, output_profile.p, output_profile.device8bit_format, C.cmsUInt32Number(intent), C.cmsFLAGS_NOOPTIMIZE); t == nil {
 			return "failed to create transform"
 		}
 		return ""
@@ -168,7 +168,7 @@ func (p *CMSProfile) TransformRGB8bitToPCS(data []uint8, intent icc.RenderingInt
 	}
 	var t C.cmsHTRANSFORM
 	if err = p.call_func_with_error_handling(func() string {
-		if t = C.cmsCreateTransformTHR(p.ctx, p.p, C.TYPE_RGB_8, nil, p.pcs_output_format, C.cmsUInt32Number(intent), 0); t == nil {
+		if t = C.cmsCreateTransformTHR(p.ctx, p.p, C.TYPE_RGB_8, nil, p.pcs_output_format, C.cmsUInt32Number(intent), C.cmsFLAGS_NOOPTIMIZE); t == nil {
 			return "failed to create transform"
 		}
 		return ""
@@ -187,7 +187,7 @@ func (p *CMSProfile) TransformFloatToPCS(data []float64, intent icc.RenderingInt
 	}
 	var t C.cmsHTRANSFORM
 	if err = p.call_func_with_error_handling(func() string {
-		if t = C.cmsCreateTransformTHR(p.ctx, p.p, C.TYPE_RGB_DBL, nil, p.pcs_output_format, C.cmsUInt32Number(intent), 0); t == nil {
+		if t = C.cmsCreateTransformTHR(p.ctx, p.p, C.TYPE_RGB_DBL, nil, p.pcs_output_format, C.cmsUInt32Number(intent), C.cmsFLAGS_NOOPTIMIZE); t == nil {
 			return "failed to create transform"
 		}
 		return ""
@@ -221,7 +221,7 @@ func (p *CMSProfile) TransformFloatToDevice(data []float64, intent icc.Rendering
 	}()
 	var t C.cmsHTRANSFORM
 	if err = p.call_func_with_error_handling(func() string {
-		if t = C.cmsCreateTransformTHR(p.ctx, pcs, p.pcs_output_format, p.p, p.device_float_format, C.cmsUInt32Number(intent), 0); t == nil {
+		if t = C.cmsCreateTransformTHR(p.ctx, pcs, p.pcs_output_format, p.p, p.device_float_format, C.cmsUInt32Number(intent), C.cmsFLAGS_NOOPTIMIZE); t == nil {
 			return "failed to create transform"
 		}
 		return ""
@@ -244,7 +244,7 @@ func (p *CMSProfile) TransformFloatToSRGB(data []float64, intent icc.RenderingIn
 	}()
 	var t C.cmsHTRANSFORM
 	if err = p.call_func_with_error_handling(func() string {
-		if t = C.cmsCreateTransformTHR(p.ctx, p.p, p.device_float_format, output_profile, C.TYPE_RGB_DBL, C.cmsUInt32Number(intent), 0); t == nil {
+		if t = C.cmsCreateTransformTHR(p.ctx, p.p, p.device_float_format, output_profile, C.TYPE_RGB_DBL, C.cmsUInt32Number(intent), C.cmsFLAGS_NOOPTIMIZE); t == nil {
 			return "failed to create transform"
 		}
 		return ""
