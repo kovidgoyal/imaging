@@ -14,6 +14,10 @@ type Pipeline struct {
 	tfuncs       []func(r, g, b unit_float) (unit_float, unit_float, unit_float)
 }
 
+type AsMatrix3 interface {
+	AsMatrix3() *Matrix3
+}
+
 // check for interface being nil or the dynamic value it points to being nil
 func is_nil(i any) bool {
 	if i == nil {
@@ -44,9 +48,11 @@ func (p *Pipeline) insert(idx int, c ChannelTransformer) {
 		panic(fmt.Sprintf("cannot insert at idx: %d in pipeline of length: %d", idx, len(p.transformers)))
 	}
 	prepend := idx > -1
-	if cm, ok := c.(*Matrix3); ok {
+	if cmm, ok := c.(AsMatrix3); ok {
 		q := p.transformers[IfElse(prepend, idx, len(p.transformers)-1)]
-		if mat, ok := q.(*Matrix3); ok {
+		if cmat, ok := q.(AsMatrix3); ok {
+			mat := cmat.AsMatrix3()
+			cm := cmm.AsMatrix3()
 			var combined Matrix3
 			if prepend {
 				combined = mat.Multiply(*cm)

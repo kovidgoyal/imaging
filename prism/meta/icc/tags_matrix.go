@@ -99,6 +99,12 @@ func (m *Matrix3) String() string {
 	return fmt.Sprintf("Matrix3{ %.6v, %.6v, %.6v }", m[0], m[1], m[2])
 }
 
+func (m *Matrix3) AsMatrix3() *Matrix3 { return m }
+func NewScalingMatrix3(scale unit_float) *Matrix3 {
+	return &Matrix3{{scale, 0, 0}, {0, scale, 0}, {0, 0, scale}}
+}
+func (m *IdentityMatrix) AsMatrix3() *Matrix3 { return NewScalingMatrix3(1) }
+
 // Return m * o
 func (m *Matrix3) Multiply(o Matrix3) Matrix3 {
 	t := o.Transpose()

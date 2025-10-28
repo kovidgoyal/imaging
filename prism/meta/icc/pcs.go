@@ -50,6 +50,7 @@ func (n *XYZtoICC) Iter(f func(ChannelTransformer) bool) { f(n) }
 func (m *XYZtoICC) Transform(x, y, z unit_float) (unit_float, unit_float, unit_float) {
 	return x * MAX_ENCODEABLE_XYZ, y * MAX_ENCODEABLE_XYZ, z * MAX_ENCODEABLE_XYZ
 }
+func (m *XYZtoICC) AsMatrix3() *Matrix3 { return NewScalingMatrix3(MAX_ENCODEABLE_XYZ) }
 
 func (m *XYZtoICC) TransformGeneral(o, i []unit_float) { tg33(m.Transform, o, i) }
 
@@ -66,6 +67,7 @@ func (n *ICCtoXYZ) Iter(f func(ChannelTransformer) bool) { f(n) }
 func (m *ICCtoXYZ) Transform(x, y, z unit_float) (unit_float, unit_float, unit_float) {
 	return x * MAX_ENCODEABLE_XYZ_INVERSE, y * MAX_ENCODEABLE_XYZ_INVERSE, z * MAX_ENCODEABLE_XYZ_INVERSE
 }
+func (m *ICCtoXYZ) AsMatrix3() *Matrix3 { return NewScalingMatrix3(MAX_ENCODEABLE_XYZ_INVERSE) }
 
 func (m *ICCtoXYZ) TransformGeneral(o, i []unit_float) { tg33(m.Transform, o, i) }
 
