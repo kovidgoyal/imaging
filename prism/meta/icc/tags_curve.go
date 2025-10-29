@@ -568,9 +568,11 @@ func (c *SplitCurve) Prepare() error {
 	return nil
 }
 
+func eq(a, b unit_float) bool { return abs(a-b) <= FLOAT_EQUALITY_THRESHOLD }
+
 func (c *SplitCurve) IsSRGB() bool {
 	s := SRGBCurve()
-	return *c == *s
+	return eq(s.a, c.a) && eq(s.b, c.b) && eq(s.c, c.c) && eq(s.d, c.d)
 }
 
 func (c *SplitCurve) String() string {
@@ -601,11 +603,8 @@ func (c *SplitCurve) InverseTransform(y unit_float) unit_float {
 }
 
 func (c *ComplexCurve) IsSRGB() bool {
-	if c.e != 0 || c.f != 0 {
-		return false
-	}
 	s := SRGBCurve()
-	return c.a == s.a && c.b == s.b && c.c == s.c && c.d == s.d && c.g == s.g
+	return eq(s.a, c.a) && eq(s.b, c.b) && eq(s.c, c.c) && eq(s.d, c.d) && eq(c.e, 0) && eq(c.f, 0)
 }
 
 type IsSRGB interface {
