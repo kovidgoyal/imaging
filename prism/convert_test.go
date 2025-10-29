@@ -152,7 +152,7 @@ func test_profile(t *testing.T, opt opt) {
 				x, y, z := pos[0], pos[1], pos[2]
 				r, g, b := pcs.Transform(x, y, z)
 				actual.pcs = append(actual.pcs, r, g, b)
-				ir, ig, ib := inv.Transform(x, y, z)
+				ir, ig, ib := inv.Transform(r, g, b)
 				actual.inv = append(actual.inv, ir, ig, ib)
 				r, g, b = srgb.Transform(x, y, z)
 				actual.srgb = append(actual.srgb, r, g, b)
@@ -161,12 +161,12 @@ func test_profile(t *testing.T, opt opt) {
 		} else {
 			actual.pcs, actual.inv, actual.srgb = actual.pcs[:3*num_pixels], actual.inv[:3*num_pixels], actual.srgb[:3*num_pixels]
 			pcs.TransformGeneral(actual.pcs, pts)
-			inv.TransformGeneral(actual.inv, pts)
+			inv.TransformGeneral(actual.inv, actual.pcs)
 			srgb.TransformGeneral(actual.srgb, pts)
 		}
 		expected.pcs, err = lcms.TransformFloatToPCS(pts, p.Header.RenderingIntent)
 		require.NoError(t, err)
-		expected.inv, err = lcms.TransformFloatToDevice(pts, p.Header.RenderingIntent)
+		expected.inv, err = lcms.TransformFloatToDevice(actual.pcs, p.Header.RenderingIntent)
 		require.NoError(t, err)
 		expected.srgb, err = lcms.TransformFloatToSRGB(pts, p.Header.RenderingIntent)
 		require.NoError(t, err)
