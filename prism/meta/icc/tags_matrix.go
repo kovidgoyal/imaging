@@ -88,7 +88,7 @@ func (m *Matrix3) Transform(r, g, b unit_float) (unit_float, unit_float, unit_fl
 }
 func (m *Matrix3) TransformGeneral(o, i []unit_float) { tg33(m.Transform, o, i) }
 
-func (m Matrix3) Transpose() Matrix3 {
+func (m *Matrix3) Transpose() Matrix3 {
 	return Matrix3{
 		{m[0][0], m[1][0], m[2][0]},
 		{m[0][1], m[1][1], m[2][1]},
@@ -98,6 +98,18 @@ func (m Matrix3) Transpose() Matrix3 {
 
 func Dot(v1, v2 [3]unit_float) unit_float {
 	return v1[0]*v2[0] + v1[1]*v2[1] + v1[2]*v2[2]
+}
+
+func (m *Matrix3) Equals(o *Matrix3, threshold unit_float) bool {
+	for r := range 3 {
+		ar, br := m[r], o[r]
+		for c := range 3 {
+			if abs(ar[c]-br[c]) > threshold {
+				return false
+			}
+		}
+	}
+	return true
 }
 
 func (m *Matrix3) String() string {

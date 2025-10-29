@@ -568,13 +568,13 @@ func (c *SplitCurve) Prepare() error {
 	return nil
 }
 
-func (c SplitCurve) is_srgb() bool {
+func (c *SplitCurve) IsSRGB() bool {
 	s := SRGBCurve()
-	return c == *s
+	return *c == *s
 }
 
 func (c *SplitCurve) String() string {
-	if c.is_srgb() {
+	if c.IsSRGB() {
 		return "SRGBCurve"
 	}
 	return fmt.Sprintf("SplitCurve{a: %v b: %v c: %v d: %v g: %v}", c.a, c.b, c.c, c.d, c.g)
@@ -598,6 +598,18 @@ func (c *SplitCurve) InverseTransform(y unit_float) unit_float {
 		return y * c.inv_c
 	}
 	return (pow(y, c.inv_g) - c.b) * c.inv_a
+}
+
+func (c *ComplexCurve) IsSRGB() bool {
+	if c.e != 0 || c.f != 0 {
+		return false
+	}
+	s := SRGBCurve()
+	return c.a == s.a && c.b == s.b && c.c == s.c && c.d == s.d && c.g == s.g
+}
+
+type IsSRGB interface {
+	IsSRGB() bool
 }
 
 func (c *ComplexCurve) Prepare() error {

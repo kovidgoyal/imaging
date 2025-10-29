@@ -90,6 +90,17 @@ func (p *Pipeline) Append(c ...ChannelTransformer) {
 	}
 }
 
+func (p *Pipeline) RemoveLastMatrix3() *Matrix3 {
+	if len(p.transformers) > 0 {
+		if q, ok := p.transformers[len(p.transformers)-1].(AsMatrix3); ok {
+			p.transformers = p.transformers[:len(p.transformers)-1]
+			p.tfuncs = p.tfuncs[:len(p.tfuncs)-1]
+			return q.AsMatrix3()
+		}
+	}
+	return nil
+}
+
 func (p *Pipeline) Transform(r, g, b unit_float) (unit_float, unit_float, unit_float) {
 	for _, t := range p.tfuncs {
 		r, g, b = t(r, g, b)
@@ -144,4 +155,29 @@ func (p *Pipeline) IsSuitableFor(i, o int) bool {
 		i = qo
 	}
 	return i == o
+}
+
+func (p *Pipeline) IsXYZSRGB() bool {
+	if p.Len() == 2 {
+		if c, ok := p.transformers[0].(Curves); ok {
+			is_srgb := true
+			for _, cc := range c.Curves() {
+				if q, ok := cc.(IsSRGB); ok {
+					is_srgb = q.IsSRGB()
+				} else {
+					is_srgb = false
+				}
+				if !is_srgb {
+					break
+				}
+			}
+			if is_srgb {
+				if c, ok := p.transformers[1].(AsMatrix3); ok {
+					q := c.AsMatrix3()
+					_ = q
+				}
+			}
+		}
+	}
+	return false
 }

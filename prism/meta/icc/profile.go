@@ -257,18 +257,7 @@ func (p *Profile) CreateTransformerToDevice(rendering_intent RenderingIntent) (a
 	return
 }
 
-func (p *Profile) CreateTransformerToPCS(rendering_intent RenderingIntent, input_channels int) (ans *Pipeline, err error) {
-	defer func() {
-		if err == nil && !ans.IsSuitableFor(input_channels, 3) {
-			err = fmt.Errorf("transformer to PCS %s not suitable for %d input channels", ans.String(), input_channels)
-		}
-
-		if err == nil {
-			if p.Header.ProfileConnectionSpace == ColorSpaceXYZ {
-				ans.Append(NewXYZtoICC())
-			}
-		}
-	}()
+func (p *Profile) createTransformerToPCS(rendering_intent RenderingIntent) (ans *Pipeline, err error) {
 	ans = &Pipeline{}
 	const forward = true
 	a2b, err := p.find_conversion_tag(forward, rendering_intent)
@@ -291,6 +280,32 @@ func (p *Profile) CreateTransformerToPCS(rendering_intent RenderingIntent, input
 	return
 }
 
+func (p *Profile) IsSRGB() bool {
+	if p.Header.ProfileConnectionSpace == ColorSpaceXYZ {
+		tr, err := p.createTransformerToPCS(p.Header.RenderingIntent)
+		if err != nil {
+			return false
+		}
+		return tr.IsXYZSRGB()
+	}
+	return false
+}
+
+func (p *Profile) CreateTransformerToPCS(rendering_intent RenderingIntent, input_channels int) (ans *Pipeline, err error) {
+	defer func() {
+		if err == nil && !ans.IsSuitableFor(input_channels, 3) {
+			err = fmt.Errorf("transformer to PCS %s not suitable for %d input channels", ans.String(), input_channels)
+		}
+
+		if err == nil {
+			if p.Header.ProfileConnectionSpace == ColorSpaceXYZ {
+				ans.Append(NewXYZtoICC())
+			}
+		}
+	}()
+	return p.createTransformerToPCS(rendering_intent)
+}
+
 func (p *Profile) CreateTransformerToSRGB(rendering_intent RenderingIntent, input_channels int) (ans *Pipeline, err error) {
 	if ans, err = p.CreateTransformerToPCS(rendering_intent, input_channels); err != nil {
 		return
@@ -308,6 +323,9 @@ func (p *Profile) CreateTransformerToSRGB(rendering_intent RenderingIntent, inpu
 	switch input_colorspace {
 	case ColorSpaceXYZ:
 		t := NewXYZtosRGB(p.PCSIlluminant)
+		if m := ans.RemoveLastMatrix3(); m != nil {
+			t.AddPreviousMatrix(*m)
+		}
 		ans.Append(t)
 	case ColorSpaceLab:
 		ans.Append(NewLABtosRGB(p.PCSIlluminant))

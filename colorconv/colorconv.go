@@ -24,7 +24,7 @@ type Vec3 [3]float64
 type Mat3 [3][3]float64
 
 func (m *Mat3) String() string {
-	return fmt.Sprintf("Matrix3{ %v %v %v }", m[0], m[1], m[2])
+	return fmt.Sprintf("Matrix3{ %.6v %.6v %.6v }", m[0], m[1], m[2])
 }
 
 // Standard reference whites (CIE XYZ) normalized so Y = 1.0
@@ -39,7 +39,7 @@ type ConvertColor struct {
 }
 
 func (c ConvertColor) String() string {
-	return fmt.Sprintf("{whitepoint:%v matrix:%v}", c.whitepoint, c.combined_XYZ_to_linear_SRGB)
+	return fmt.Sprintf("{whitepoint:%.6v matrix:%.6v}", c.whitepoint, c.combined_XYZ_to_linear_SRGB)
 }
 
 func (cc *ConvertColor) AddPreviousMatrix(a, b, c [3]float64) {

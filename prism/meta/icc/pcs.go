@@ -141,6 +141,23 @@ func (n LABtosRGB) IOSig() (int, int)                    { return 3, 3 }
 func (n LABtosRGB) String() string                       { return fmt.Sprintf("%T%s", n, n.c.String()) }
 func (n LABtosRGB) Iter(f func(ChannelTransformer) bool) { f(n) }
 
+type UniformFunctionTransformer struct {
+	name string
+	f    func(unit_float) unit_float
+}
+
+func (n UniformFunctionTransformer) IOSig() (int, int)                     { return 3, 3 }
+func (n UniformFunctionTransformer) String() string                        { return n.name }
+func (n *UniformFunctionTransformer) Iter(f func(ChannelTransformer) bool) { f(n) }
+func (c *UniformFunctionTransformer) Transform(x, y, z unit_float) (unit_float, unit_float, unit_float) {
+	return c.f(x), c.f(y), c.f(z)
+}
+func (c *UniformFunctionTransformer) TransformGeneral(o, i []unit_float) {
+	for k, x := range i {
+		o[k] = c.f(x)
+	}
+}
+
 type XYZtosRGB struct {
 	c *colorconv.ConvertColor
 	t func(l, a, b unit_float) (x, y, z unit_float)
@@ -158,16 +175,10 @@ func (n *XYZtosRGB) AddPreviousMatrix(m Matrix3) {
 func (c XYZtosRGB) Transform(l, a, b unit_float) (unit_float, unit_float, unit_float) {
 	return c.t(l, a, b)
 }
-func (m XYZtosRGB) TransformGeneral(o, i []unit_float) { tg33(m.Transform, o, i) }
-func (n XYZtosRGB) IOSig() (int, int)                  { return 3, 3 }
-func (n XYZtosRGB) String() string                     { return fmt.Sprintf("%T%s", n, n.c.String()) }
-func (n XYZtosRGB) Iter(f func(ChannelTransformer) bool) {
-	m := Matrix3(n.c.Matrix())
-	if !f(&m) {
-		return
-	}
-	f(SRGBCurveInverseTransformer())
-}
+func (m XYZtosRGB) TransformGeneral(o, i []unit_float)   { tg33(m.Transform, o, i) }
+func (n XYZtosRGB) IOSig() (int, int)                    { return 3, 3 }
+func (n XYZtosRGB) String() string                       { return fmt.Sprintf("%T%s", n, n.c.String()) }
+func (n XYZtosRGB) Iter(f func(ChannelTransformer) bool) { f(n) }
 
 type LABtoXYZ struct {
 	c *colorconv.ConvertColor
