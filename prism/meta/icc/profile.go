@@ -155,7 +155,7 @@ func (p *Profile) find_conversion_tag(forward bool, rendering_intent RenderingIn
 	return ans, nil
 }
 
-func (p *Profile) CreateTransformerToDevice(rendering_intent RenderingIntent) (ans *Pipeline, err error) {
+func (p *Profile) CreateTransformerToDevice(rendering_intent RenderingIntent, optimize bool) (ans *Pipeline, err error) {
 	num_output_channels := len(p.Header.DataColorSpace.BlackPoint())
 	if num_output_channels == 0 {
 		return nil, fmt.Errorf("unsupported device color space: %s", p.Header.DataColorSpace)
@@ -165,7 +165,7 @@ func (p *Profile) CreateTransformerToDevice(rendering_intent RenderingIntent) (a
 			err = fmt.Errorf("transformer to PCS %s not suitable for 3 output channels", ans.String())
 		}
 	}()
-	ans = &Pipeline{}
+	ans = &Pipeline{coalesce_matrices: optimize}
 	if p.Header.ProfileConnectionSpace == ColorSpaceXYZ {
 		ans.Append(NewICCtoXYZ())
 	}
@@ -191,8 +191,8 @@ func (p *Profile) CreateTransformerToDevice(rendering_intent RenderingIntent) (a
 	return
 }
 
-func (p *Profile) createTransformerToPCS(rendering_intent RenderingIntent) (ans *Pipeline, err error) {
-	ans = &Pipeline{}
+func (p *Profile) createTransformerToPCS(rendering_intent RenderingIntent, optimize bool) (ans *Pipeline, err error) {
+	ans = &Pipeline{coalesce_matrices: optimize}
 	const forward = true
 	a2b, err := p.find_conversion_tag(forward, rendering_intent)
 	if err != nil {
@@ -216,7 +216,7 @@ func (p *Profile) createTransformerToPCS(rendering_intent RenderingIntent) (ans 
 
 func (p *Profile) IsSRGB() bool {
 	if p.Header.ProfileConnectionSpace == ColorSpaceXYZ {
-		tr, err := p.createTransformerToPCS(p.Header.RenderingIntent)
+		tr, err := p.createTransformerToPCS(p.Header.RenderingIntent, true)
 		if err != nil {
 			return false
 		}
@@ -225,7 +225,7 @@ func (p *Profile) IsSRGB() bool {
 	return false
 }
 
-func (p *Profile) CreateTransformerToPCS(rendering_intent RenderingIntent, input_channels int) (ans *Pipeline, err error) {
+func (p *Profile) CreateTransformerToPCS(rendering_intent RenderingIntent, input_channels int, optimize bool) (ans *Pipeline, err error) {
 	defer func() {
 		if err == nil && !ans.IsSuitableFor(input_channels, 3) {
 			err = fmt.Errorf("transformer to PCS %s not suitable for %d input channels", ans.String(), input_channels)
@@ -237,12 +237,15 @@ func (p *Profile) CreateTransformerToPCS(rendering_intent RenderingIntent, input
 			}
 		}
 	}()
-	return p.createTransformerToPCS(rendering_intent)
+	return p.createTransformerToPCS(rendering_intent, optimize)
 }
 
-func (p *Profile) CreateTransformerToSRGB(rendering_intent RenderingIntent, input_channels int) (ans *Pipeline, err error) {
-	if ans, err = p.CreateTransformerToPCS(rendering_intent, input_channels); err != nil {
+func (p *Profile) CreateTransformerToSRGB(rendering_intent RenderingIntent, input_channels int, clamp, map_gamut, optimize bool) (ans *Pipeline, err error) {
+	if ans, err = p.createTransformerToPCS(rendering_intent, optimize); err != nil {
 		return
+	}
+	if !ans.IsSuitableFor(input_channels, 3) {
+		return nil, fmt.Errorf("transformer to PCS %s not suitable for %d input channels", ans.String(), input_channels)
 	}
 	input_colorspace := p.Header.ProfileConnectionSpace
 	var sRGB_blackpoint XYZType // 0, 0, 0
@@ -256,9 +259,12 @@ func (p *Profile) CreateTransformerToSRGB(rendering_intent RenderingIntent, inpu
 	}
 	switch input_colorspace {
 	case ColorSpaceXYZ:
-		t := NewXYZtosRGB(p.PCSIlluminant)
-		if m := ans.RemoveLastMatrix3(); m != nil {
-			t.AddPreviousMatrix(*m)
+		ans.Append(NewXYZtoICC())
+		t := NewXYZtosRGB(p.PCSIlluminant, clamp, map_gamut)
+		if optimize {
+			if m := ans.RemoveLastMatrix3(); m != nil {
+				t.AddPreviousMatrix(*m)
+			}
 		}
 		ans.Append(t)
 	case ColorSpaceLab:
@@ -270,11 +276,11 @@ func (p *Profile) CreateTransformerToSRGB(rendering_intent RenderingIntent, inpu
 }
 
 func (p *Profile) CreateDefaultTransformerToDevice() (*Pipeline, error) {
-	return p.CreateTransformerToDevice(p.Header.RenderingIntent)
+	return p.CreateTransformerToDevice(p.Header.RenderingIntent, true)
 }
 
 func (p *Profile) CreateDefaultTransformerToPCS(input_channels int) (*Pipeline, error) {
-	return p.CreateTransformerToPCS(p.Header.RenderingIntent, input_channels)
+	return p.CreateTransformerToPCS(p.Header.RenderingIntent, input_channels, true)
 }
 
 func newProfile() *Profile {

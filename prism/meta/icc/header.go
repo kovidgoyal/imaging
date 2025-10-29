@@ -8,7 +8,8 @@ import (
 
 type unit_float = float64
 
-const FLOAT_EQUALITY_THRESHOLD = 1e-5
+// We consider two floats equal if they result in the same uint16 representation
+const FLOAT_EQUALITY_THRESHOLD = 1. / math.MaxUint16
 
 func pow(a, b unit_float) unit_float { return unit_float(math.Pow(float64(a), float64(b))) }
 func abs(a unit_float) unit_float    { return unit_float(math.Abs(float64(a))) }

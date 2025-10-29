@@ -10,8 +10,9 @@ import (
 var _ = fmt.Print
 
 type Pipeline struct {
-	transformers []ChannelTransformer
-	tfuncs       []func(r, g, b unit_float) (unit_float, unit_float, unit_float)
+	coalesce_matrices bool
+	transformers      []ChannelTransformer
+	tfuncs            []func(r, g, b unit_float) (unit_float, unit_float, unit_float)
 }
 
 type AsMatrix3 interface {
@@ -48,7 +49,7 @@ func (p *Pipeline) insert(idx int, c ChannelTransformer) {
 		panic(fmt.Sprintf("cannot insert at idx: %d in pipeline of length: %d", idx, len(p.transformers)))
 	}
 	prepend := idx > -1
-	if cmm, ok := c.(AsMatrix3); ok {
+	if cmm, ok := c.(AsMatrix3); p.coalesce_matrices && ok {
 		q := p.transformers[IfElse(prepend, idx, len(p.transformers)-1)]
 		if cmat, ok := q.(AsMatrix3); ok {
 			mat := cmat.AsMatrix3()
@@ -177,7 +178,7 @@ func (p *Pipeline) IsXYZSRGB() bool {
 					var expected_matrix = Matrix3{{0.218036, 0.192576, 0.0715343}, {0.111246, 0.358442, 0.0303044}, {0.00695811, 0.0485389, 0.357053}}
 					// unfortunately there exist profiles in the wild that
 					// deviate from the expected matrix by more than FLOAT_EQUALITY_THRESHOLD
-					if q.Equals(&expected_matrix, 10*FLOAT_EQUALITY_THRESHOLD) {
+					if q.Equals(&expected_matrix, 7*FLOAT_EQUALITY_THRESHOLD) {
 						return true
 					}
 				}

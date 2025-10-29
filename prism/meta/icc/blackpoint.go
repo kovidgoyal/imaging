@@ -48,7 +48,7 @@ func (p *Profile) black_point_as_darker_colorant(intent RenderingIntent) XYZType
 	if bp == nil || (len(bp) != 3 && len(bp) != 4) {
 		return XYZType{}
 	}
-	tr, err := p.CreateTransformerToPCS(intent, len(bp))
+	tr, err := p.CreateTransformerToPCS(intent, len(bp), true)
 	if err != nil {
 		return XYZType{}
 	}
@@ -72,13 +72,13 @@ func (p *Profile) black_point_as_darker_colorant(intent RenderingIntent) XYZType
 }
 
 func (p *Profile) black_point_using_perceptual_black() XYZType {
-	dev, err := p.CreateTransformerToDevice(PerceptualRenderingIntent)
+	dev, err := p.CreateTransformerToDevice(PerceptualRenderingIntent, true)
 	if err != nil {
 		return XYZType{}
 	}
 	cmyk := [4]unit_float{}
 	dev.TransformGeneral(cmyk[:], []unit_float{0, 0, 0})
-	tr, err := p.CreateTransformerToPCS(PerceptualRenderingIntent, 4)
+	tr, err := p.CreateTransformerToPCS(PerceptualRenderingIntent, 4, true)
 	if err != nil {
 		return XYZType{}
 	}

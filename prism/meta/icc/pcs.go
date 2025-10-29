@@ -163,9 +163,15 @@ type XYZtosRGB struct {
 	t func(l, a, b unit_float) (x, y, z unit_float)
 }
 
-func NewXYZtosRGB(whitepoint XYZType) XYZtosRGB {
+func NewXYZtosRGB(whitepoint XYZType, clamp, map_gamut bool) XYZtosRGB {
 	c := colorconv.NewConvertColor(whitepoint.X, whitepoint.Y, whitepoint.Z, 1)
-	return XYZtosRGB{c, c.XYZToSRGB}
+	if clamp {
+		if map_gamut {
+			return XYZtosRGB{c, c.XYZToSRGB}
+		}
+		return XYZtosRGB{c, c.XYZToSRGBNoGamutMap}
+	}
+	return XYZtosRGB{c, c.XYZToSRGBNoClamp}
 }
 
 func (n *XYZtosRGB) AddPreviousMatrix(m Matrix3) {

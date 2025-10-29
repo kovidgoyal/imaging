@@ -5,6 +5,7 @@ package prism
 import (
 	"bytes"
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -20,6 +21,8 @@ var _ = fmt.Print
 
 const srgb_lab_profile_name = "sRGB_ICC_v4_Appearance.icc"
 const srgb_xyz_profile_name = "sRGB2014.icc"
+const THRESHOLD16 = 1. / math.MaxUint16
+const THRESHOLD8 = 1. / math.MaxUint8
 
 // testDir returns the absolute path to the directory containing the test file.
 // It searches the call stack for the first frame whose filename ends with "_test.go".
@@ -104,12 +107,26 @@ func in_delta_rgb(t *testing.T, desc string, expected, actual []float64, toleran
 	}
 }
 
-func test_profile(t *testing.T, name string, tolerance float64) {
-	t.Run(name, func(t *testing.T) {
+type opt struct {
+	name                                         string
+	pcs_tolerance, inv_tolerance, srgb_tolerance float64
+}
+
+func test_profile(t *testing.T, opt opt) {
+	if opt.pcs_tolerance == 0 {
+		opt.pcs_tolerance = THRESHOLD16
+	}
+	if opt.inv_tolerance == 0 {
+		opt.inv_tolerance = THRESHOLD16
+	}
+	if opt.srgb_tolerance == 0 {
+		opt.srgb_tolerance = THRESHOLD16
+	}
+	t.Run(opt.name, func(t *testing.T) {
 		t.Parallel()
-		p := profile(t, name)
+		p := profile(t, opt.name)
 		input_channels := icc.IfElse(p.Header.DataColorSpace == icc.ColorSpaceCMYK, 4, 3)
-		lcms := lcms_profile(t, name)
+		lcms := lcms_profile(t, opt.name)
 		actual_bp := p.BlackPoint(p.Header.RenderingIntent)
 		expected_bp, ok := lcms.DetectBlackPoint(p.Header.RenderingIntent)
 		require.True(t, ok)
@@ -118,7 +135,7 @@ func test_profile(t *testing.T, name string, tolerance float64) {
 		require.NoError(t, err)
 		inv, err := p.CreateDefaultTransformerToDevice()
 		require.NoError(t, err)
-		srgb, err := p.CreateTransformerToSRGB(p.Header.RenderingIntent, input_channels)
+		srgb, err := p.CreateTransformerToSRGB(p.Header.RenderingIntent, input_channels, false, false, true)
 		require.NoError(t, err)
 		var pts []float64
 		if input_channels == 3 {
@@ -153,19 +170,26 @@ func test_profile(t *testing.T, name string, tolerance float64) {
 		require.NoError(t, err)
 		expected.srgb, err = lcms.TransformFloatToSRGB(pts, p.Header.RenderingIntent)
 		require.NoError(t, err)
-		in_delta_rgb(t, "to pcs", expected.pcs, actual.pcs, tolerance)
-		in_delta_rgb(t, "to device", expected.inv, actual.inv, tolerance)
-		in_delta_rgb(t, "to sRGB", expected.srgb, actual.srgb, tolerance)
+		in_delta_rgb(t, "to pcs", expected.pcs, actual.pcs, opt.pcs_tolerance)
+		in_delta_rgb(t, "to device", expected.inv, actual.inv, opt.inv_tolerance)
+		in_delta_rgb(t, "to sRGB", expected.srgb, actual.srgb, opt.srgb_tolerance)
 	})
 }
 
 func TestAgainstLCMS2(t *testing.T) {
-	// simplest case: matrix/trc profile
-	test_profile(t, srgb_xyz_profile_name, icc.FLOAT_EQUALITY_THRESHOLD)
-	// LutAtoBType profile with PCS=XYZ
-	// test_profile(t, "jpegli.icc", icc.FLOAT_EQUALITY_THRESHOLD)
-	// LutAtoBType profile with PCS=LAB
-	// test_profile(t, srgb_lab_profile_name, 0.0005)
+	for _, c := range []opt{
+		// simplest case: matrix/trc profile
+		{name: srgb_xyz_profile_name},
+		// LutAtoBType profile with PCS=XYZ (need slightly higher tolerance for
+		// srgb because of different order of operations causing small
+		// differences. This profile has completely broken inverse mapping so
+		// ignore it.)
+		{name: "jpegli.icc", inv_tolerance: THRESHOLD8, srgb_tolerance: 2 * THRESHOLD16},
+		// LutAtoBType profile with PCS=LAB
+		// test_profile(t, srgb_lab_profile_name, 0.0005)
+	} {
+		test_profile(t, c)
+	}
 }
 
 func transform_debug(r, g, b, x, y, z float64, t icc.ChannelTransformer) {
@@ -180,12 +204,12 @@ func develop_to_srgb(t *testing.T, name string) {
 	p := profile(t, name)
 	lcms := lcms_profile(t, name)
 	l, err := lcms.TransformFloatToSRGB([]float64{r, g, b}, p.Header.RenderingIntent)
-	tr, err := p.CreateTransformerToSRGB(p.Header.RenderingIntent, 3)
+	tr, err := p.CreateTransformerToSRGB(p.Header.RenderingIntent, 3, false, false, false)
 	require.NoError(t, err)
 	x, y, z := tr.TransformDebug(r, g, b, transform_debug)
 	fmt.Println()
 
-	in_delta_rgb(t, name, l, []float64{x, y, z}, 0.001)
+	in_delta_rgb(t, name, l, []float64{x, y, z}, 14*THRESHOLD16)
 }
 
 var _ = develop_to_srgb
@@ -196,12 +220,12 @@ func develop_inverse(t *testing.T, name string) {
 	lcms := lcms_profile(t, name)
 	l, err := lcms.TransformFloatToDevice([]float64{r, g, b}, p.Header.RenderingIntent)
 	fmt.Println()
-	tr, err := p.CreateDefaultTransformerToDevice()
+	tr, err := p.CreateTransformerToDevice(p.Header.RenderingIntent, false)
 	require.NoError(t, err)
 	x, y, z := tr.TransformDebug(r, g, b, transform_debug)
 	fmt.Println()
 
-	in_delta_rgb(t, name, l, []float64{x, y, z}, 0.001)
+	in_delta_rgb(t, name, l, []float64{x, y, z}, THRESHOLD16)
 }
 
 var _ = develop_inverse
@@ -212,18 +236,18 @@ func develop_pcs(t *testing.T, name string) {
 	lcms := lcms_profile(t, name)
 	l, err := lcms.TransformFloatToPCS([]float64{r, g, b}, p.Header.RenderingIntent)
 	fmt.Println()
-	tr, err := p.CreateDefaultTransformerToPCS(3)
+	tr, err := p.CreateTransformerToPCS(p.Header.RenderingIntent, 3, false)
 	require.NoError(t, err)
 	x, y, z := tr.TransformDebug(r, g, b, transform_debug)
 	fmt.Println()
-	in_delta_rgb(t, name, l, []float64{x, y, z}, 0.001)
+	in_delta_rgb(t, name, l, []float64{x, y, z}, THRESHOLD16)
 }
 
 var _ = develop_pcs
 
 func TestDevelop(t *testing.T) {
-	const name = srgb_xyz_profile_name
-	develop_to_srgb(t, name)
+	const name = "jpegli.icc"
 	develop_pcs(t, name)
-	develop_inverse(t, name)
+	// develop_inverse(t, name)
+	develop_to_srgb(t, name)
 }
