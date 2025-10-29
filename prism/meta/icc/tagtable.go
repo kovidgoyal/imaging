@@ -1,6 +1,7 @@
 package icc
 
 import (
+	"errors"
 	"fmt"
 	"sync"
 )
@@ -223,6 +224,10 @@ func array_to_matrix(a []unit_float) *Matrix3 {
 func (p *TagTable) get_chromatic_adaption() (*Matrix3, error) {
 	x, err := p.get_parsed(ChromaticAdaptationTagSignature, ColorSpaceRGB, ColorSpaceXYZ)
 	if err != nil {
+		var nf *not_found
+		if errors.As(err, &nf) {
+			return nil, nil
+		}
 		return nil, err
 	}
 	a, ok := x.([]unit_float)
