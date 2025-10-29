@@ -198,11 +198,12 @@ func (c *ConvertColor) XYZToLab(X, Y, Z float64) (L, a, b float64) {
 
 // linearToSRGBComp applies the sRGB (gamma) companding function to a linear component.
 func linearToSRGBComp(c float64) float64 {
-	// clip small negative rounding noise at this stage for stability
 	switch {
-	case c <= 0:
-		return 0.0
 	case c <= 0.0031308:
+		// clip small negative values for stability
+		if c < 0 && c >= -1e-5 {
+			return 0
+		}
 		return 12.92 * c
 	default:
 		return 1.055*math.Pow(c, 1.0/2.4) - 0.055
