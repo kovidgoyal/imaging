@@ -174,7 +174,12 @@ func (p *Pipeline) IsXYZSRGB() bool {
 			if is_srgb {
 				if c, ok := p.transformers[1].(AsMatrix3); ok {
 					q := c.AsMatrix3()
-					_ = q
+					var expected_matrix = Matrix3{{0.218036, 0.192576, 0.0715343}, {0.111246, 0.358442, 0.0303044}, {0.00695811, 0.0485389, 0.357053}}
+					// unfortunately there exist profiles in the wild that
+					// deviate from the expected matrix by more than FLOAT_EQUALITY_THRESHOLD
+					if q.Equals(&expected_matrix, 10*FLOAT_EQUALITY_THRESHOLD) {
+						return true
+					}
 				}
 			}
 		}

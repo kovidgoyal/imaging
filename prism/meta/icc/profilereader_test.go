@@ -11,7 +11,36 @@ import (
 	"path"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
+
+func TestSRGBProfileDetection(t *testing.T) {
+	for name, is_srgb := range map[string]bool{
+		"sRGB2014.icc":      true,
+		"sRGB-v4.icc":       true,
+		"sRGB-v2-magic.icc": true,
+		"sRGB-v2-micro.icc": true,
+		"sRGB-v2-nano.icc":  true,
+		"sRGBz.icc":         true,
+		"sRGB.icm":          true,
+		"tinyrgb.icc":       true,
+
+		"ClayRGB1998.icm":                false,
+		"jpegli.icc":                     false,
+		"display-p3-v4-with-v2-desc.icc": false,
+		"cmyk.icc":                       false,
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			p, err := ReadProfile("test-profiles/" + name)
+			require.NoError(t, err)
+			tr, err := p.createTransformerToPCS(p.Header.RenderingIntent)
+			require.NoError(t, err)
+			require.Equal(t, is_srgb, p.IsSRGB(), tr.String())
+		})
+	}
+}
 
 func TestProfileReader(t *testing.T) {
 	var profileSize uint32
@@ -168,25 +197,6 @@ func TestProfileReader(t *testing.T) {
 
 				if desc != c.ExpectedDescription {
 					t.Errorf("Expected description '%s' for profile '%s' but got '%s'", c.ExpectedDescription, c.ProfileFileName, desc)
-				}
-			}
-		})
-
-		t.Run("recognises well known profiles", func(t *testing.T) {
-			for fname, expected := range map[string]WellKnownProfile{
-				"sRGB2014.icc":                   SRGBProfile,
-				"sRGB_ICC_v4_Appearance.icc":     SRGBProfile,
-				"display-p3-v4-with-v2-desc.icc": DisplayP3Profile,
-			} {
-				p, err := loadTestProfile(fname)
-				if err != nil {
-					t.Fatalf("failed reading profile: %s with error: %s", fname, err)
-				}
-				d, err := p.Description()
-				man, err := p.DeviceManufacturerDescription()
-				model, err := p.DeviceModelDescription()
-				if actual := p.WellKnownProfile(); actual != expected {
-					t.Fatalf("Incorrect profile for img: %s, expected %s, got %s\nHeader: %s\nDescription: %s\nDeviceManufacturer: %s\nDevice Model: %s", fname, expected, actual, p.Header, d, man, model)
 				}
 			}
 		})

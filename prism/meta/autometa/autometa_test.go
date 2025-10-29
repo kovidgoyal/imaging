@@ -5,11 +5,7 @@ import (
 	"crypto/rand"
 	"fmt"
 	"io"
-	"os"
-	"path/filepath"
 	"testing"
-
-	"github.com/kovidgoyal/imaging/prism/meta/icc"
 )
 
 var _ = fmt.Println
@@ -50,37 +46,4 @@ func TestLoad(t *testing.T) {
 			t.Errorf("Expected returned stream to contain original image data but was different.\n\nExpected:%v\nActual:%v\n", randomBytes, returnedBytes)
 		}
 	})
-}
-
-func TestProfileRecognition(t *testing.T) {
-	for imgname, expected := range map[string]icc.WellKnownProfile{
-		"pizza-rgb8-srgb.jpg":        icc.SRGBProfile,
-		"pizza-rgb8-adobergb.jpg":    icc.AdobeRGBProfile,
-		"pizza-rgb8-displayp3.jpg":   icc.DisplayP3Profile,
-		"pizza-rgb8-prophotorgb.jpg": icc.PhotoProProfile,
-	} {
-		t.Run(imgname, func(t *testing.T) {
-			t.Parallel()
-			path := filepath.Join("../../test-images", imgname)
-			f, err := os.Open(path)
-			if err != nil {
-				t.Fatal(err)
-			}
-			m, _, err := Load(f)
-			f.Close()
-			if err != nil {
-				t.Fatal(err)
-			}
-			p, err := m.ICCProfile()
-			if err != nil {
-				t.Fatal(err)
-			}
-			d, err := p.Description()
-			man, err := p.DeviceManufacturerDescription()
-			mod, err := p.DeviceModelDescription()
-			if actual := p.WellKnownProfile(); actual != expected {
-				t.Fatalf("Incorrect profile for img: %s, expected %s, got %s\n%s\nDescription: %s\nManufacturer: %s\nModel: %s", imgname, expected, actual, p.Header, d, man, mod)
-			}
-		})
-	}
 }

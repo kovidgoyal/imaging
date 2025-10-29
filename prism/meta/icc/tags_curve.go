@@ -191,8 +191,18 @@ func fixed88ToFloat(raw []byte) unit_float {
 }
 
 func samples_to_analytic(points []unit_float) Curve1D {
-	const threshold = 1e-3
-	if len(points) < 64 {
+	threshold := 1e-3
+	switch {
+	case len(points) < 2:
+		return nil
+	case len(points) > 400:
+		threshold = FLOAT_EQUALITY_THRESHOLD
+	case len(points) > 100:
+		threshold = 4 * FLOAT_EQUALITY_THRESHOLD
+	case len(points) > 40:
+		threshold = 20 * FLOAT_EQUALITY_THRESHOLD
+	}
+	if len(points) < 2 {
 		return nil
 	}
 	n := 1 / unit_float(len(points)-1)
