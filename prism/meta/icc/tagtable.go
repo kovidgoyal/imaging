@@ -73,8 +73,10 @@ func parse_tag(sig Signature, data []byte, input_colorspace, output_colorspace C
 		return decode_xyz(data)
 	case S15Fixed16ArrayTypeSignature:
 		return decode_array(data)
-	case CurveTypeSignature, ParametricCurveTypeSignature:
+	case CurveTypeSignature:
 		return curveDecoder(data)
+	case ParametricCurveTypeSignature:
+		return parametricCurveDecoder(data)
 	}
 }
 
