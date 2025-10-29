@@ -132,12 +132,12 @@ func load_mft_body(a *MFT, raw []byte, load_table func([]byte, int) ([]unit_floa
 		}
 	}
 	a.input_curve = NewCurveTransformer("Input", input_curves...)
-	fp, consumed, err := decode_clut_table(raw, int(bytes_per_channel), a.out_channels, a.grid_points, output_colorspace, true)
+	fp, consumed, err := decode_clut_table(raw, int(bytes_per_channel), a.out_channels, a.grid_points, output_colorspace)
 	if err != nil {
 		return err
 	}
 	raw = raw[consumed:]
-	a.clut = make_clut(a.grid_points, a.in_channels, a.out_channels, fp)
+	a.clut = make_clut(a.grid_points, a.in_channels, a.out_channels, fp, true)
 	for i := range a.out_channels {
 		if fp, raw, err = load_table(raw, output_table_entries); err != nil {
 			return err

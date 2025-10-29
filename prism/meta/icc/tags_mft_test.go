@@ -117,7 +117,7 @@ func TestMFTTag(t *testing.T) {
 	m := MFT{
 		in_channels: 3, out_channels: 3, grid_points: gp,
 		input_curve: NewCurveTransformer("test", c, c, c), output_curve: NewCurveTransformer("test", c, c, c),
-		clut: make_clut(gp, 3, 3, curve_points(make_curve(expectedValues(gp, 3)))), matrix: &im,
+		clut: make_clut(gp, 3, 3, curve_points(make_curve(expectedValues(gp, 3))), true), matrix: &im,
 	}
 
 	roundtrip := func() {

@@ -130,7 +130,7 @@ func TestCLUTTransform(t *testing.T) {
 				0.6, 0.6, 0.6,
 				1, 1, 1,
 			}, // 8 points per output
-		)}
+		), false}
 		out[0], out[1], out[2] = clut.Transform(0.0, 0.0, 0.0) // Should hit [0.0]
 		in_delta(t, 0.0, out[0], 1e-6)
 		out[0], out[1], out[2] = clut.Transform(1.0, 1.0, 1.0) // Should hit [1.0]
@@ -153,7 +153,7 @@ func TestCLUTTransform(t *testing.T) {
 				0, 0, 1, // <- R=1, G=1, B=0
 				0, 0, 0, // <- R=1, G=1, B=1
 			}, // 8 points per output
-		)}
+		), false}
 		type u = [3]unit_float
 		for _, c := range []u{
 			{0, 0, 0}, {1, 1, 1}, {1, 0, 0}, {0, 1, 0}, {0, 0, 1}, {0.5, 0.5, 0.5},
