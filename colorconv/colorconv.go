@@ -201,7 +201,7 @@ func linearToSRGBComp(c float64) float64 {
 	switch {
 	case c <= 0.0031308:
 		// clip small negative values for stability
-		if c < 0 && c >= -1e-5 {
+		if c < 0 && c > -1./math.MaxUint16 {
 			return 0
 		}
 		return 12.92 * c
