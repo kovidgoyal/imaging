@@ -143,10 +143,18 @@ type Curves interface {
 }
 
 func NewCurveTransformer(name string, curves ...Curve1D) Curves {
+	all_identity := true
 	for _, c := range curves {
 		if c == nil {
-			panic("curve must not be nil")
+			ident := IdentityCurve(0)
+			c = &ident
 		}
+		if _, is_ident := c.(*IdentityCurve); !is_ident {
+			all_identity = false
+		}
+	}
+	if all_identity {
+		return nil
 	}
 	switch len(curves) {
 	case 3:
@@ -156,10 +164,18 @@ func NewCurveTransformer(name string, curves ...Curve1D) Curves {
 	}
 }
 func NewInverseCurveTransformer(name string, curves ...Curve1D) Curves {
+	all_identity := true
 	for _, c := range curves {
 		if c == nil {
-			panic("curve must not be nil")
+			ident := IdentityCurve(0)
+			c = &ident
 		}
+		if _, is_ident := c.(*IdentityCurve); !is_ident {
+			all_identity = false
+		}
+	}
+	if all_identity {
+		return nil
 	}
 	switch len(curves) {
 	case 3:

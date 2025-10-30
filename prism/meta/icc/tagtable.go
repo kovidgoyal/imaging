@@ -168,6 +168,9 @@ func (t *TagTable) load_curve_tag(s Signature) (Curve1D, error) {
 	if ans, ok := r.(Curve1D); !ok {
 		return nil, fmt.Errorf("could not load %s tag from profile as it is of unsupported type: %T", s, r)
 	} else {
+		if _, ok := r.(*IdentityCurve); ok {
+			return nil, nil
+		}
 		return ans, nil
 	}
 }

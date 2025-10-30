@@ -84,8 +84,14 @@ func (p *Profile) create_matrix_trc_transformer(forward bool, chromatic_adaptati
 	if err != nil {
 		return err
 	}
+	var c Curves
 	if forward {
-		pipeline.Append(NewCurveTransformer("TRC", rc, gc, bc), m, chromatic_adaptation)
+		c = NewCurveTransformer("TRC", rc, gc, bc)
+	} else {
+		c = NewInverseCurveTransformer("TRC", rc, gc, bc)
+	}
+	if forward {
+		pipeline.Append(c, m, chromatic_adaptation)
 	} else {
 		pipeline.Append(chromatic_adaptation, m, NewInverseCurveTransformer("TRC", rc, gc, bc))
 	}
