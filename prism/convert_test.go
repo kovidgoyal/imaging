@@ -185,8 +185,10 @@ func TestAgainstLCMS2(t *testing.T) {
 		// differences. This profile has completely broken inverse mapping so
 		// ignore it.)
 		{name: "jpegli.icc", inv_tolerance: THRESHOLD8, srgb_tolerance: 2 * THRESHOLD16},
-		// LutAtoBType profile with PCS=LAB
-		// test_profile(t, srgb_lab_profile_name, 0.0005)
+		// LutAtoBType profile with PCS=LAB. Their is some numerical
+		// instability in the lcms code because of conversion to and from float
+		// and fixed point representations, hence higher tolerances.
+		{name: srgb_lab_profile_name, inv_tolerance: 0.7 * THRESHOLD8, srgb_tolerance: 3 * THRESHOLD16},
 	} {
 		test_profile(t, c)
 	}
@@ -215,8 +217,11 @@ func develop_to_srgb(t *testing.T, name string) {
 var _ = develop_to_srgb
 
 func develop_inverse(t *testing.T, name string) {
-	const r, g, b float64 = 0.1, 0.2, 0.3
+	var r, g, b float64 = 0.1, 0.2, 0.3
 	p := profile(t, name)
+	if p.Header.ProfileConnectionSpace == icc.ColorSpaceLab {
+		r, g, b = icc.NewLABtoICC().Transform(r, g, b)
+	}
 	lcms := lcms_profile(t, name)
 	l, err := lcms.TransformFloatToDevice([]float64{r, g, b}, p.Header.RenderingIntent)
 	fmt.Println()
@@ -230,6 +235,13 @@ func develop_inverse(t *testing.T, name string) {
 
 var _ = develop_inverse
 
+func scale_threshold(p *icc.Profile, threshold float64) float64 {
+	if p.Header.ProfileConnectionSpace == icc.ColorSpaceLab {
+		threshold *= 256
+	}
+	return threshold
+}
+
 func develop_pcs(t *testing.T, name string) {
 	const r, g, b float64 = 0.1, 0.2, 0.3
 	p := profile(t, name)
@@ -240,14 +252,14 @@ func develop_pcs(t *testing.T, name string) {
 	require.NoError(t, err)
 	x, y, z := tr.TransformDebug(r, g, b, transform_debug)
 	fmt.Println()
-	in_delta_rgb(t, name, l, []float64{x, y, z}, THRESHOLD16)
+	in_delta_rgb(t, name, l, []float64{x, y, z}, scale_threshold(p, THRESHOLD16))
 }
 
 var _ = develop_pcs
 
 func TestDevelop(t *testing.T) {
-	const name = "jpegli.icc"
-	develop_pcs(t, name)
+	const name = srgb_lab_profile_name
+	// develop_pcs(t, name)
 	// develop_inverse(t, name)
 	develop_to_srgb(t, name)
 }

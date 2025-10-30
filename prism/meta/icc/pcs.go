@@ -17,26 +17,6 @@ func tg33(t func(r, g, b unit_float) (x, y, z unit_float), o, i []unit_float) {
 	}
 }
 
-// A transformer to convert LAB colors to normalized [0,1] values
-type NormalizeLAB int
-
-var _ ChannelTransformer = (*NormalizeLAB)(nil)
-var _ ChannelTransformer = (*BlackPointCorrection)(nil)
-
-func (n NormalizeLAB) String() string                        { return "NormalizeLAB" }
-func (n NormalizeLAB) IOSig() (int, int)                     { return 3, 3 }
-func (n *NormalizeLAB) Iter(f func(ChannelTransformer) bool) { f(n) }
-func (m *NormalizeLAB) Transform(l, a, b unit_float) (unit_float, unit_float, unit_float) {
-	return l / 100, (a + 128) / 255, (b + 128) / 255
-}
-
-func (m *NormalizeLAB) TransformGeneral(o, i []unit_float) { tg33(m.Transform, o, i) }
-
-func NewNormalizeLAB() *NormalizeLAB {
-	x := NormalizeLAB(0)
-	return &x
-}
-
 // A transformer to convert XYZ colors normalized [0,1] values to the [0,1.99997]
 // (u1Fixed15Number) values used by ICC color profiles
 type XYZtoICC int
@@ -73,6 +53,42 @@ func (m *ICCtoXYZ) TransformGeneral(o, i []unit_float) { tg33(m.Transform, o, i)
 
 func NewICCtoXYZ() *ICCtoXYZ {
 	x := ICCtoXYZ(0)
+	return &x
+}
+
+// A transformer to convert normalized LAB [0,1] to the LAB co-ordinate system
+// used by ICC profiles
+type LABtoICC int
+
+func (n LABtoICC) String() string                        { return "LABtoICC" }
+func (n LABtoICC) IOSig() (int, int)                     { return 3, 3 }
+func (n *LABtoICC) Iter(f func(ChannelTransformer) bool) { f(n) }
+func (m *LABtoICC) Transform(x, y, z unit_float) (unit_float, unit_float, unit_float) {
+	// See PackLabDoubleFromFloat in lcms source code
+	return x * 100, (y*255 - 128), (z*255 - 128)
+}
+
+func (m *LABtoICC) TransformGeneral(o, i []unit_float) { tg33(m.Transform, o, i) }
+
+func NewLABtoICC() *LABtoICC {
+	x := LABtoICC(0)
+	return &x
+}
+
+type ICCtoLAB int
+
+func (n ICCtoLAB) String() string                        { return "ICCtoLAB" }
+func (n ICCtoLAB) IOSig() (int, int)                     { return 3, 3 }
+func (n *ICCtoLAB) Iter(f func(ChannelTransformer) bool) { f(n) }
+func (m *ICCtoLAB) Transform(x, y, z unit_float) (unit_float, unit_float, unit_float) {
+	// See PackLabDoubleFromFloat in lcms source code
+	return x * (1. / 100), (y*(1./255) + 128./255), (z*(1./255) + 128./255)
+}
+
+func (m *ICCtoLAB) TransformGeneral(o, i []unit_float) { tg33(m.Transform, o, i) }
+
+func NewICCtoLAB() *ICCtoLAB {
+	x := ICCtoLAB(0)
 	return &x
 }
 
