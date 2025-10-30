@@ -32,6 +32,7 @@ func is_nil(i any) bool {
 		return false
 	}
 }
+
 func (p *Pipeline) insert(idx int, c ChannelTransformer) {
 	if is_nil(c) {
 		return
@@ -156,6 +157,15 @@ func (p *Pipeline) IsSuitableFor(i, o int) bool {
 		i = qo
 	}
 	return i == o
+}
+
+func (p *Pipeline) UseTrilinearInsteadOfTetrahedral() {
+	for i, q := range p.transformers {
+		if x, ok := q.(*TetrahedralInterpolate); ok {
+			p.transformers[i] = &TrilinearInterpolate{x.d, x.legacy}
+			p.tfuncs[i] = p.transformers[i].Transform
+		}
+	}
 }
 
 func (p *Pipeline) IsXYZSRGB() bool {

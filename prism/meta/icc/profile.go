@@ -201,6 +201,11 @@ func (p *Profile) CreateTransformerToDevice(rendering_intent RenderingIntent, op
 	if b2a != nil {
 		ans.Append(b2a)
 		ans.Append(chromatic_adaptation)
+		if p.Header.ProfileConnectionSpace == ColorSpaceLab {
+			// For some reason, lcms prefers trilinear over tetrahedral in this
+			// case, see _cmsReadOutputLUT() in cmsio1.c
+			ans.UseTrilinearInsteadOfTetrahedral()
+		}
 	} else {
 		err = p.create_matrix_trc_transformer(forward, chromatic_adaptation, ans)
 	}

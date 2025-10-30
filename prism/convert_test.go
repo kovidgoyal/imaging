@@ -24,6 +24,26 @@ const srgb_xyz_profile_name = "sRGB2014.icc"
 const THRESHOLD16 = 1. / math.MaxUint16
 const THRESHOLD8 = 1. / math.MaxUint8
 
+var profiles = map[string]opt{
+	// simplest case: matrix/trc profile
+	srgb_xyz_profile_name: {srgb_tolerance: 0.4 * THRESHOLD8, inv_tolerance: 6 * THRESHOLD16},
+	// LutAtoBType profile with PCS=XYZ (need higher tolerance for
+	// because of lcms does interpolation and matrix calculation using 16bit
+	// numbers, we use 64bit numbers)
+	"jpegli.icc": {pcs_tolerance: 0.07 * THRESHOLD8, inv_tolerance: 0.25 * THRESHOLD8, srgb_tolerance: 0.94 * THRESHOLD8},
+	// LutAtoBType profile with PCS=LAB. Their is some numerical
+	// instability in the lcms code because of conversion to and from float
+	// and fixed point representations, hence higher tolerances.
+	srgb_lab_profile_name: {inv_tolerance: 0.05 * THRESHOLD8, srgb_tolerance: 0.35 * THRESHOLD8},
+	// profile created by lcms to check browser compatibility using V2 LUTs
+	"lcms-check-lut.icc": {skip_inv: true, srgb_tolerance: 5 * THRESHOLD16},
+	// profile created by lcms to check browser compatibility uses both matrix and LUTs
+	"lcms-check-full.icc": {skip_inv: true, srgb_tolerance: 5 * THRESHOLD16},
+	// profile created by lcms to check browser compatibility uses v4
+	// constructs uses LutAtoBType with PCS=LAB
+	"lcms-stress.icc": {skip_inv: true, pcs_tolerance: 2 * THRESHOLD16, srgb_tolerance: 4 * THRESHOLD16},
+}
+
 // testDir returns the absolute path to the directory containing the test file.
 // It searches the call stack for the first frame whose filename ends with "_test.go".
 // Falls back to os.Getwd() if nothing is found (very unlikely).
@@ -100,10 +120,46 @@ func TestCGOConversion(t *testing.T) {
 	}
 }
 
-func in_delta_rgb(t *testing.T, desc string, expected, actual []float64, tolerance float64) {
+func max_diff(expected, actual []float64) (ans float64) {
+	for i := range expected {
+		ans = max(ans, math.Abs(expected[i]-actual[i]))
+	}
+	return
+}
+
+func lab_l(l float64) float64  { return l / 100 }
+func lab_ab(a float64) float64 { return a*(1./255) + 128./255 }
+
+var lab_scalers = [3]func(float64) float64{lab_l, lab_ab, lab_ab}
+
+func max_lab_diff(expected, actual []float64) (ans float64) {
+	for i := range expected {
+		ans = max(ans, math.Abs(lab_scalers[i](expected[i])-lab_scalers[i](actual[i])))
+	}
+	return
+}
+
+func in_delta_rgb(t *testing.T, desc string, num_channels int, pts, expected, actual []float64, tolerance float64, is_lab bool) {
 	t.Helper()
-	for i := range len(actual) / 3 {
-		require.InDeltaSlice(t, expected[:3], actual[:3], tolerance, fmt.Sprintf("%s: the %dth pixel does not match. Want %.6v got %.6v", desc, i, expected[:3], actual[:3]))
+	var worst struct {
+		pts, expected, actual []float64
+		max_diff              float64
+	}
+	df := icc.IfElse(is_lab, max_lab_diff, max_diff)
+	for range len(actual) / num_channels {
+		if d := df(expected[:num_channels], actual[:num_channels]); d > tolerance {
+			if d > worst.max_diff {
+				worst.max_diff = d
+				worst.pts, worst.expected, worst.actual = pts[:num_channels], expected[:num_channels], actual[:num_channels]
+			}
+		}
+		expected = expected[num_channels:]
+		actual = actual[num_channels:]
+		pts = pts[num_channels:]
+	}
+	if worst.max_diff > 0 {
+		t.Fatalf("%s: the pixel %.6v does not match.\nThe max difference is %d times the tolerance of %.2v.\nWant %.6v got %.6v",
+			desc, worst.pts, int(math.Ceil(worst.max_diff/tolerance)), tolerance, worst.expected, worst.actual)
 	}
 }
 
@@ -184,32 +240,12 @@ func test_profile(t *testing.T, name string) {
 		}
 		expected.srgb, err = lcms.TransformFloatToSRGB(pts, p.Header.RenderingIntent)
 		require.NoError(t, err)
-		in_delta_rgb(t, "to pcs", expected.pcs, actual.pcs, opt.pcs_tolerance)
+		in_delta_rgb(t, "to pcs", input_channels, pts, expected.pcs, actual.pcs, opt.pcs_tolerance, p.Header.ProfileConnectionSpace == icc.ColorSpaceLab)
 		if !opt.skip_inv {
-			in_delta_rgb(t, "to device", expected.inv, actual.inv, opt.inv_tolerance)
+			in_delta_rgb(t, "to device", input_channels, actual.pcs, expected.inv, actual.inv, opt.inv_tolerance, false)
 		}
-		in_delta_rgb(t, "to sRGB", expected.srgb, actual.srgb, opt.srgb_tolerance)
+		in_delta_rgb(t, "to sRGB", input_channels, pts, expected.srgb, actual.srgb, opt.srgb_tolerance, false)
 	})
-}
-
-var profiles = map[string]opt{
-	// simplest case: matrix/trc profile
-	srgb_xyz_profile_name: {srgb_tolerance: 3 * THRESHOLD16},
-	// LutAtoBType profile with PCS=XYZ (need slightly higher tolerance for
-	// srgb because of different order of operations causing small
-	// differences. This profile has completely broken inverse mapping so
-	// ignore it.)
-	"jpegli.icc": {inv_tolerance: THRESHOLD8, srgb_tolerance: 2 * THRESHOLD16},
-	// LutAtoBType profile with PCS=LAB. Their is some numerical
-	// instability in the lcms code because of conversion to and from float
-	// and fixed point representations, hence higher tolerances.
-	srgb_lab_profile_name: {inv_tolerance: 0.7 * THRESHOLD8, srgb_tolerance: 3 * THRESHOLD16},
-	// profile created by lcms to check browser compatibility using V2 LUTs
-	"lcms-check-lut.icc": {skip_inv: true},
-	// profile created by lcms to check browser compatibility uses both matrix and LUTs
-	"lcms-check-full.icc": {skip_inv: true},
-	// profile created by lcms to check browser compatibility uses v4 constructs
-	"lcms-stress.icc": {skip_inv: true},
 }
 
 func TestAgainstLCMS2(t *testing.T) {
@@ -226,7 +262,7 @@ func transform_debug(r, g, b, x, y, z float64, t icc.ChannelTransformer) {
 var _ = transform_debug
 
 func develop_to_srgb(t *testing.T, name string, tolerance float64) {
-	const r, g, b float64 = 0.1, 0.2, 0.3
+	const r, g, b float64 = 1, 0.0666667, 0.2
 	p := profile(t, name)
 	lcms := lcms_profile(t, name)
 	l, err := lcms.TransformFloatToSRGB([]float64{r, g, b}, p.Header.RenderingIntent)
@@ -235,17 +271,14 @@ func develop_to_srgb(t *testing.T, name string, tolerance float64) {
 	x, y, z := tr.TransformDebug(r, g, b, transform_debug)
 	fmt.Println()
 
-	in_delta_rgb(t, name+":srgb", l, []float64{x, y, z}, tolerance)
+	in_delta_rgb(t, name+":srgb", 3, []float64{r, g, b}, l, []float64{x, y, z}, tolerance, false)
 }
 
 var _ = develop_to_srgb
 
 func develop_inverse(t *testing.T, name string, tolerance float64) {
-	var r, g, b float64 = 0.1, 0.2, 0.3
+	var r, g, b float64 = 78.2471, -57.496, 10.4908
 	p := profile(t, name)
-	if p.Header.ProfileConnectionSpace == icc.ColorSpaceLab {
-		r, g, b = icc.NewNormalizedToLAB().Transform(r, g, b)
-	}
 	lcms := lcms_profile(t, name)
 	l, err := lcms.TransformFloatToDevice([]float64{r, g, b}, p.Header.RenderingIntent)
 	fmt.Println()
@@ -253,20 +286,13 @@ func develop_inverse(t *testing.T, name string, tolerance float64) {
 	require.NoError(t, err)
 	x, y, z := tr.TransformDebug(r, g, b, transform_debug)
 	fmt.Println()
-	in_delta_rgb(t, name+":inverse", l, []float64{x, y, z}, tolerance)
+	in_delta_rgb(t, name+":inverse", 3, []float64{r, g, b}, l, []float64{x, y, z}, tolerance, false)
 }
 
 var _ = develop_inverse
 
-func scale_threshold(p *icc.Profile, threshold float64) float64 {
-	if p.Header.ProfileConnectionSpace == icc.ColorSpaceLab {
-		threshold *= 256
-	}
-	return threshold
-}
-
 func develop_pcs(t *testing.T, name string, tolerance float64) {
-	const r, g, b float64 = 0.1, 0.2, 0.3
+	const r, g, b float64 = 0.933333, 0.666667, 0.666667
 	p := profile(t, name)
 	lcms := lcms_profile(t, name)
 	l, err := lcms.TransformFloatToPCS([]float64{r, g, b}, p.Header.RenderingIntent)
@@ -275,17 +301,18 @@ func develop_pcs(t *testing.T, name string, tolerance float64) {
 	require.NoError(t, err)
 	x, y, z := tr.TransformDebug(r, g, b, transform_debug)
 	fmt.Println()
-	in_delta_rgb(t, name+": pcs", l, []float64{x, y, z}, scale_threshold(p, tolerance))
+	in_delta_rgb(t, name+": pcs", 3, []float64{r, g, b}, l, []float64{x, y, z}, tolerance, true)
 }
 
 var _ = develop_pcs
 
+// Run this with ./custom-lcms.sh
 func TestDevelop(t *testing.T) {
-	const name = srgb_xyz_profile_name
+	const name = "lcms-stress.icc"
 	opt := options_for_profile(name)
 	develop_pcs(t, name, opt.pcs_tolerance)
-	if !opt.skip_inv {
-		develop_inverse(t, name, opt.inv_tolerance)
-	}
-	develop_to_srgb(t, name, opt.srgb_tolerance)
+	// if !opt.skip_inv {
+	// 	develop_inverse(t, name, opt.inv_tolerance)
+	// }
+	// develop_to_srgb(t, name, opt.srgb_tolerance)
 }
