@@ -125,6 +125,13 @@ func (p *Pipeline) TransformGeneral(out, in []unit_float) {
 	}
 }
 
+func (p *Pipeline) TransformGeneralDebug(out, in []unit_float, f func(in, out []unit_float, t ChannelTransformer)) {
+	for _, t := range p.transformers {
+		t.TransformGeneral(out, in)
+		f(in, out, t)
+	}
+}
+
 func (p *Pipeline) Len() int { return len(p.transformers) }
 
 func transformers_as_string(t ...ChannelTransformer) string {

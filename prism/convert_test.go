@@ -42,6 +42,8 @@ var profiles = map[string]opt{
 	// profile created by lcms to check browser compatibility uses v4
 	// constructs uses LutAtoBType with PCS=LAB
 	"lcms-stress.icc": {skip_inv: true, pcs_tolerance: 2 * THRESHOLD16, srgb_tolerance: 4 * THRESHOLD16},
+	// CMYK profile using LAB space
+	"cmyk.icc": {skip_inv: true, pcs_tolerance: 2 * THRESHOLD16, srgb_tolerance: 4 * THRESHOLD16},
 }
 
 // testDir returns the absolute path to the directory containing the test file.
@@ -208,8 +210,8 @@ func test_profile(t *testing.T, name string) {
 			pts = icc.Points_for_transformer_comparison4()
 		}
 		var actual, expected struct{ pcs, inv, srgb []float64 }
-		actual.pcs, actual.inv, actual.srgb = make([]float64, 0, len(pts)), make([]float64, 0, len(pts)), make([]float64, 0, len(pts))
 		num_pixels := len(pts) / input_channels
+		actual.pcs, actual.inv, actual.srgb = make([]float64, 0, num_pixels*3), make([]float64, 0, num_pixels*input_channels), make([]float64, 0, num_pixels*3)
 		if input_channels == 3 {
 			pos := pts
 			for range num_pixels {
@@ -225,7 +227,7 @@ func test_profile(t *testing.T, name string) {
 				pos = pos[3:]
 			}
 		} else {
-			actual.pcs, actual.inv, actual.srgb = actual.pcs[:3*num_pixels], actual.inv[:3*num_pixels], actual.srgb[:3*num_pixels]
+			actual.pcs, actual.inv, actual.srgb = actual.pcs[:3*cap(actual.pcs)], actual.inv[:cap(actual.inv)], actual.srgb[:cap(actual.srgb)]
 			pcs.TransformGeneral(actual.pcs, pts)
 			if !opt.skip_inv {
 				inv.TransformGeneral(actual.inv, actual.pcs)
@@ -259,11 +261,15 @@ func transform_debug(r, g, b, x, y, z float64, t icc.ChannelTransformer) {
 	fmt.Printf("  %.6v → %.6v\n", []float64{r, g, b}, []float64{x, y, z})
 }
 
+func transform_general_debug(inp, outp []float64, t icc.ChannelTransformer) {
+	fmt.Printf("\x1b[34m%s\x1b[m\n", t)
+	fmt.Printf("  %.6v → %.6v\n", inp, outp)
+}
+
 var _ = transform_debug
 
-func develop_to_srgb(t *testing.T, name string, tolerance float64) {
+func develop_to_srgb(p *icc.Profile, t *testing.T, name string, tolerance float64) {
 	const r, g, b float64 = 1, 0.0666667, 0.2
-	p := profile(t, name)
 	lcms := lcms_profile(t, name)
 	l, err := lcms.TransformFloatToSRGB([]float64{r, g, b}, p.Header.RenderingIntent)
 	tr, err := p.CreateTransformerToSRGB(p.Header.RenderingIntent, 3, false, false, false)
@@ -276,9 +282,8 @@ func develop_to_srgb(t *testing.T, name string, tolerance float64) {
 
 var _ = develop_to_srgb
 
-func develop_inverse(t *testing.T, name string, tolerance float64) {
+func develop_inverse(p *icc.Profile, t *testing.T, name string, tolerance float64) {
 	var r, g, b float64 = 78.2471, -57.496, 10.4908
-	p := profile(t, name)
 	lcms := lcms_profile(t, name)
 	l, err := lcms.TransformFloatToDevice([]float64{r, g, b}, p.Header.RenderingIntent)
 	fmt.Println()
@@ -291,9 +296,8 @@ func develop_inverse(t *testing.T, name string, tolerance float64) {
 
 var _ = develop_inverse
 
-func develop_pcs(t *testing.T, name string, tolerance float64) {
+func develop_pcs(p *icc.Profile, t *testing.T, name string, tolerance float64) {
 	const r, g, b float64 = 0.933333, 0.666667, 0.666667
-	p := profile(t, name)
 	lcms := lcms_profile(t, name)
 	l, err := lcms.TransformFloatToPCS([]float64{r, g, b}, p.Header.RenderingIntent)
 	fmt.Println()
@@ -304,15 +308,34 @@ func develop_pcs(t *testing.T, name string, tolerance float64) {
 	in_delta_rgb(t, name+": pcs", 3, []float64{r, g, b}, l, []float64{x, y, z}, tolerance, true)
 }
 
+func develop_pcs4(p *icc.Profile, t *testing.T, name string, tolerance float64) {
+	const c, m, y, k = 0.933333, 0.666667, 0.666667, 0.5
+	lcms := lcms_profile(t, name)
+	inp := []float64{c, m, y, k}
+	l, err := lcms.TransformFloatToPCS(inp, p.Header.RenderingIntent)
+	fmt.Println()
+	tr, err := p.CreateTransformerToPCS(p.Header.RenderingIntent, 4, false)
+	require.NoError(t, err)
+	out := []float64{0, 0, 0, 0}
+	tr.TransformGeneralDebug(out, inp, transform_general_debug)
+	fmt.Println()
+	in_delta_rgb(t, name+": pcs", 4, inp, l, out[:3], tolerance, true)
+}
+
 var _ = develop_pcs
 
 // Run this with ./custom-lcms.sh
 func TestDevelop(t *testing.T) {
-	const name = "lcms-stress.icc"
+	const name = "cmyk.icc"
 	opt := options_for_profile(name)
-	develop_pcs(t, name, opt.pcs_tolerance)
-	// if !opt.skip_inv {
-	// 	develop_inverse(t, name, opt.inv_tolerance)
-	// }
-	// develop_to_srgb(t, name, opt.srgb_tolerance)
+	p := profile(t, name)
+	if p.Header.DataColorSpace == icc.ColorSpaceCMYK {
+		develop_pcs4(p, t, name, opt.pcs_tolerance)
+	} else {
+		develop_pcs(p, t, name, opt.pcs_tolerance)
+		// if !opt.skip_inv {
+		// 	develop_inverse(p, t, name, opt.inv_tolerance)
+		// }
+		// develop_to_srgb(p, t, name, opt.srgb_tolerance)
+	}
 }
