@@ -173,11 +173,11 @@ func (p *Profile) CreateTransformerToDevice(rendering_intent RenderingIntent, op
 		is_lab := p.Header.ProfileConnectionSpace == ColorSpaceLab
 		if is_lab {
 			ans.Append(NewLABtoXYZ(p.PCSIlluminant))
-			ans.Append(NewICCtoXYZ())
+			ans.Append(NewXYZToNormalized())
 		}
 		ans.Append(NewBlackPointCorrection(p.PCSIlluminant, PCS_blackpoint, output_blackpoint))
 		if is_lab {
-			ans.Append(NewXYZtoICC())
+			ans.Append(NewNormalizedToXYZ())
 			ans.Append(NewXYZtoLAB(p.PCSIlluminant))
 		}
 	}
@@ -236,14 +236,14 @@ func transform_for_pcs_colorspace(cs ColorSpace, forward bool) ChannelTransforme
 	switch cs {
 	case ColorSpaceXYZ:
 		if forward {
-			return NewXYZtoICC()
+			return NewNormalizedToXYZ()
 		}
-		return NewICCtoXYZ()
+		return NewXYZToNormalized()
 	case ColorSpaceLab:
 		if forward {
-			return NewLABtoICC()
+			return NewNormalizedToLAB()
 		}
-		return NewICCtoLAB()
+		return NewLABToNormalized()
 	default:
 		panic(fmt.Sprintf("unsupported PCS colorspace in profile: %s", cs))
 	}
@@ -274,7 +274,7 @@ func (p *Profile) CreateTransformerToSRGB(rendering_intent RenderingIntent, inpu
 		if input_colorspace == ColorSpaceLab {
 			ans.Append(transform_for_pcs_colorspace(input_colorspace, true))
 			ans.Append(NewLABtoXYZ(p.PCSIlluminant))
-			ans.Append(NewICCtoXYZ())
+			ans.Append(NewXYZToNormalized())
 			input_colorspace = ColorSpaceXYZ
 		}
 		ans.Append(NewBlackPointCorrection(p.PCSIlluminant, input_blackpoint, sRGB_blackpoint))

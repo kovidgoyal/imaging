@@ -220,7 +220,7 @@ func develop_inverse(t *testing.T, name string) {
 	var r, g, b float64 = 0.1, 0.2, 0.3
 	p := profile(t, name)
 	if p.Header.ProfileConnectionSpace == icc.ColorSpaceLab {
-		r, g, b = icc.NewLABtoICC().Transform(r, g, b)
+		r, g, b = icc.NewNormalizedToLAB().Transform(r, g, b)
 	}
 	lcms := lcms_profile(t, name)
 	l, err := lcms.TransformFloatToDevice([]float64{r, g, b}, p.Header.RenderingIntent)

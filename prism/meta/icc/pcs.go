@@ -17,78 +17,78 @@ func tg33(t func(r, g, b unit_float) (x, y, z unit_float), o, i []unit_float) {
 	}
 }
 
-// A transformer to convert XYZ colors normalized [0,1] values to the [0,1.99997]
-// (u1Fixed15Number) values used by ICC color profiles
-type XYZtoICC int
+// A transformer to convert normalized [0,1] values to the [0,1.99997]
+// (u1Fixed15Number) values used by ICC XYZ PCS space
+type NormalizedToXYZ int
 
 const MAX_ENCODEABLE_XYZ = 1.0 + 32767.0/32768.0
 const MAX_ENCODEABLE_XYZ_INVERSE = 1 / (MAX_ENCODEABLE_XYZ)
 
-func (n XYZtoICC) String() string                        { return "XYZtoICC" }
-func (n XYZtoICC) IOSig() (int, int)                     { return 3, 3 }
-func (n *XYZtoICC) Iter(f func(ChannelTransformer) bool) { f(n) }
-func (m *XYZtoICC) Transform(x, y, z unit_float) (unit_float, unit_float, unit_float) {
+func (n NormalizedToXYZ) String() string                        { return "NormalizedToXYZ" }
+func (n NormalizedToXYZ) IOSig() (int, int)                     { return 3, 3 }
+func (n *NormalizedToXYZ) Iter(f func(ChannelTransformer) bool) { f(n) }
+func (m *NormalizedToXYZ) Transform(x, y, z unit_float) (unit_float, unit_float, unit_float) {
 	return x * MAX_ENCODEABLE_XYZ, y * MAX_ENCODEABLE_XYZ, z * MAX_ENCODEABLE_XYZ
 }
-func (m *XYZtoICC) AsMatrix3() *Matrix3 { return NewScalingMatrix3(MAX_ENCODEABLE_XYZ) }
+func (m *NormalizedToXYZ) AsMatrix3() *Matrix3 { return NewScalingMatrix3(MAX_ENCODEABLE_XYZ) }
 
-func (m *XYZtoICC) TransformGeneral(o, i []unit_float) { tg33(m.Transform, o, i) }
+func (m *NormalizedToXYZ) TransformGeneral(o, i []unit_float) { tg33(m.Transform, o, i) }
 
-func NewXYZtoICC() *XYZtoICC {
-	x := XYZtoICC(0)
+func NewNormalizedToXYZ() *NormalizedToXYZ {
+	x := NormalizedToXYZ(0)
 	return &x
 }
 
-type ICCtoXYZ int
+type XYZToNormalized int
 
-func (n ICCtoXYZ) String() string                        { return "ICCtoXYZ" }
-func (n ICCtoXYZ) IOSig() (int, int)                     { return 3, 3 }
-func (n *ICCtoXYZ) Iter(f func(ChannelTransformer) bool) { f(n) }
-func (m *ICCtoXYZ) Transform(x, y, z unit_float) (unit_float, unit_float, unit_float) {
+func (n XYZToNormalized) String() string                        { return "XYZToNormalized" }
+func (n XYZToNormalized) IOSig() (int, int)                     { return 3, 3 }
+func (n *XYZToNormalized) Iter(f func(ChannelTransformer) bool) { f(n) }
+func (m *XYZToNormalized) Transform(x, y, z unit_float) (unit_float, unit_float, unit_float) {
 	return x * MAX_ENCODEABLE_XYZ_INVERSE, y * MAX_ENCODEABLE_XYZ_INVERSE, z * MAX_ENCODEABLE_XYZ_INVERSE
 }
-func (m *ICCtoXYZ) AsMatrix3() *Matrix3 { return NewScalingMatrix3(MAX_ENCODEABLE_XYZ_INVERSE) }
+func (m *XYZToNormalized) AsMatrix3() *Matrix3 { return NewScalingMatrix3(MAX_ENCODEABLE_XYZ_INVERSE) }
 
-func (m *ICCtoXYZ) TransformGeneral(o, i []unit_float) { tg33(m.Transform, o, i) }
+func (m *XYZToNormalized) TransformGeneral(o, i []unit_float) { tg33(m.Transform, o, i) }
 
-func NewICCtoXYZ() *ICCtoXYZ {
-	x := ICCtoXYZ(0)
+func NewXYZToNormalized() *XYZToNormalized {
+	x := XYZToNormalized(0)
 	return &x
 }
 
-// A transformer to convert normalized LAB [0,1] to the LAB co-ordinate system
-// used by ICC profiles
-type LABtoICC int
+// A transformer to convert normalized [0,1] to the LAB co-ordinate system
+// used by ICC PCS LAB profiles [0-100], [-128, 127]
+type NormalizedToLAB int
 
-func (n LABtoICC) String() string                        { return "LABtoICC" }
-func (n LABtoICC) IOSig() (int, int)                     { return 3, 3 }
-func (n *LABtoICC) Iter(f func(ChannelTransformer) bool) { f(n) }
-func (m *LABtoICC) Transform(x, y, z unit_float) (unit_float, unit_float, unit_float) {
+func (n NormalizedToLAB) String() string                        { return "NormalizedToLAB" }
+func (n NormalizedToLAB) IOSig() (int, int)                     { return 3, 3 }
+func (n *NormalizedToLAB) Iter(f func(ChannelTransformer) bool) { f(n) }
+func (m *NormalizedToLAB) Transform(x, y, z unit_float) (unit_float, unit_float, unit_float) {
 	// See PackLabDoubleFromFloat in lcms source code
 	return x * 100, (y*255 - 128), (z*255 - 128)
 }
 
-func (m *LABtoICC) TransformGeneral(o, i []unit_float) { tg33(m.Transform, o, i) }
+func (m *NormalizedToLAB) TransformGeneral(o, i []unit_float) { tg33(m.Transform, o, i) }
 
-func NewLABtoICC() *LABtoICC {
-	x := LABtoICC(0)
+func NewNormalizedToLAB() *NormalizedToLAB {
+	x := NormalizedToLAB(0)
 	return &x
 }
 
-type ICCtoLAB int
+type LABToNormalized int
 
-func (n ICCtoLAB) String() string                        { return "ICCtoLAB" }
-func (n ICCtoLAB) IOSig() (int, int)                     { return 3, 3 }
-func (n *ICCtoLAB) Iter(f func(ChannelTransformer) bool) { f(n) }
-func (m *ICCtoLAB) Transform(x, y, z unit_float) (unit_float, unit_float, unit_float) {
+func (n LABToNormalized) String() string                        { return "LABToNormalized" }
+func (n LABToNormalized) IOSig() (int, int)                     { return 3, 3 }
+func (n *LABToNormalized) Iter(f func(ChannelTransformer) bool) { f(n) }
+func (m *LABToNormalized) Transform(x, y, z unit_float) (unit_float, unit_float, unit_float) {
 	// See PackLabDoubleFromFloat in lcms source code
 	return x * (1. / 100), (y*(1./255) + 128./255), (z*(1./255) + 128./255)
 }
 
-func (m *ICCtoLAB) TransformGeneral(o, i []unit_float) { tg33(m.Transform, o, i) }
+func (m *LABToNormalized) TransformGeneral(o, i []unit_float) { tg33(m.Transform, o, i) }
 
-func NewICCtoLAB() *ICCtoLAB {
-	x := ICCtoLAB(0)
+func NewLABToNormalized() *LABToNormalized {
+	x := LABToNormalized(0)
 	return &x
 }
 
