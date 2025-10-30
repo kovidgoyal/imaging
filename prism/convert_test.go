@@ -110,6 +110,7 @@ func in_delta_rgb(t *testing.T, desc string, expected, actual []float64, toleran
 type opt struct {
 	name                                         string
 	pcs_tolerance, inv_tolerance, srgb_tolerance float64
+	skip_inv                                     bool
 }
 
 func test_profile(t *testing.T, opt opt) {
@@ -134,7 +135,9 @@ func test_profile(t *testing.T, opt opt) {
 		pcs, err := p.CreateDefaultTransformerToPCS(input_channels)
 		require.NoError(t, err)
 		inv, err := p.CreateDefaultTransformerToDevice()
-		require.NoError(t, err)
+		if !opt.skip_inv {
+			require.NoError(t, err)
+		}
 		srgb, err := p.CreateTransformerToSRGB(p.Header.RenderingIntent, input_channels, false, false, true)
 		require.NoError(t, err)
 		var pts []float64
@@ -152,8 +155,10 @@ func test_profile(t *testing.T, opt opt) {
 				x, y, z := pos[0], pos[1], pos[2]
 				r, g, b := pcs.Transform(x, y, z)
 				actual.pcs = append(actual.pcs, r, g, b)
-				ir, ig, ib := inv.Transform(r, g, b)
-				actual.inv = append(actual.inv, ir, ig, ib)
+				if !opt.skip_inv {
+					ir, ig, ib := inv.Transform(r, g, b)
+					actual.inv = append(actual.inv, ir, ig, ib)
+				}
 				r, g, b = srgb.Transform(x, y, z)
 				actual.srgb = append(actual.srgb, r, g, b)
 				pos = pos[3:]
@@ -161,17 +166,23 @@ func test_profile(t *testing.T, opt opt) {
 		} else {
 			actual.pcs, actual.inv, actual.srgb = actual.pcs[:3*num_pixels], actual.inv[:3*num_pixels], actual.srgb[:3*num_pixels]
 			pcs.TransformGeneral(actual.pcs, pts)
-			inv.TransformGeneral(actual.inv, actual.pcs)
+			if !opt.skip_inv {
+				inv.TransformGeneral(actual.inv, actual.pcs)
+			}
 			srgb.TransformGeneral(actual.srgb, pts)
 		}
 		expected.pcs, err = lcms.TransformFloatToPCS(pts, p.Header.RenderingIntent)
 		require.NoError(t, err)
-		expected.inv, err = lcms.TransformFloatToDevice(actual.pcs, p.Header.RenderingIntent)
-		require.NoError(t, err)
+		if !opt.skip_inv {
+			expected.inv, err = lcms.TransformFloatToDevice(actual.pcs, p.Header.RenderingIntent)
+			require.NoError(t, err)
+		}
 		expected.srgb, err = lcms.TransformFloatToSRGB(pts, p.Header.RenderingIntent)
 		require.NoError(t, err)
 		in_delta_rgb(t, "to pcs", expected.pcs, actual.pcs, opt.pcs_tolerance)
-		in_delta_rgb(t, "to device", expected.inv, actual.inv, opt.inv_tolerance)
+		if !opt.skip_inv {
+			in_delta_rgb(t, "to device", expected.inv, actual.inv, opt.inv_tolerance)
+		}
 		in_delta_rgb(t, "to sRGB", expected.srgb, actual.srgb, opt.srgb_tolerance)
 	})
 }
@@ -189,6 +200,12 @@ func TestAgainstLCMS2(t *testing.T) {
 		// instability in the lcms code because of conversion to and from float
 		// and fixed point representations, hence higher tolerances.
 		{name: srgb_lab_profile_name, inv_tolerance: 0.7 * THRESHOLD8, srgb_tolerance: 3 * THRESHOLD16},
+		// profile created by lcms to check browser compatibility using V2 LUTs
+		{name: "lcms-check-lut.icc", skip_inv: true},
+		// profile created by lcms to check browser compatibility uses both matrix and LUTs
+		{name: "lcms-check-full.icc", skip_inv: true},
+		// profile created by lcms to check browser compatibility uses v4 constructs
+		{name: "lcms-check-full.icc", skip_inv: true},
 	} {
 		test_profile(t, c)
 	}
