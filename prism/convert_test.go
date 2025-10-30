@@ -275,8 +275,8 @@ func develop_pcs(t *testing.T, name string) {
 var _ = develop_pcs
 
 func TestDevelop(t *testing.T) {
-	const name = srgb_lab_profile_name
-	// develop_pcs(t, name)
-	// develop_inverse(t, name)
+	const name = srgb_xyz_profile_name
+	develop_pcs(t, name)
+	develop_inverse(t, name)
 	develop_to_srgb(t, name)
 }
