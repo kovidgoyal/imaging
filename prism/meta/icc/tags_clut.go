@@ -73,7 +73,7 @@ func decode_clut_table(raw []byte, bytes_per_channel, OutputChannels int, grid_p
 }
 
 func make_clut(grid_points []int, num_inputs, num_outputs int, samples []unit_float, legacy, prefer_trilinear bool) CLUT {
-	if num_inputs == 3 && !prefer_trilinear {
+	if num_inputs >= 3 && !prefer_trilinear {
 		return &TetrahedralInterpolate{make_interpolation_data(num_inputs, num_outputs, grid_points, samples), legacy}
 	}
 	return &TrilinearInterpolate{make_interpolation_data(num_inputs, num_outputs, grid_points, samples), legacy}
@@ -114,18 +114,9 @@ func expectedValues(gridPoints []int, outputChannels int) int {
 }
 
 func (c *TrilinearInterpolate) IOSig() (int, int)                      { return c.d.num_inputs, c.d.num_outputs }
-func (c *TetrahedralInterpolate) IOSig() (int, int)                    { return 3, c.d.num_outputs }
+func (c *TetrahedralInterpolate) IOSig() (int, int)                    { return c.d.num_inputs, c.d.num_outputs }
 func (c *TrilinearInterpolate) Iter(f func(ChannelTransformer) bool)   { f(c) }
 func (c *TetrahedralInterpolate) Iter(f func(ChannelTransformer) bool) { f(c) }
-
-func tgg(num_in, num_out int, f func(inbuf, outbuf []unit_float), o, i []unit_float) {
-	limit := len(i) / num_in
-	_ = o[num_out*limit-1]
-	for range limit {
-		f(i[0:num_in:num_in], o[0:num_out:num_out])
-		i, o = i[num_in:], o[num_out:]
-	}
-}
 
 func (c *TrilinearInterpolate) Transform(r, g, b unit_float) (unit_float, unit_float, unit_float) {
 	var obuf [3]unit_float
@@ -134,7 +125,7 @@ func (c *TrilinearInterpolate) Transform(r, g, b unit_float) (unit_float, unit_f
 	return obuf[0], obuf[1], obuf[2]
 }
 func (m *TrilinearInterpolate) TransformGeneral(o, i []unit_float) {
-	tgg(m.d.num_inputs, m.d.num_outputs, m.d.trilinear_interpolate, o, i)
+	m.d.trilinear_interpolate(i[0:m.d.num_inputs:m.d.num_inputs], o[0:m.d.num_outputs:m.d.num_outputs])
 }
 
 func (c *TetrahedralInterpolate) Trilinear_interpolate(r, g, b unit_float) (unit_float, unit_float, unit_float) {
@@ -151,14 +142,14 @@ func (c *TetrahedralInterpolate) Tetrahedral_interpolate(r, g, b unit_float) (un
 }
 
 func (c *TetrahedralInterpolate) Tetrahedral_interpolate_g(i, o []unit_float) {
-	c.d.tetrahedral_interpolation(i[0], i[1], i[2], o)
 }
 
 func (c *TetrahedralInterpolate) Transform(r, g, b unit_float) (unit_float, unit_float, unit_float) {
 	return c.Tetrahedral_interpolate(r, g, b)
 }
+
 func (m *TetrahedralInterpolate) TransformGeneral(o, i []unit_float) {
-	tgg(m.d.num_inputs, m.d.num_outputs, m.Tetrahedral_interpolate_g, o, i)
+	m.d.tetrahedral_interpolation4(i[0], i[1], i[2], i[3], o[:m.d.num_outputs:m.d.num_outputs])
 }
 
 func clamp01(v unit_float) unit_float {

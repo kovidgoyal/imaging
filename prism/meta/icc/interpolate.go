@@ -12,24 +12,24 @@ type interpolation_data struct {
 	samples                  []unit_float
 	grid_points              []int
 	max_grid_points          []int
-	tetrahedral_index_lookup [3]int
+	tetrahedral_index_lookup []int
 }
 
 func make_interpolation_data(num_inputs, num_outputs int, grid_points []int, samples []unit_float) *interpolation_data {
-	var tetrahedral_index_lookup [3]int
+	var tetrahedral_index_lookup [4]int
 	max_grid_points := make([]int, len(grid_points))
 	for i, g := range grid_points {
 		max_grid_points[i] = g - 1
 	}
-	if num_inputs == 3 {
+	if num_inputs >= 3 {
 		tetrahedral_index_lookup[0] = num_outputs
-		for i := 1; i < num_outputs; i++ {
+		for i := 1; i < num_inputs; i++ {
 			tetrahedral_index_lookup[i] = tetrahedral_index_lookup[i-1] * grid_points[num_inputs-1]
 		}
 	}
 	return &interpolation_data{
 		num_inputs: num_inputs, num_outputs: num_outputs, grid_points: grid_points, max_grid_points: max_grid_points,
-		tetrahedral_index_lookup: tetrahedral_index_lookup, samples: samples,
+		tetrahedral_index_lookup: tetrahedral_index_lookup[:], samples: samples,
 	}
 }
 
@@ -89,6 +89,33 @@ func (c *interpolation_data) tetrahedral_interpolation(r, g, b unit_float, outpu
 	for o := range c.num_outputs {
 		s := c.samples[o:]
 		output[o] = s[c0] + (s[c1.a]-s[c1.b])*rx + (s[c2.a]-s[c2.b])*ry + (s[c3.a]-s[c3.b])*rz
+	}
+}
+
+// For more that 3 inputs (i.e., CMYK)
+// evaluate two 3-dimensional interpolations and then linearly interpolate between them.
+func (d *interpolation_data) tetrahedral_interpolation4(c, m, y, k unit_float, output []unit_float) {
+	var tmp1, tmp2 [4]float64
+	pk := clamp01(c) * unit_float(d.max_grid_points[0])
+	k0 := int(math.Trunc(pk))
+	rest := pk - unit_float(k0)
+
+	K0 := d.tetrahedral_index_lookup[3] * k0
+	K1 := K0 + IfElse(c >= 1, 0, d.tetrahedral_index_lookup[3])
+
+	half := *d
+	half.grid_points = half.grid_points[1:]
+	half.max_grid_points = half.max_grid_points[1:]
+
+	half.samples = d.samples[K0:]
+	half.tetrahedral_interpolation(m, y, k, tmp1[:len(output)])
+
+	half.samples = d.samples[K1:]
+	half.tetrahedral_interpolation(m, y, k, tmp2[:len(output)])
+
+	for i := range output {
+		y0, y1 := tmp1[i], tmp2[i]
+		output[i] = y0 + (y1-y0)*rest
 	}
 }
 
