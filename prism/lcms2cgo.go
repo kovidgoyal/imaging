@@ -96,6 +96,8 @@ func format_for_8bit(s icc.Signature) (ans C.cmsUInt32Number, err error) {
 		ans = C.TYPE_GRAY_8
 	case icc.RGBSignature:
 		ans = C.TYPE_RGB_8
+	case icc.CMYKSignature:
+		ans = C.TYPE_CMYK_8
 	default:
 		err = fmt.Errorf("unknown format: %s", s)
 	}
@@ -187,7 +189,7 @@ func (p *CMSProfile) TransformFloatToPCS(data []float64, intent icc.RenderingInt
 	}
 	var t C.cmsHTRANSFORM
 	if err = p.call_func_with_error_handling(func() string {
-		if t = C.cmsCreateTransformTHR(p.ctx, p.p, C.TYPE_RGB_DBL, nil, p.pcs_output_format, C.cmsUInt32Number(intent), C.cmsFLAGS_NOOPTIMIZE); t == nil {
+		if t = C.cmsCreateTransformTHR(p.ctx, p.p, p.device_float_format, nil, p.pcs_output_format, C.cmsUInt32Number(intent), C.cmsFLAGS_NOOPTIMIZE); t == nil {
 			return "failed to create transform"
 		}
 		return ""
@@ -195,8 +197,12 @@ func (p *CMSProfile) TransformFloatToPCS(data []float64, intent icc.RenderingInt
 		return
 	}
 	defer C.cmsDeleteTransform(t)
-	ans = make([]float64, len(data))
-	C.cmsDoTransform(t, unsafe.Pointer(&data[0]), unsafe.Pointer(&ans[0]), C.cmsUInt32Number(len(data)/3))
+	num_channels := 3
+	if p.DeviceColorSpace == icc.CMYKSignature {
+		num_channels = 4
+	}
+	ans = make([]float64, 3*(len(data)/num_channels))
+	C.cmsDoTransform(t, unsafe.Pointer(&data[0]), unsafe.Pointer(&ans[0]), C.cmsUInt32Number(len(data)/num_channels))
 	return
 }
 
