@@ -6,13 +6,13 @@ import (
 	"math"
 )
 
-// CLUTTag represents a color lookup table tag (TagColorLookupTable)
-type CLUTTag struct {
+// TrilinearInterpolate represents a color lookup table tag (TagColorLookupTable)
+type TrilinearInterpolate struct {
 	d      *interpolation_data
 	legacy bool
 }
 
-type CLUT3D struct {
+type TetrahedralInterpolate struct {
 	d      *interpolation_data
 	legacy bool
 }
@@ -22,19 +22,19 @@ type CLUT interface {
 	Samples() []unit_float
 }
 
-func (c *CLUTTag) Samples() []unit_float { return c.d.samples }
-func (c *CLUT3D) Samples() []unit_float  { return c.d.samples }
+func (c *TrilinearInterpolate) Samples() []unit_float   { return c.d.samples }
+func (c *TetrahedralInterpolate) Samples() []unit_float { return c.d.samples }
 
-func (c CLUT3D) String() string {
-	return fmt.Sprintf("CLUT3D{ outp:%v grid:%v values[:9]:%v }", c.d.num_outputs, c.d.grid_points, c.d.samples[:min(9, len(c.d.samples))])
+func (c TetrahedralInterpolate) String() string {
+	return fmt.Sprintf("TetrahedralInterpolate{ outp:%v grid:%v values[:9]:%v }", c.d.num_outputs, c.d.grid_points, c.d.samples[:min(9, len(c.d.samples))])
 }
 
-func (c CLUTTag) String() string {
-	return fmt.Sprintf("CLUTTag{ inp:%v outp:%v grid:%v values[:9]:%v }", c.d.num_inputs, c.d.num_outputs, c.d.grid_points, c.d.samples[:min(9, len(c.d.samples))])
+func (c TrilinearInterpolate) String() string {
+	return fmt.Sprintf("TrilinearInterpolate{ inp:%v outp:%v grid:%v values[:9]:%v }", c.d.num_inputs, c.d.num_outputs, c.d.grid_points, c.d.samples[:min(9, len(c.d.samples))])
 }
 
-var _ CLUT = (*CLUTTag)(nil)
-var _ CLUT = (*CLUT3D)(nil)
+var _ CLUT = (*TrilinearInterpolate)(nil)
+var _ CLUT = (*TetrahedralInterpolate)(nil)
 
 func decode_clut_table8(raw []byte, ans []unit_float) {
 	for i, x := range raw {
@@ -72,15 +72,15 @@ func decode_clut_table(raw []byte, bytes_per_channel, OutputChannels int, grid_p
 	return
 }
 
-func make_clut(grid_points []int, num_inputs, num_outputs int, samples []unit_float, legacy bool) CLUT {
-	if num_inputs == 3 {
-		return &CLUT3D{make_interpolation_data(num_inputs, num_outputs, grid_points, samples), legacy}
+func make_clut(grid_points []int, num_inputs, num_outputs int, samples []unit_float, legacy, prefer_trilinear bool) CLUT {
+	if num_inputs == 3 && !prefer_trilinear {
+		return &TetrahedralInterpolate{make_interpolation_data(num_inputs, num_outputs, grid_points, samples), legacy}
 	}
-	return &CLUTTag{make_interpolation_data(num_inputs, num_outputs, grid_points, samples), legacy}
+	return &TrilinearInterpolate{make_interpolation_data(num_inputs, num_outputs, grid_points, samples), legacy}
 }
 
 // section 10.12.3 (CLUT) in ICC.1-2202-05.pdf
-func embeddedClutDecoder(raw []byte, InputChannels, OutputChannels int, output_colorspace ColorSpace) (any, error) {
+func embeddedClutDecoder(raw []byte, InputChannels, OutputChannels int, output_colorspace ColorSpace, prefer_trilinear bool) (any, error) {
 	if len(raw) < 20 {
 		return nil, errors.New("clut tag too short")
 	}
@@ -102,7 +102,7 @@ func embeddedClutDecoder(raw []byte, InputChannels, OutputChannels int, output_c
 	if err != nil {
 		return nil, err
 	}
-	return make_clut(gridPoints, InputChannels, OutputChannels, values, false), nil
+	return make_clut(gridPoints, InputChannels, OutputChannels, values, false, prefer_trilinear), nil
 }
 
 func expectedValues(gridPoints []int, outputChannels int) int {
@@ -113,10 +113,10 @@ func expectedValues(gridPoints []int, outputChannels int) int {
 	return expectedPoints * outputChannels
 }
 
-func (c *CLUTTag) IOSig() (int, int)                    { return c.d.num_inputs, c.d.num_outputs }
-func (c *CLUT3D) IOSig() (int, int)                     { return 3, c.d.num_outputs }
-func (c *CLUTTag) Iter(f func(ChannelTransformer) bool) { f(c) }
-func (c *CLUT3D) Iter(f func(ChannelTransformer) bool)  { f(c) }
+func (c *TrilinearInterpolate) IOSig() (int, int)                      { return c.d.num_inputs, c.d.num_outputs }
+func (c *TetrahedralInterpolate) IOSig() (int, int)                    { return 3, c.d.num_outputs }
+func (c *TrilinearInterpolate) Iter(f func(ChannelTransformer) bool)   { f(c) }
+func (c *TetrahedralInterpolate) Iter(f func(ChannelTransformer) bool) { f(c) }
 
 func tgg(num_in, num_out int, f func(inbuf, outbuf []unit_float), o, i []unit_float) {
 	limit := len(i) / num_in
@@ -127,37 +127,37 @@ func tgg(num_in, num_out int, f func(inbuf, outbuf []unit_float), o, i []unit_fl
 	}
 }
 
-func (c *CLUTTag) Transform(r, g, b unit_float) (unit_float, unit_float, unit_float) {
+func (c *TrilinearInterpolate) Transform(r, g, b unit_float) (unit_float, unit_float, unit_float) {
 	var obuf [3]unit_float
 	var ibuf = [3]unit_float{r, g, b}
 	c.d.trilinear_interpolate(ibuf[:], obuf[:])
 	return obuf[0], obuf[1], obuf[2]
 }
-func (m *CLUTTag) TransformGeneral(o, i []unit_float) {
+func (m *TrilinearInterpolate) TransformGeneral(o, i []unit_float) {
 	tgg(m.d.num_inputs, m.d.num_outputs, m.d.trilinear_interpolate, o, i)
 }
 
-func (c *CLUT3D) Trilinear_interpolate(r, g, b unit_float) (unit_float, unit_float, unit_float) {
+func (c *TetrahedralInterpolate) Trilinear_interpolate(r, g, b unit_float) (unit_float, unit_float, unit_float) {
 	var obuf [3]unit_float
 	var ibuf = [3]unit_float{r, g, b}
 	c.d.trilinear_interpolate(ibuf[:], obuf[:])
 	return obuf[0], obuf[1], obuf[2]
 }
 
-func (c *CLUT3D) Tetrahedral_interpolate(r, g, b unit_float) (unit_float, unit_float, unit_float) {
+func (c *TetrahedralInterpolate) Tetrahedral_interpolate(r, g, b unit_float) (unit_float, unit_float, unit_float) {
 	var obuf [3]unit_float
 	c.d.tetrahedral_interpolation(r, g, b, obuf[:])
 	return obuf[0], obuf[1], obuf[2]
 }
 
-func (c *CLUT3D) Tetrahedral_interpolate_g(i, o []unit_float) {
+func (c *TetrahedralInterpolate) Tetrahedral_interpolate_g(i, o []unit_float) {
 	c.d.tetrahedral_interpolation(i[0], i[1], i[2], o)
 }
 
-func (c *CLUT3D) Transform(r, g, b unit_float) (unit_float, unit_float, unit_float) {
+func (c *TetrahedralInterpolate) Transform(r, g, b unit_float) (unit_float, unit_float, unit_float) {
 	return c.Tetrahedral_interpolate(r, g, b)
 }
-func (m *CLUT3D) TransformGeneral(o, i []unit_float) {
+func (m *TetrahedralInterpolate) TransformGeneral(o, i []unit_float) {
 	tgg(m.d.num_inputs, m.d.num_outputs, m.Tetrahedral_interpolate_g, o, i)
 }
 

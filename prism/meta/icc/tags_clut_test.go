@@ -66,10 +66,10 @@ func encode_clut16bit() []byte {
 
 func TestCLUTDecoder(t *testing.T) {
 	t.Run("Success3D16bit", func(t *testing.T) {
-		val, err := embeddedClutDecoder(encode_clut16bit(), 3, 3, ColorSpaceXYZ)
+		val, err := embeddedClutDecoder(encode_clut16bit(), 3, 3, ColorSpaceXYZ, false)
 		require.NoError(t, err)
-		require.IsType(t, &CLUT3D{}, val)
-		clut := val.(*CLUT3D)
+		require.IsType(t, &TetrahedralInterpolate{}, val)
+		clut := val.(*TetrahedralInterpolate)
 		assert.Equal(t, (3), clut.d.num_outputs)
 		assert.Equal(t, []int{2, 2, 2}, clut.d.grid_points)
 		assert.Len(t, clut.d.samples, 8*3)
@@ -86,10 +86,10 @@ func TestCLUTDecoder(t *testing.T) {
 			buf.WriteByte(uint8(i))
 		}
 		buf.WriteByte(255)
-		val, err := embeddedClutDecoder(buf.Bytes(), 3, 3, ColorSpaceXYZ)
+		val, err := embeddedClutDecoder(buf.Bytes(), 3, 3, ColorSpaceXYZ, false)
 		require.NoError(t, err)
-		require.IsType(t, &CLUT3D{}, val)
-		clut := val.(*CLUT3D)
+		require.IsType(t, &TetrahedralInterpolate{}, val)
+		clut := val.(*TetrahedralInterpolate)
 		assert.Equal(t, (3), clut.d.num_outputs)
 		assert.Equal(t, []int{2, 2, 2}, clut.d.grid_points)
 		assert.Len(t, clut.d.samples, 8*3)
@@ -98,7 +98,7 @@ func TestCLUTDecoder(t *testing.T) {
 	})
 	t.Run("TooShort", func(t *testing.T) {
 		data := make([]byte, 19) // should be at least 20 bytes
-		_, err := embeddedClutDecoder(data, 1, 1, ColorSpaceXYZ)
+		_, err := embeddedClutDecoder(data, 1, 1, ColorSpaceXYZ, false)
 		assert.ErrorContains(t, err, "clut tag too short")
 	})
 	t.Run("UnexpectedBodyLength", func(t *testing.T) {
@@ -110,7 +110,7 @@ func TestCLUTDecoder(t *testing.T) {
 		for i := range 8*3 - 1 {
 			buf.WriteByte(uint8(i))
 		}
-		_, err := embeddedClutDecoder(buf.Bytes(), 3, 3, ColorSpaceXYZ)
+		_, err := embeddedClutDecoder(buf.Bytes(), 3, 3, ColorSpaceXYZ, false)
 		assert.ErrorContains(t, err, "CLUT table too short 23 < 24")
 	})
 }
@@ -119,7 +119,7 @@ func TestCLUTTransform(t *testing.T) {
 	var output [16]unit_float
 	out := output[:]
 	t.Run("HappyPath_3D", func(t *testing.T) {
-		clut := &CLUT3D{make_interpolation_data(3, 3, []int{2, 2, 2},
+		clut := &TetrahedralInterpolate{make_interpolation_data(3, 3, []int{2, 2, 2},
 			[]unit_float{
 				0.0, 0.0, 0.0,
 				0.1, 0.1, 0.1,
@@ -137,7 +137,7 @@ func TestCLUTTransform(t *testing.T) {
 		in_delta(t, 1.0, out[0], 1e-6)
 	})
 	t.Run("RGB->1-RGB", func(t *testing.T) {
-		clut := &CLUT3D{make_interpolation_data(3, 3, []int{2, 2, 2},
+		clut := &TetrahedralInterpolate{make_interpolation_data(3, 3, []int{2, 2, 2},
 			// The table below has the output on the left and input in the comment on the right.
 			// As per section 10.12.3 of of ICC.1-2022-5.pdf spec the first input channel (R)
 			// varies least rapidly and the last (B) varies most rapidly
