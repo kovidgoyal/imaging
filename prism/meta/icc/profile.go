@@ -176,18 +176,20 @@ func (p *Profile) CreateTransformerToDevice(rendering_intent RenderingIntent, op
 	}()
 	ans = &Pipeline{}
 
-	var PCS_blackpoint XYZType // 0, 0, 0
-	output_blackpoint := p.BlackPoint(rendering_intent, nil)
-	if PCS_blackpoint != output_blackpoint {
-		is_lab := p.Header.ProfileConnectionSpace == ColorSpaceLab
-		if is_lab {
-			ans.Append(NewLABtoXYZ(p.PCSIlluminant))
-			ans.Append(NewXYZToNormalized())
-		}
-		ans.Append(NewBlackPointCorrection(p.PCSIlluminant, PCS_blackpoint, output_blackpoint))
-		if is_lab {
-			ans.Append(NewNormalizedToXYZ())
-			ans.Append(NewXYZtoLAB(p.PCSIlluminant))
+	if (rendering_intent == PerceptualRenderingIntent || rendering_intent == SaturationRenderingIntent) && p.Header.Version.Major >= 4 {
+		var PCS_blackpoint XYZType // 0, 0, 0
+		output_blackpoint := p.BlackPoint(rendering_intent, nil)
+		if PCS_blackpoint != output_blackpoint {
+			is_lab := p.Header.ProfileConnectionSpace == ColorSpaceLab
+			if is_lab {
+				ans.Append(NewLABtoXYZ(p.PCSIlluminant))
+				ans.Append(NewXYZToNormalized())
+			}
+			ans.Append(NewBlackPointCorrection(p.PCSIlluminant, PCS_blackpoint, output_blackpoint))
+			if is_lab {
+				ans.Append(NewNormalizedToXYZ())
+				ans.Append(NewXYZtoLAB(p.PCSIlluminant))
+			}
 		}
 	}
 	ans.Append(transform_for_pcs_colorspace(p.Header.ProfileConnectionSpace, false))

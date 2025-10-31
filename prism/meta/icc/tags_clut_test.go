@@ -160,11 +160,8 @@ func TestCLUTTransform(t *testing.T) {
 			{0.5, 0, 0}, {0.5, 1, 1}, {0.25, 0.5, 0.75}, {0.75, 0.5, 0.25},
 		} {
 			expected := []unit_float{1 - c[0], 1 - c[1], 1 - c[2]}
-			r, g, b := clut.Trilinear_interpolate(c[0], c[1], c[2])
+			r, g, b := clut.Tetrahedral_interpolate(c[0], c[1], c[2])
 			actual := []unit_float{r, g, b}
-			in_delta_slice(t, expected, actual, FLOAT_EQUALITY_THRESHOLD, fmt.Sprintf("trilinear: %v -> %v != %v", c, actual, expected))
-			r, g, b = clut.Tetrahedral_interpolate(c[0], c[1], c[2])
-			actual = []unit_float{r, g, b}
 			in_delta_slice(t, expected, actual, FLOAT_EQUALITY_THRESHOLD, fmt.Sprintf("tetrahedral: %v -> %v != %v", c, actual, expected))
 		}
 	})

@@ -197,7 +197,7 @@ func (p *Pipeline) IOSig() (i int, o int) {
 		return -1, -1
 	}
 	i, _ = p.transformers[0].IOSig()
-	_, o = p.transformers[0].IOSig()
+	_, o = p.transformers[len(p.transformers)-1].IOSig()
 	return
 }
 
