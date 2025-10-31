@@ -155,8 +155,8 @@ func decode_mft8(raw []byte, input_colorspace, output_colorspace ColorSpace) (an
 	if a, raw, err = load_mft_header(raw); err != nil {
 		return nil, err
 	}
-	err = load_mft_body(a, raw, load_8bit_table, 256, 256, input_colorspace, output_colorspace, 1)
 	a.is8bit = true
+	err = load_mft_body(a, raw, load_8bit_table, 256, 256, input_colorspace, output_colorspace, 1)
 	return a, err
 }
 

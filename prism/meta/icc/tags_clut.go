@@ -1,6 +1,7 @@
 package icc
 
 import (
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"math"
@@ -26,7 +27,7 @@ func (c *TrilinearInterpolate) Samples() []unit_float   { return c.d.samples }
 func (c *TetrahedralInterpolate) Samples() []unit_float { return c.d.samples }
 
 func (c TetrahedralInterpolate) String() string {
-	return fmt.Sprintf("TetrahedralInterpolate{ outp:%v grid:%v values[:9]:%v }", c.d.num_outputs, c.d.grid_points, c.d.samples[:min(9, len(c.d.samples))])
+	return fmt.Sprintf("TetrahedralInterpolate{ inp:%v outp:%v grid:%v values[:9]:%v }", c.d.num_inputs, c.d.num_outputs, c.d.grid_points, c.d.samples[:min(9, len(c.d.samples))])
 }
 
 func (c TrilinearInterpolate) String() string {
@@ -43,8 +44,11 @@ func decode_clut_table8(raw []byte, ans []unit_float) {
 }
 
 func decode_clut_table16(raw []byte, ans []unit_float) {
+	raw = raw[:2*len(ans)]
+	const inv = 1. / math.MaxUint16
 	for i := range ans {
-		ans[i] = unit_float((uint16(raw[0])<<8)|uint16(raw[1])) / math.MaxUint16
+		val := binary.BigEndian.Uint16(raw)
+		ans[i] = unit_float(val) * inv
 		raw = raw[2:]
 	}
 }

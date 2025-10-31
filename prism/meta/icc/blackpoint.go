@@ -82,7 +82,7 @@ func (p *Profile) black_point_using_perceptual_black(debug General_debug_callbac
 	if err != nil {
 		return XYZType{}
 	}
-	tr, err := p.CreateTransformerToPCS(PerceptualRenderingIntent, 4, debug == nil)
+	tr, err := p.CreateTransformerToPCS(RelativeColorimetricRenderingIntent, 4, debug == nil)
 	if err != nil {
 		return XYZType{}
 	}
