@@ -59,7 +59,7 @@ func IfElse[T any](condition bool, if_val T, else_val T) T {
 	return else_val
 }
 
-func modularDecoder(raw []byte, input_colorspace, output_colorspace ColorSpace) (ans any, err error) {
+func modularDecoder(raw []byte, _, output_colorspace ColorSpace) (ans any, err error) {
 	if len(raw) < 40 {
 		return nil, errors.New("modular (mAB/mBA) tag too short")
 	}

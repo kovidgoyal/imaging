@@ -35,7 +35,7 @@ func TestSRGBProfileDetection(t *testing.T) {
 			t.Parallel()
 			p, err := ReadProfile("test-profiles/" + name)
 			require.NoError(t, err)
-			tr, err := p.createTransformerToPCS(p.Header.RenderingIntent, true)
+			tr, err := p.createTransformerToPCS(p.Header.RenderingIntent)
 			require.NoError(t, err)
 			require.Equal(t, is_srgb, p.IsSRGB(), tr.String())
 		})

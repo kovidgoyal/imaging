@@ -8,53 +8,38 @@ import (
 
 var _ = fmt.Println
 
+const MAX_ENCODEABLE_XYZ = 1.0 + 32767.0/32768.0
+const MAX_ENCODEABLE_XYZ_INVERSE = 1 / (MAX_ENCODEABLE_XYZ)
+const LAB_MFT2_ENCODING_CORRECTION = 65535.0 / 65280.0
+const LAB_MFT2_ENCODING_CORRECTION_INVERSE = 65280.0 / 65535.0
+
 func tg33(t func(r, g, b unit_float) (x, y, z unit_float), o, i []unit_float) {
-	_ = o[len(i)-1]
-	limit := len(i) / 3
-	for range limit {
-		o[0], o[1], o[2] = t(i[0], i[1], i[2])
-		i, o = i[3:], o[3:]
-	}
+	o[0], o[1], o[2] = t(i[0], i[1], i[2])
 }
+
+type Scaling struct {
+	name string
+	s    unit_float
+}
+
+func (n Scaling) String() string                        { return fmt.Sprintf("%s{%.6v}", n.name, n.s) }
+func (n Scaling) IOSig() (int, int)                     { return 3, 3 }
+func (n *Scaling) Iter(f func(ChannelTransformer) bool) { f(n) }
+func (m *Scaling) Transform(x, y, z unit_float) (unit_float, unit_float, unit_float) {
+	return x * m.s, y * m.s, z * m.s
+}
+func (m *Scaling) AsMatrix3() *Matrix3 { return NewScalingMatrix3(m.s) }
+
+func (m *Scaling) TransformGeneral(o, i []unit_float) { tg33(m.Transform, o, i) }
 
 // A transformer to convert normalized [0,1] values to the [0,1.99997]
 // (u1Fixed15Number) values used by ICC XYZ PCS space
-type NormalizedToXYZ int
+func NewNormalizedToXYZ() *Scaling { return &Scaling{"NormalizedToXYZ", MAX_ENCODEABLE_XYZ} }
+func NewXYZToNormalized() *Scaling { return &Scaling{"XYZToNormalized", MAX_ENCODEABLE_XYZ_INVERSE} }
 
-const MAX_ENCODEABLE_XYZ = 1.0 + 32767.0/32768.0
-const MAX_ENCODEABLE_XYZ_INVERSE = 1 / (MAX_ENCODEABLE_XYZ)
-
-func (n NormalizedToXYZ) String() string                        { return "NormalizedToXYZ" }
-func (n NormalizedToXYZ) IOSig() (int, int)                     { return 3, 3 }
-func (n *NormalizedToXYZ) Iter(f func(ChannelTransformer) bool) { f(n) }
-func (m *NormalizedToXYZ) Transform(x, y, z unit_float) (unit_float, unit_float, unit_float) {
-	return x * MAX_ENCODEABLE_XYZ, y * MAX_ENCODEABLE_XYZ, z * MAX_ENCODEABLE_XYZ
-}
-func (m *NormalizedToXYZ) AsMatrix3() *Matrix3 { return NewScalingMatrix3(MAX_ENCODEABLE_XYZ) }
-
-func (m *NormalizedToXYZ) TransformGeneral(o, i []unit_float) { tg33(m.Transform, o, i) }
-
-func NewNormalizedToXYZ() *NormalizedToXYZ {
-	x := NormalizedToXYZ(0)
-	return &x
-}
-
-type XYZToNormalized int
-
-func (n XYZToNormalized) String() string                        { return "XYZToNormalized" }
-func (n XYZToNormalized) IOSig() (int, int)                     { return 3, 3 }
-func (n *XYZToNormalized) Iter(f func(ChannelTransformer) bool) { f(n) }
-func (m *XYZToNormalized) Transform(x, y, z unit_float) (unit_float, unit_float, unit_float) {
-	return x * MAX_ENCODEABLE_XYZ_INVERSE, y * MAX_ENCODEABLE_XYZ_INVERSE, z * MAX_ENCODEABLE_XYZ_INVERSE
-}
-func (m *XYZToNormalized) AsMatrix3() *Matrix3 { return NewScalingMatrix3(MAX_ENCODEABLE_XYZ_INVERSE) }
-
-func (m *XYZToNormalized) TransformGeneral(o, i []unit_float) { tg33(m.Transform, o, i) }
-
-func NewXYZToNormalized() *XYZToNormalized {
-	x := XYZToNormalized(0)
-	return &x
-}
+// A transformer that converts from the legacy LAB encoding used in the obsolete lut16type (mft2) tags
+func NewLABFromMFT2() *Scaling { return &Scaling{"LABFromMFT2", LAB_MFT2_ENCODING_CORRECTION} }
+func NewLABToMFT2() *Scaling   { return &Scaling{"LABToMFT2", LAB_MFT2_ENCODING_CORRECTION_INVERSE} }
 
 // A transformer to convert normalized [0,1] to the LAB co-ordinate system
 // used by ICC PCS LAB profiles [0-100], [-128, 127]
@@ -179,28 +164,28 @@ type XYZtosRGB struct {
 	t func(l, a, b unit_float) (x, y, z unit_float)
 }
 
-func NewXYZtosRGB(whitepoint XYZType, clamp, map_gamut bool) XYZtosRGB {
+func NewXYZtosRGB(whitepoint XYZType, clamp, map_gamut bool) *XYZtosRGB {
 	c := colorconv.NewConvertColor(whitepoint.X, whitepoint.Y, whitepoint.Z, 1)
 	if clamp {
 		if map_gamut {
-			return XYZtosRGB{c, c.XYZToSRGB}
+			return &XYZtosRGB{c, c.XYZToSRGB}
 		}
-		return XYZtosRGB{c, c.XYZToSRGBNoGamutMap}
+		return &XYZtosRGB{c, c.XYZToSRGBNoGamutMap}
 	}
-	return XYZtosRGB{c, c.XYZToSRGBNoClamp}
+	return &XYZtosRGB{c, c.XYZToSRGBNoClamp}
 }
 
 func (n *XYZtosRGB) AddPreviousMatrix(m Matrix3) {
 	n.c.AddPreviousMatrix(m[0], m[1], m[2])
 }
 
-func (c XYZtosRGB) Transform(l, a, b unit_float) (unit_float, unit_float, unit_float) {
+func (c *XYZtosRGB) Transform(l, a, b unit_float) (unit_float, unit_float, unit_float) {
 	return c.t(l, a, b)
 }
-func (m XYZtosRGB) TransformGeneral(o, i []unit_float)   { tg33(m.Transform, o, i) }
-func (n XYZtosRGB) IOSig() (int, int)                    { return 3, 3 }
-func (n XYZtosRGB) String() string                       { return fmt.Sprintf("%T%s", n, n.c.String()) }
-func (n XYZtosRGB) Iter(f func(ChannelTransformer) bool) { f(n) }
+func (m *XYZtosRGB) TransformGeneral(o, i []unit_float)   { tg33(m.Transform, o, i) }
+func (n *XYZtosRGB) IOSig() (int, int)                    { return 3, 3 }
+func (n *XYZtosRGB) String() string                       { return fmt.Sprintf("%T%s", n, n.c.String()) }
+func (n *XYZtosRGB) Iter(f func(ChannelTransformer) bool) { f(n) }
 
 type LABtoXYZ struct {
 	c *colorconv.ConvertColor

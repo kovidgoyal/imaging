@@ -210,9 +210,6 @@ func (p *CMSProfile) TransformFloatToDevice(data []float64, intent icc.Rendering
 	if len(data) == 0 {
 		return nil, nil
 	}
-	if len(data)%3 != 0 {
-		return nil, fmt.Errorf("pixel data must be a multiple of 3")
-	}
 	var pcs C.cmsHPROFILE
 	switch p.PCSColorSpace {
 	case icc.XYZSignature:
@@ -225,6 +222,7 @@ func (p *CMSProfile) TransformFloatToDevice(data []float64, intent icc.Rendering
 	defer func() {
 		C.cmsCloseProfile(pcs)
 	}()
+
 	var t C.cmsHTRANSFORM
 	if err = p.call_func_with_error_handling(func() string {
 		if t = C.cmsCreateTransformTHR(p.ctx, pcs, p.pcs_output_format, p.p, p.device_float_format, C.cmsUInt32Number(intent), C.cmsFLAGS_NOOPTIMIZE); t == nil {
@@ -234,9 +232,14 @@ func (p *CMSProfile) TransformFloatToDevice(data []float64, intent icc.Rendering
 	}); err != nil {
 		return
 	}
+	num_pixels := len(data) / 3
+	num_channels := 3
+	if p.DeviceColorSpace == icc.CMYKSignature {
+		num_channels = 4
+	}
 	defer C.cmsDeleteTransform(t)
-	ans = make([]float64, len(data))
-	C.cmsDoTransform(t, unsafe.Pointer(&data[0]), unsafe.Pointer(&ans[0]), C.cmsUInt32Number(len(data)/3))
+	ans = make([]float64, num_pixels*num_channels)
+	C.cmsDoTransform(t, unsafe.Pointer(&data[0]), unsafe.Pointer(&ans[0]), C.cmsUInt32Number(num_pixels))
 	return
 }
 

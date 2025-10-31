@@ -43,7 +43,7 @@ var profiles = map[string]opt{
 	// constructs uses LutAtoBType with PCS=LAB
 	"lcms-stress.icc": {skip_inv: true, pcs_tolerance: 2 * THRESHOLD16, srgb_tolerance: 4 * THRESHOLD16},
 	// CMYK profile using LAB space
-	"cmyk.icc": {skip_inv: true, pcs_tolerance: 2 * THRESHOLD16, srgb_tolerance: 4 * THRESHOLD16},
+	// "cmyk.icc": {skip_inv: true, pcs_tolerance: 2 * THRESHOLD16, srgb_tolerance: 4 * THRESHOLD16},
 }
 
 // testDir returns the absolute path to the directory containing the test file.
@@ -312,17 +312,32 @@ func develop_pcs4(p *icc.Profile, t *testing.T, name string, tolerance float64) 
 	const c, m, y, k = 0.933333, 0.666667, 0.666667, 0.5
 	lcms := lcms_profile(t, name)
 	inp := []float64{c, m, y, k}
-	l, err := lcms.TransformFloatToPCS(inp, p.Header.RenderingIntent)
+	l, err := lcms.TransformFloatToPCS([]float64{c * 100, m * 100, y * 100, k * 100}, p.Header.RenderingIntent)
 	fmt.Println()
 	tr, err := p.CreateTransformerToPCS(p.Header.RenderingIntent, 4, false)
 	require.NoError(t, err)
 	out := []float64{0, 0, 0, 0}
 	tr.TransformGeneralDebug(out, inp, transform_general_debug)
 	fmt.Println()
-	in_delta_rgb(t, name+": pcs", 4, inp, l, out[:3], tolerance, true)
+	in_delta_rgb(t, name+": pcs", 3, inp, l, out[:3], tolerance, true)
+}
+
+func develop_inverse4(p *icc.Profile, t *testing.T, name string, tolerance float64) {
+	var r, g, b float64 = 78.2471, -57.496, 10.4908
+	lcms := lcms_profile(t, name)
+	l, err := lcms.TransformFloatToDevice([]float64{r, g, b}, p.Header.RenderingIntent)
+	fmt.Println()
+	tr, err := p.CreateTransformerToDevice(p.Header.RenderingIntent, false)
+	require.NoError(t, err)
+	cmyk := []float64{0, 0, 0, 0}
+	tr.TransformGeneralDebug(cmyk, []float64{r, g, b, 0}, transform_general_debug)
+	fmt.Println()
+	in_delta_rgb(t, name+":inverse", 3, []float64{r, g, b}, l, cmyk, tolerance, false)
 }
 
 var _ = develop_pcs
+var _ = develop_pcs4
+var _ = develop_inverse4
 
 // Run this with ./custom-lcms.sh
 func TestDevelop(t *testing.T) {
@@ -330,12 +345,15 @@ func TestDevelop(t *testing.T) {
 	opt := options_for_profile(name)
 	p := profile(t, name)
 	if p.Header.DataColorSpace == icc.ColorSpaceCMYK {
-		develop_pcs4(p, t, name, opt.pcs_tolerance)
+		// develop_pcs4(p, t, name, opt.pcs_tolerance)
+		if !opt.skip_inv {
+			develop_inverse4(p, t, name, opt.inv_tolerance)
+		}
 	} else {
 		develop_pcs(p, t, name, opt.pcs_tolerance)
 		// if !opt.skip_inv {
 		// 	develop_inverse(p, t, name, opt.inv_tolerance)
 		// }
-		// develop_to_srgb(p, t, name, opt.srgb_tolerance)
+		develop_to_srgb(p, t, name, opt.srgb_tolerance)
 	}
 }

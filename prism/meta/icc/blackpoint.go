@@ -59,7 +59,7 @@ func (p *Profile) black_point_as_darker_colorant(intent RenderingIntent) XYZType
 	if len(bp) == 3 {
 		l, a, b = tr.Transform(bp[0], bp[1], bp[2])
 	} else {
-		var x [3]unit_float
+		var x [4]unit_float
 		tr.TransformGeneral(x[:], bp)
 		l, a, b = x[0], x[1], x[2]
 	}
@@ -77,13 +77,13 @@ func (p *Profile) black_point_using_perceptual_black() XYZType {
 		return XYZType{}
 	}
 	cmyk := [4]unit_float{}
-	dev.TransformGeneral(cmyk[:], []unit_float{0, 0, 0})
+	dev.TransformGeneral(cmyk[:], []unit_float{0, 0, 0, 0})
 	tr, err := p.CreateTransformerToPCS(PerceptualRenderingIntent, 4, true)
 	if err != nil {
 		return XYZType{}
 	}
-	lab := [3]unit_float{}
-	tr.TransformGeneral(cmyk[:], lab[:])
+	lab := [4]unit_float{}
+	tr.TransformGeneral(lab[:], cmyk[:])
 	l, a, b := lab[0], lab[1], lab[2]
 	l = min(l, 50)
 	a, b = 0, 0

@@ -10,9 +10,10 @@ import (
 var _ = fmt.Print
 
 type Pipeline struct {
-	coalesce_matrices bool
 	transformers      []ChannelTransformer
 	tfuncs            []func(r, g, b unit_float) (unit_float, unit_float, unit_float)
+	has_lut16type_tag bool
+	finalized         bool
 }
 
 type AsMatrix3 interface {
@@ -33,6 +34,55 @@ func is_nil(i any) bool {
 	}
 }
 
+func (p *Pipeline) finalize(optimize bool) {
+	if p.finalized {
+		panic("pipeline already finalized")
+	}
+	p.finalized = true
+	if optimize && len(p.transformers) > 1 {
+		// Combine all neighboring Matrix3 transformers into a single transformer by multiplying the matrices
+		var pm AsMatrix3
+		nt := make([]ChannelTransformer, 0, len(p.transformers))
+		for i := 0; i < len(p.transformers); {
+			t := p.transformers[i]
+			if tm, ok := t.(AsMatrix3); ok {
+				for i+1 < len(p.transformers) {
+					if pm, ok = p.transformers[i+1].(AsMatrix3); !ok {
+						break
+					}
+					a, b := tm.AsMatrix3(), pm.AsMatrix3()
+					combined := b.Multiply(*a)
+					tm = &combined
+					t = &combined
+					i++
+				}
+			}
+			nt = append(nt, t)
+			i++
+		}
+		p.transformers = nt
+		// Check if the last transform can absorb previous matrices
+		if len(p.transformers) > 1 {
+			last := p.transformers[len(p.transformers)-1]
+			if apm, ok := last.(*XYZtosRGB); ok {
+				p.transformers = p.transformers[:len(p.transformers)-1]
+				for {
+					m := p.remove_last_matrix3()
+					if m == nil {
+						break
+					}
+					apm.AddPreviousMatrix(*m)
+				}
+				p.transformers = append(p.transformers, last)
+			}
+		}
+	}
+	p.tfuncs = make([]func(r unit_float, g unit_float, b unit_float) (unit_float, unit_float, unit_float), len(p.transformers))
+	for i, t := range p.transformers {
+		p.tfuncs[i] = t.Transform
+	}
+}
+
 func (p *Pipeline) insert(idx int, c ChannelTransformer) {
 	if is_nil(c) {
 		return
@@ -43,36 +93,16 @@ func (p *Pipeline) insert(idx int, c ChannelTransformer) {
 	}
 	if len(p.transformers) == 0 {
 		p.transformers = append(p.transformers, c)
-		p.tfuncs = append(p.tfuncs, c.Transform)
 		return
 	}
 	if idx >= len(p.transformers) {
 		panic(fmt.Sprintf("cannot insert at idx: %d in pipeline of length: %d", idx, len(p.transformers)))
 	}
 	prepend := idx > -1
-	if cmm, ok := c.(AsMatrix3); p.coalesce_matrices && ok {
-		q := p.transformers[IfElse(prepend, idx, len(p.transformers)-1)]
-		if cmat, ok := q.(AsMatrix3); ok {
-			mat := cmat.AsMatrix3()
-			cm := cmm.AsMatrix3()
-			var combined Matrix3
-			if prepend {
-				combined = mat.Multiply(*cm)
-			} else {
-				combined = cm.Multiply(*mat)
-				idx = len(p.transformers) - 1
-			}
-			p.transformers[idx] = &combined
-			p.tfuncs[idx] = combined.Transform
-			return
-		}
-	}
 	if prepend {
-		p.transformers = slices.Insert(p.transformers, 0, c)
-		p.tfuncs = slices.Insert(p.tfuncs, 0, c.Transform)
+		p.transformers = slices.Insert(p.transformers, idx, c)
 	} else {
 		p.transformers = append(p.transformers, c)
-		p.tfuncs = append(p.tfuncs, c.Transform)
 	}
 }
 
@@ -84,6 +114,9 @@ func (p *Pipeline) Insert(idx int, c ChannelTransformer) {
 	for _, x := range s {
 		p.insert(idx, x)
 	}
+	if mft, ok := c.(*MFT); ok && !mft.is8bit {
+		p.has_lut16type_tag = true
+	}
 }
 
 func (p *Pipeline) Append(c ...ChannelTransformer) {
@@ -92,11 +125,10 @@ func (p *Pipeline) Append(c ...ChannelTransformer) {
 	}
 }
 
-func (p *Pipeline) RemoveLastMatrix3() *Matrix3 {
+func (p *Pipeline) remove_last_matrix3() *Matrix3 {
 	if len(p.transformers) > 0 {
 		if q, ok := p.transformers[len(p.transformers)-1].(AsMatrix3); ok {
 			p.transformers = p.transformers[:len(p.transformers)-1]
-			p.tfuncs = p.tfuncs[:len(p.tfuncs)-1]
 			return q.AsMatrix3()
 		}
 	}
@@ -122,13 +154,16 @@ func (p *Pipeline) TransformDebug(r, g, b unit_float, f Debug_callback) (unit_fl
 func (p *Pipeline) TransformGeneral(out, in []unit_float) {
 	for _, t := range p.transformers {
 		t.TransformGeneral(out, in)
+		copy(in, out)
 	}
 }
 
 func (p *Pipeline) TransformGeneralDebug(out, in []unit_float, f func(in, out []unit_float, t ChannelTransformer)) {
 	for _, t := range p.transformers {
 		t.TransformGeneral(out, in)
-		f(in, out, t)
+		nin, nout := t.IOSig()
+		f(in[:nin], out[:nout], t)
+		copy(in, out)
 	}
 }
 
@@ -170,7 +205,6 @@ func (p *Pipeline) UseTrilinearInsteadOfTetrahedral() {
 	for i, q := range p.transformers {
 		if x, ok := q.(*TetrahedralInterpolate); ok {
 			p.transformers[i] = &TrilinearInterpolate{x.d, x.legacy}
-			p.tfuncs[i] = p.transformers[i].Transform
 		}
 	}
 }
