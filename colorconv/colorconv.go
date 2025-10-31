@@ -88,6 +88,15 @@ func (c *ConvertColor) LabToSRGBNoGamutMap(L, a, b float64) (r, g, bl float64) {
 	return
 }
 
+// LabToSRGBClamp converts Lab(whitepoint) to sRGB(D65) without doing any gamut mapping.
+func (c *ConvertColor) LabToSRGBClamp(L, a, b float64) (r, g, bl float64) {
+	rLin, gLin, bLin := c.LabToLinearRGB(L, a, b)
+	r = clamp01(linearToSRGBComp(rLin))
+	g = clamp01(linearToSRGBComp(gLin))
+	bl = clamp01(linearToSRGBComp(bLin))
+	return
+}
+
 // LabToLinearRGB converts Lab to linear RGB (not gamma-corrected), but still
 // with chromatic adaptation to D65 fused into the matrix. Output is linear sRGB.
 func (c *ConvertColor) LabToLinearRGB(L, a, b float64) (r, g, bl float64) {

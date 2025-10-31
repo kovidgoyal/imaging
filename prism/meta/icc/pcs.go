@@ -146,9 +146,15 @@ type LABtosRGB struct {
 	t func(l, a, b unit_float) (x, y, z unit_float)
 }
 
-func NewLABtosRGB(whitepoint XYZType) LABtosRGB {
+func NewLABtosRGB(whitepoint XYZType, clamp, map_gamut bool) *LABtosRGB {
 	c := colorconv.NewConvertColor(whitepoint.X, whitepoint.Y, whitepoint.Z, 1)
-	return LABtosRGB{c, c.LabToSRGB}
+	if clamp {
+		if map_gamut {
+			return &LABtosRGB{c, c.LabToSRGB}
+		}
+		return &LABtosRGB{c, c.LabToSRGBClamp}
+	}
+	return &LABtosRGB{c, c.LabToSRGBNoGamutMap}
 }
 
 func (c LABtosRGB) Transform(l, a, b unit_float) (unit_float, unit_float, unit_float) {

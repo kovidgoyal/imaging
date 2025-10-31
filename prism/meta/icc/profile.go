@@ -323,7 +323,7 @@ func (p *Profile) CreateTransformerToSRGB(rendering_intent RenderingIntent, inpu
 		t := NewXYZtosRGB(p.PCSIlluminant, clamp, map_gamut)
 		ans.Append(t)
 	case ColorSpaceLab:
-		ans.Append(NewLABtosRGB(p.PCSIlluminant))
+		ans.Append(NewLABtosRGB(p.PCSIlluminant, clamp, map_gamut))
 	default:
 		return nil, fmt.Errorf("unknown PCS colorspace: %s", input_colorspace)
 	}

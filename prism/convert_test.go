@@ -43,7 +43,7 @@ var profiles = map[string]opt{
 	// constructs uses LutAtoBType with PCS=LAB
 	"lcms-stress.icc": {skip_inv: true, pcs_tolerance: 2 * THRESHOLD16, srgb_tolerance: 4 * THRESHOLD16},
 	// CMYK profile using LAB space
-	// "cmyk.icc": {pcs_tolerance: 2 * THRESHOLD16, inv_tolerance: 5 * THRESHOLD8, srgb_tolerance: 0.35 * THRESHOLD8},
+	"cmyk.icc": {pcs_tolerance: 2 * THRESHOLD16, inv_tolerance: 0.05 * THRESHOLD8, srgb_tolerance: 0.2 * THRESHOLD8},
 }
 
 // testDir returns the absolute path to the directory containing the test file.
@@ -131,6 +131,7 @@ func max_diff(expected, actual []float64) (ans float64) {
 
 func lab_l(l float64) float64  { return l / 100 }
 func lab_ab(a float64) float64 { return a*(1./255) + 128./255 }
+func xyz(x float64) float64    { return x / 2. }
 
 var lab_scalers = [3]func(float64) float64{lab_l, lab_ab, lab_ab}
 
@@ -141,15 +142,28 @@ func max_lab_diff(expected, actual []float64) (ans float64) {
 	return
 }
 
-func in_delta_rgb(t *testing.T, desc string, input_channels, output_channels int, pts, expected, actual []float64, tolerance float64, is_lab bool) {
+func max_cmyk_diff(expected, actual []float64) (ans float64) {
+	for i := range expected {
+		ans = max(ans, math.Abs(lab_scalers[0](expected[i])-lab_scalers[0](actual[i])))
+	}
+	return
+}
+
+func max_xyz_diff(expected, actual []float64) (ans float64) {
+	for i := range expected {
+		ans = max(ans, math.Abs(xyz(expected[i])-xyz(actual[i])))
+	}
+	return
+}
+
+func in_delta_rgb(t *testing.T, desc string, input_channels, output_channels int, pts, expected, actual []float64, tolerance float64, differ func(e, a []float64) float64) {
 	t.Helper()
 	var worst struct {
 		pts, expected, actual []float64
 		max_diff              float64
 	}
-	df := icc.IfElse(is_lab, max_lab_diff, max_diff)
 	for range len(actual) / output_channels {
-		if d := df(expected[:output_channels], actual[:output_channels]); d > tolerance {
+		if d := differ(expected[:output_channels], actual[:output_channels]); d > tolerance {
 			if d > worst.max_diff {
 				worst.max_diff = d
 				worst.pts, worst.expected, worst.actual = pts[:input_channels], expected[:output_channels], actual[:output_channels]
@@ -254,11 +268,13 @@ func test_profile(t *testing.T, name string) {
 		}
 		expected.srgb, err = lcms.TransformFloatToSRGB(pts, p.Header.RenderingIntent)
 		require.NoError(t, err)
-		in_delta_rgb(t, "to pcs", dev_channels, 3, pts, expected.pcs, actual.pcs, opt.pcs_tolerance, p.Header.ProfileConnectionSpace == icc.ColorSpaceLab)
+		d := icc.IfElse(p.Header.ProfileConnectionSpace == icc.ColorSpaceLab, max_lab_diff, max_xyz_diff)
+		in_delta_rgb(t, "to pcs", dev_channels, 3, pts, expected.pcs, actual.pcs, opt.pcs_tolerance, d)
 		if !opt.skip_inv {
-			in_delta_rgb(t, "to device", 3, dev_channels, actual.pcs, expected.inv, actual.inv, opt.inv_tolerance, false)
+			d := icc.IfElse(p.Header.DataColorSpace == icc.ColorSpaceCMYK, max_cmyk_diff, max_diff)
+			in_delta_rgb(t, "to device", 3, dev_channels, actual.pcs, expected.inv, actual.inv, opt.inv_tolerance, d)
 		}
-		in_delta_rgb(t, "to sRGB", dev_channels, 3, pts, expected.srgb, actual.srgb, opt.srgb_tolerance, false)
+		in_delta_rgb(t, "to sRGB", dev_channels, 3, pts, expected.srgb, actual.srgb, opt.srgb_tolerance, max_diff)
 	})
 }
 
@@ -288,7 +304,7 @@ func develop_to_srgb(p *icc.Profile, lcms *CMSProfile, t *testing.T, name string
 	x, y, z := tr.TransformDebug(r, g, b, transform_debug)
 	fmt.Println()
 
-	in_delta_rgb(t, name+":srgb", 3, 3, []float64{r, g, b}, l, []float64{x, y, z}, tolerance, false)
+	in_delta_rgb(t, name+":srgb", 3, 3, []float64{r, g, b}, l, []float64{x, y, z}, tolerance, max_diff)
 }
 
 var _ = develop_to_srgb
@@ -301,7 +317,8 @@ func develop_inverse(p *icc.Profile, lcms *CMSProfile, t *testing.T, name string
 	require.NoError(t, err)
 	x, y, z := tr.TransformDebug(r, g, b, transform_debug)
 	fmt.Println()
-	in_delta_rgb(t, name+":inverse", 3, 3, []float64{r, g, b}, l, []float64{x, y, z}, tolerance, false)
+	d := icc.IfElse(p.Header.DataColorSpace == icc.ColorSpaceCMYK, max_cmyk_diff, max_diff)
+	in_delta_rgb(t, name+":inverse", 3, 3, []float64{r, g, b}, l, []float64{x, y, z}, tolerance, d)
 }
 
 var _ = develop_inverse
@@ -314,7 +331,8 @@ func develop_pcs(p *icc.Profile, lcms *CMSProfile, t *testing.T, name string, to
 	require.NoError(t, err)
 	x, y, z := tr.TransformDebug(r, g, b, transform_debug)
 	fmt.Println()
-	in_delta_rgb(t, name+": pcs", 3, 3, []float64{r, g, b}, l, []float64{x, y, z}, tolerance, true)
+	d := icc.IfElse(p.Header.ProfileConnectionSpace == icc.ColorSpaceLab, max_lab_diff, max_xyz_diff)
+	in_delta_rgb(t, name+": pcs", 3, 3, []float64{r, g, b}, l, []float64{x, y, z}, tolerance, d)
 }
 
 func develop_pcs4(p *icc.Profile, lcms *CMSProfile, t *testing.T, name string, tolerance float64) {
@@ -327,11 +345,11 @@ func develop_pcs4(p *icc.Profile, lcms *CMSProfile, t *testing.T, name string, t
 	out := []float64{0, 0, 0, 0}
 	tr.TransformGeneralDebug(out, inp, transform_general_debug)
 	fmt.Println()
-	in_delta_rgb(t, name+": pcs", 4, 3, inp, l, out[:3], tolerance, true)
+	in_delta_rgb(t, name+": pcs", 4, 3, inp, l, out[:3], tolerance, max_diff)
 }
 
 func develop_inverse4(p *icc.Profile, lcms *CMSProfile, t *testing.T, name string, tolerance float64) {
-	var r, g, b float64 = 78.2471, -57.496, 10.4908
+	var r, g, b float64 = 41.3376, 39.8013, 25.6128
 	l, err := lcms.TransformFloatToDevice([]float64{r, g, b}, p.Header.RenderingIntent)
 	fmt.Println()
 	tr, err := p.CreateTransformerToDevice(p.Header.RenderingIntent, false)
@@ -339,20 +357,19 @@ func develop_inverse4(p *icc.Profile, lcms *CMSProfile, t *testing.T, name strin
 	cmyk := []float64{0, 0, 0, 0}
 	tr.TransformGeneralDebug(cmyk, []float64{r, g, b, 0}, transform_general_debug)
 	fmt.Println()
-	in_delta_rgb(t, name+":inverse", 3, 4, []float64{r, g, b, 0}, l, cmyk, tolerance, false)
+	in_delta_rgb(t, name+":inverse", 3, 4, []float64{r, g, b, 0}, l, cmyk, tolerance, max_cmyk_diff)
 }
 
 func develop_to_srgb4(p *icc.Profile, lcms *CMSProfile, t *testing.T, name string, tolerance float64) {
 	const c, m, y, k = 100, 0, 0, 0
-	inp := []float64{c, m, y, k}
 	l, err := lcms.TransformFloatToSRGB([]float64{c, m, y, k}, p.Header.RenderingIntent)
 	fmt.Println()
 	tr, err := p.CreateTransformerToSRGB(p.Header.RenderingIntent, 4, false, false, false)
 	require.NoError(t, err)
 	out := []float64{0, 0, 0, 0}
-	tr.TransformGeneralDebug(out, inp, transform_general_debug)
+	tr.TransformGeneralDebug(out, []float64{c, m, y, k}, transform_general_debug)
 	fmt.Println()
-	in_delta_rgb(t, name+": srgb", 4, 3, inp, l, out[:3], tolerance, true)
+	in_delta_rgb(t, name+": srgb", 4, 3, []float64{c, m, y, k}, l, out[:3], tolerance, max_diff)
 }
 
 var _ = develop_pcs
@@ -371,17 +388,17 @@ func develop_blackpoint(p *icc.Profile, lcms *CMSProfile, t *testing.T) {
 
 // Run this with ./custom-lcms.sh
 func TestDevelop(t *testing.T) {
-	const name = srgb_xyz_profile_name
+	const name = "cmyk.icc"
 	opt := options_for_profile(name)
 	p := profile(t, name)
 	lcms := lcms_profile(t, name)
 	// develop_blackpoint(p, lcms, t)
 	if p.Header.DataColorSpace == icc.ColorSpaceCMYK {
 		// develop_pcs4(p, lcms, t, name, opt.pcs_tolerance)
-		// if !opt.skip_inv {
-		// 	develop_inverse4(p, lcms, t, name, opt.inv_tolerance)
-		// }
-		develop_to_srgb4(p, lcms, t, name, opt.srgb_tolerance)
+		if !opt.skip_inv {
+			develop_inverse4(p, lcms, t, name, opt.inv_tolerance)
+		}
+		// develop_to_srgb4(p, lcms, t, name, opt.srgb_tolerance)
 	} else {
 		develop_pcs(p, lcms, t, name, opt.pcs_tolerance)
 		// if !opt.skip_inv {
