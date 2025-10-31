@@ -22,8 +22,8 @@ type Scaling struct {
 	s    unit_float
 }
 
-func (n Scaling) String() string                        { return fmt.Sprintf("%s{%.6v}", n.name, n.s) }
-func (n Scaling) IOSig() (int, int)                     { return 3, 3 }
+func (n *Scaling) String() string                       { return fmt.Sprintf("%s{%.6v}", n.name, n.s) }
+func (n *Scaling) IOSig() (int, int)                    { return 3, 3 }
 func (n *Scaling) Iter(f func(ChannelTransformer) bool) { f(n) }
 func (m *Scaling) Transform(x, y, z unit_float) (unit_float, unit_float, unit_float) {
 	return x * m.s, y * m.s, z * m.s
@@ -31,6 +31,23 @@ func (m *Scaling) Transform(x, y, z unit_float) (unit_float, unit_float, unit_fl
 func (m *Scaling) AsMatrix3() *Matrix3 { return NewScalingMatrix3(m.s) }
 
 func (m *Scaling) TransformGeneral(o, i []unit_float) { tg33(m.Transform, o, i) }
+
+type Scaling4 struct {
+	name string
+	s    unit_float
+}
+
+func (n *Scaling4) String() string                       { return fmt.Sprintf("%s{%.6v}", n.name, n.s) }
+func (n *Scaling4) IOSig() (int, int)                    { return 4, 4 }
+func (n *Scaling4) Iter(f func(ChannelTransformer) bool) { f(n) }
+func (m *Scaling4) Transform(x, y, z unit_float) (unit_float, unit_float, unit_float) {
+	return x * m.s, y * m.s, z * m.s
+}
+func (m *Scaling4) TransformGeneral(o, i []unit_float) {
+	for x := range 4 {
+		o[x] = m.s * i[x]
+	}
+}
 
 // A transformer to convert normalized [0,1] values to the [0,1.99997]
 // (u1Fixed15Number) values used by ICC XYZ PCS space

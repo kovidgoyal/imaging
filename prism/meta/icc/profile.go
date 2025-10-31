@@ -177,7 +177,7 @@ func (p *Profile) CreateTransformerToDevice(rendering_intent RenderingIntent, op
 	ans = &Pipeline{}
 
 	var PCS_blackpoint XYZType // 0, 0, 0
-	output_blackpoint := p.BlackPoint(rendering_intent)
+	output_blackpoint := p.BlackPoint(rendering_intent, nil)
 	if PCS_blackpoint != output_blackpoint {
 		is_lab := p.Header.ProfileConnectionSpace == ColorSpaceLab
 		if is_lab {
@@ -209,6 +209,9 @@ func (p *Profile) CreateTransformerToDevice(rendering_intent RenderingIntent, op
 			// case, see _cmsReadOutputLUT() in cmsio1.c
 			ans.UseTrilinearInsteadOfTetrahedral()
 		}
+		if p.Header.DataColorSpace == ColorSpaceCMYK {
+			ans.Append(&Scaling4{"NormalizedToCMYK", 100.})
+		}
 	} else {
 		err = p.create_matrix_trc_transformer(forward, chromatic_adaptation, ans)
 	}
@@ -216,8 +219,8 @@ func (p *Profile) CreateTransformerToDevice(rendering_intent RenderingIntent, op
 }
 
 func (p *Profile) createTransformerToPCS(rendering_intent RenderingIntent) (ans *Pipeline, err error) {
-	ans = &Pipeline{}
 	const forward = true
+	ans = &Pipeline{}
 	a2b, err := p.find_conversion_tag(forward, rendering_intent)
 	if err != nil {
 		return nil, err
@@ -227,6 +230,9 @@ func (p *Profile) createTransformerToPCS(rendering_intent RenderingIntent) (ans 
 		return nil, err
 	}
 	if a2b != nil {
+		if p.Header.DataColorSpace == ColorSpaceCMYK {
+			ans.Append(&Scaling4{"CMYKtoNormalized", 1 / 100.})
+		}
 		ans.Append(a2b)
 		ans.Append(chromatic_adaptation)
 		if ans.has_lut16type_tag && p.Header.ProfileConnectionSpace == ColorSpaceLab {
@@ -292,7 +298,7 @@ func (p *Profile) CreateTransformerToSRGB(rendering_intent RenderingIntent, inpu
 	}
 	input_colorspace := p.Header.ProfileConnectionSpace
 	var sRGB_blackpoint XYZType // 0, 0, 0
-	input_blackpoint := p.BlackPoint(rendering_intent)
+	input_blackpoint := p.BlackPoint(rendering_intent, nil)
 	if input_blackpoint != sRGB_blackpoint {
 		if input_colorspace == ColorSpaceLab {
 			ans.Append(transform_for_pcs_colorspace(input_colorspace, true))

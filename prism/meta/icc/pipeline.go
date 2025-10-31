@@ -158,7 +158,9 @@ func (p *Pipeline) TransformGeneral(out, in []unit_float) {
 	}
 }
 
-func (p *Pipeline) TransformGeneralDebug(out, in []unit_float, f func(in, out []unit_float, t ChannelTransformer)) {
+type General_debug_callback = func(in, out []unit_float, t ChannelTransformer)
+
+func (p *Pipeline) TransformGeneralDebug(out, in []unit_float, f General_debug_callback) {
 	for _, t := range p.transformers {
 		t.TransformGeneral(out, in)
 		nin, nout := t.IOSig()
@@ -168,6 +170,15 @@ func (p *Pipeline) TransformGeneralDebug(out, in []unit_float, f func(in, out []
 }
 
 func (p *Pipeline) Len() int { return len(p.transformers) }
+
+func (p *Pipeline) Weld(other *Pipeline, optimize bool) (ans *Pipeline) {
+	ans = &Pipeline{}
+	ans.transformers = append(ans.transformers, p.transformers...)
+	ans.transformers = append(ans.transformers, other.transformers...)
+	ans.finalize(true)
+	ans.has_lut16type_tag = p.has_lut16type_tag || other.has_lut16type_tag
+	return ans
+}
 
 func transformers_as_string(t ...ChannelTransformer) string {
 	items := make([]string, len(t))

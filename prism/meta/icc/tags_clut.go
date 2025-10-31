@@ -125,23 +125,17 @@ func (c *TrilinearInterpolate) Transform(r, g, b unit_float) (unit_float, unit_f
 	return obuf[0], obuf[1], obuf[2]
 }
 func (m *TrilinearInterpolate) TransformGeneral(o, i []unit_float) {
-	m.d.trilinear_interpolate(i[0:m.d.num_inputs:m.d.num_inputs], o[0:m.d.num_outputs:m.d.num_outputs])
-}
-
-func (c *TetrahedralInterpolate) Trilinear_interpolate(r, g, b unit_float) (unit_float, unit_float, unit_float) {
-	var obuf [3]unit_float
-	var ibuf = [3]unit_float{r, g, b}
-	c.d.trilinear_interpolate(ibuf[:], obuf[:])
-	return obuf[0], obuf[1], obuf[2]
+	o = o[0:m.d.num_outputs:m.d.num_outputs]
+	for i := range o {
+		o[i] = 0
+	}
+	m.d.trilinear_interpolate(i[0:m.d.num_inputs:m.d.num_inputs], o)
 }
 
 func (c *TetrahedralInterpolate) Tetrahedral_interpolate(r, g, b unit_float) (unit_float, unit_float, unit_float) {
 	var obuf [3]unit_float
 	c.d.tetrahedral_interpolation(r, g, b, obuf[:])
 	return obuf[0], obuf[1], obuf[2]
-}
-
-func (c *TetrahedralInterpolate) Tetrahedral_interpolate_g(i, o []unit_float) {
 }
 
 func (c *TetrahedralInterpolate) Transform(r, g, b unit_float) (unit_float, unit_float, unit_float) {
