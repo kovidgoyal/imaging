@@ -28,6 +28,47 @@ func xyz_type(data []byte) XYZType {
 	return XYZType{readS15Fixed16BE(data[:4]), readS15Fixed16BE(data[4:8]), readS15Fixed16BE(data[8:12])}
 }
 
+func f(t unit_float) unit_float {
+	const Limit = (24.0 / 116.0) * (24.0 / 116.0) * (24.0 / 116.0)
+
+	if t <= Limit {
+		return (841.0/108.0)*t + (16.0 / 116.0)
+	}
+	return pow(t, 1.0/3.0)
+}
+
+func f_1(t unit_float) unit_float {
+	const Limit = (24.0 / 116.0)
+
+	if t <= Limit {
+		return (108.0 / 841.0) * (t - (16.0 / 116.0))
+	}
+
+	return t * t * t
+}
+
+func (wt *XYZType) Lab_to_XYZ(l, a, b unit_float) (x, y, z unit_float) {
+	y = (l + 16.0) / 116.0
+	x = y + 0.002*a
+	z = y - 0.005*b
+
+	x = f_1(x) * wt.X
+	y = f_1(y) * wt.Y
+	z = f_1(z) * wt.Z
+	return
+}
+
+func (wt *XYZType) XYZ_to_Lab(x, y, z unit_float) (l, a, b unit_float) {
+	fx := f(x / wt.X)
+	fy := f(y / wt.Y)
+	fz := f(z / wt.Z)
+
+	l = 116.0*fy - 16.0
+	a = 500.0 * (fx - fy)
+	b = 200.0 * (fy - fz)
+	return
+}
+
 func decode_xyz(data []byte) (ans any, err error) {
 	if len(data) < 20 {
 		return nil, fmt.Errorf("xyz tag too short")

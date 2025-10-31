@@ -43,7 +43,7 @@ var profiles = map[string]opt{
 	// constructs uses LutAtoBType with PCS=LAB
 	"lcms-stress.icc": {skip_inv: true, pcs_tolerance: 2 * THRESHOLD16, srgb_tolerance: 4 * THRESHOLD16},
 	// CMYK profile using LAB space
-	// "cmyk.icc": {skip_inv: true, pcs_tolerance: 2 * THRESHOLD16, srgb_tolerance: 4 * THRESHOLD16},
+	// "cmyk.icc": {pcs_tolerance: 2 * THRESHOLD16, inv_tolerance: 5 * THRESHOLD8, srgb_tolerance: 0.35 * THRESHOLD8},
 }
 
 // testDir returns the absolute path to the directory containing the test file.
@@ -141,23 +141,23 @@ func max_lab_diff(expected, actual []float64) (ans float64) {
 	return
 }
 
-func in_delta_rgb(t *testing.T, desc string, num_channels int, pts, expected, actual []float64, tolerance float64, is_lab bool) {
+func in_delta_rgb(t *testing.T, desc string, input_channels, output_channels int, pts, expected, actual []float64, tolerance float64, is_lab bool) {
 	t.Helper()
 	var worst struct {
 		pts, expected, actual []float64
 		max_diff              float64
 	}
 	df := icc.IfElse(is_lab, max_lab_diff, max_diff)
-	for range len(actual) / num_channels {
-		if d := df(expected[:num_channels], actual[:num_channels]); d > tolerance {
+	for range len(actual) / output_channels {
+		if d := df(expected[:output_channels], actual[:output_channels]); d > tolerance {
 			if d > worst.max_diff {
 				worst.max_diff = d
-				worst.pts, worst.expected, worst.actual = pts[:num_channels], expected[:num_channels], actual[:num_channels]
+				worst.pts, worst.expected, worst.actual = pts[:input_channels], expected[:output_channels], actual[:output_channels]
 			}
 		}
-		expected = expected[num_channels:]
-		actual = actual[num_channels:]
-		pts = pts[num_channels:]
+		expected = expected[output_channels:]
+		actual = actual[output_channels:]
+		pts = pts[input_channels:]
 	}
 	if worst.max_diff > 0 {
 		t.Fatalf("%s: the pixel %.6v does not match.\nThe max difference is %d times the tolerance of %.2v.\nWant %.6v got %.6v",
@@ -184,35 +184,47 @@ func options_for_profile(name string) opt {
 	return opt
 }
 
+func run_general(p *icc.Pipeline, inp, outp []float64, ni, no, np int) {
+	var i, o [4]float64
+	for range np {
+		copy(i[:], inp[:ni])
+		p.TransformGeneral(o[:], i[:])
+		copy(outp, o[:no])
+		inp = inp[ni:]
+		outp = outp[no:]
+	}
+}
+
 func test_profile(t *testing.T, name string) {
 	opt := options_for_profile(name)
 	t.Run(name, func(t *testing.T) {
 		t.Parallel()
 		p := profile(t, name)
-		input_channels := icc.IfElse(p.Header.DataColorSpace == icc.ColorSpaceCMYK, 4, 3)
-		lcms := lcms_profile(t, name)
-		actual_bp := p.BlackPoint(p.Header.RenderingIntent)
-		expected_bp, ok := lcms.DetectBlackPoint(p.Header.RenderingIntent)
-		require.True(t, ok)
-		require.Equal(t, expected_bp, actual_bp)
-		pcs, err := p.CreateDefaultTransformerToPCS(input_channels)
-		require.NoError(t, err)
 		inv, err := p.CreateDefaultTransformerToDevice()
+		dev_channels := 3
 		if !opt.skip_inv {
 			require.NoError(t, err)
+			_, dev_channels = inv.IOSig()
 		}
-		srgb, err := p.CreateTransformerToSRGB(p.Header.RenderingIntent, input_channels, false, false, true)
+		lcms := lcms_profile(t, name)
+		actual_bp := p.BlackPoint(p.Header.RenderingIntent, nil)
+		expected_bp, ok := lcms.DetectBlackPoint(p.Header.RenderingIntent)
+		require.True(t, ok)
+		require.InDeltaSlice(t, []float64{expected_bp.X, expected_bp.Y, expected_bp.Z}, []float64{actual_bp.X, actual_bp.Y, actual_bp.Z}, THRESHOLD16)
+		pcs, err := p.CreateDefaultTransformerToPCS(dev_channels)
+		require.NoError(t, err)
+		srgb, err := p.CreateTransformerToSRGB(p.Header.RenderingIntent, dev_channels, false, false, true)
 		require.NoError(t, err)
 		var pts []float64
-		if input_channels == 3 {
+		if dev_channels == 3 {
 			pts = icc.Points_for_transformer_comparison3()
 		} else {
 			pts = icc.Points_for_transformer_comparison4()
 		}
 		var actual, expected struct{ pcs, inv, srgb []float64 }
-		num_pixels := len(pts) / input_channels
-		actual.pcs, actual.inv, actual.srgb = make([]float64, 0, num_pixels*3), make([]float64, 0, num_pixels*input_channels), make([]float64, 0, num_pixels*3)
-		if input_channels == 3 {
+		num_pixels := len(pts) / dev_channels
+		actual.pcs, actual.inv, actual.srgb = make([]float64, 0, num_pixels*3), make([]float64, 0, num_pixels*dev_channels), make([]float64, 0, num_pixels*3)
+		if dev_channels == 3 {
 			pos := pts
 			for range num_pixels {
 				x, y, z := pos[0], pos[1], pos[2]
@@ -227,12 +239,12 @@ func test_profile(t *testing.T, name string) {
 				pos = pos[3:]
 			}
 		} else {
-			actual.pcs, actual.inv, actual.srgb = actual.pcs[:3*cap(actual.pcs)], actual.inv[:cap(actual.inv)], actual.srgb[:cap(actual.srgb)]
-			pcs.TransformGeneral(actual.pcs, pts)
+			actual.pcs, actual.inv, actual.srgb = actual.pcs[:cap(actual.pcs)], actual.inv[:cap(actual.inv)], actual.srgb[:cap(actual.srgb)]
+			run_general(pcs, pts, actual.pcs, dev_channels, 3, num_pixels)
 			if !opt.skip_inv {
-				inv.TransformGeneral(actual.inv, actual.pcs)
+				run_general(inv, actual.pcs, actual.inv, 3, dev_channels, num_pixels)
 			}
-			srgb.TransformGeneral(actual.srgb, pts)
+			run_general(srgb, pts, actual.srgb, dev_channels, 3, num_pixels)
 		}
 		expected.pcs, err = lcms.TransformFloatToPCS(pts, p.Header.RenderingIntent)
 		require.NoError(t, err)
@@ -242,11 +254,11 @@ func test_profile(t *testing.T, name string) {
 		}
 		expected.srgb, err = lcms.TransformFloatToSRGB(pts, p.Header.RenderingIntent)
 		require.NoError(t, err)
-		in_delta_rgb(t, "to pcs", input_channels, pts, expected.pcs, actual.pcs, opt.pcs_tolerance, p.Header.ProfileConnectionSpace == icc.ColorSpaceLab)
+		in_delta_rgb(t, "to pcs", dev_channels, 3, pts, expected.pcs, actual.pcs, opt.pcs_tolerance, p.Header.ProfileConnectionSpace == icc.ColorSpaceLab)
 		if !opt.skip_inv {
-			in_delta_rgb(t, "to device", input_channels, actual.pcs, expected.inv, actual.inv, opt.inv_tolerance, false)
+			in_delta_rgb(t, "to device", 3, dev_channels, actual.pcs, expected.inv, actual.inv, opt.inv_tolerance, false)
 		}
-		in_delta_rgb(t, "to sRGB", input_channels, pts, expected.srgb, actual.srgb, opt.srgb_tolerance, false)
+		in_delta_rgb(t, "to sRGB", dev_channels, 3, pts, expected.srgb, actual.srgb, opt.srgb_tolerance, false)
 	})
 }
 
@@ -268,63 +280,58 @@ func transform_general_debug(inp, outp []float64, t icc.ChannelTransformer) {
 
 var _ = transform_debug
 
-func develop_to_srgb(p *icc.Profile, t *testing.T, name string, tolerance float64) {
+func develop_to_srgb(p *icc.Profile, lcms *CMSProfile, t *testing.T, name string, tolerance float64) {
 	const r, g, b float64 = 1, 0.0666667, 0.2
-	lcms := lcms_profile(t, name)
 	l, err := lcms.TransformFloatToSRGB([]float64{r, g, b}, p.Header.RenderingIntent)
 	tr, err := p.CreateTransformerToSRGB(p.Header.RenderingIntent, 3, false, false, false)
 	require.NoError(t, err)
 	x, y, z := tr.TransformDebug(r, g, b, transform_debug)
 	fmt.Println()
 
-	in_delta_rgb(t, name+":srgb", 3, []float64{r, g, b}, l, []float64{x, y, z}, tolerance, false)
+	in_delta_rgb(t, name+":srgb", 3, 3, []float64{r, g, b}, l, []float64{x, y, z}, tolerance, false)
 }
 
 var _ = develop_to_srgb
 
-func develop_inverse(p *icc.Profile, t *testing.T, name string, tolerance float64) {
+func develop_inverse(p *icc.Profile, lcms *CMSProfile, t *testing.T, name string, tolerance float64) {
 	var r, g, b float64 = 78.2471, -57.496, 10.4908
-	lcms := lcms_profile(t, name)
 	l, err := lcms.TransformFloatToDevice([]float64{r, g, b}, p.Header.RenderingIntent)
 	fmt.Println()
 	tr, err := p.CreateTransformerToDevice(p.Header.RenderingIntent, false)
 	require.NoError(t, err)
 	x, y, z := tr.TransformDebug(r, g, b, transform_debug)
 	fmt.Println()
-	in_delta_rgb(t, name+":inverse", 3, []float64{r, g, b}, l, []float64{x, y, z}, tolerance, false)
+	in_delta_rgb(t, name+":inverse", 3, 3, []float64{r, g, b}, l, []float64{x, y, z}, tolerance, false)
 }
 
 var _ = develop_inverse
 
-func develop_pcs(p *icc.Profile, t *testing.T, name string, tolerance float64) {
+func develop_pcs(p *icc.Profile, lcms *CMSProfile, t *testing.T, name string, tolerance float64) {
 	const r, g, b float64 = 0.933333, 0.666667, 0.666667
-	lcms := lcms_profile(t, name)
 	l, err := lcms.TransformFloatToPCS([]float64{r, g, b}, p.Header.RenderingIntent)
 	fmt.Println()
 	tr, err := p.CreateTransformerToPCS(p.Header.RenderingIntent, 3, false)
 	require.NoError(t, err)
 	x, y, z := tr.TransformDebug(r, g, b, transform_debug)
 	fmt.Println()
-	in_delta_rgb(t, name+": pcs", 3, []float64{r, g, b}, l, []float64{x, y, z}, tolerance, true)
+	in_delta_rgb(t, name+": pcs", 3, 3, []float64{r, g, b}, l, []float64{x, y, z}, tolerance, true)
 }
 
-func develop_pcs4(p *icc.Profile, t *testing.T, name string, tolerance float64) {
-	const c, m, y, k = 0.933333, 0.666667, 0.666667, 0.5
-	lcms := lcms_profile(t, name)
+func develop_pcs4(p *icc.Profile, lcms *CMSProfile, t *testing.T, name string, tolerance float64) {
+	const c, m, y, k = 74.06228373702423, 68.28604382929645, 66.56516724336797, 89.82698961937714
 	inp := []float64{c, m, y, k}
-	l, err := lcms.TransformFloatToPCS([]float64{c * 100, m * 100, y * 100, k * 100}, p.Header.RenderingIntent)
+	l, err := lcms.TransformFloatToPCS([]float64{c, m, y, k}, p.Header.RenderingIntent)
 	fmt.Println()
 	tr, err := p.CreateTransformerToPCS(p.Header.RenderingIntent, 4, false)
 	require.NoError(t, err)
 	out := []float64{0, 0, 0, 0}
 	tr.TransformGeneralDebug(out, inp, transform_general_debug)
 	fmt.Println()
-	in_delta_rgb(t, name+": pcs", 3, inp, l, out[:3], tolerance, true)
+	in_delta_rgb(t, name+": pcs", 4, 3, inp, l, out[:3], tolerance, true)
 }
 
-func develop_inverse4(p *icc.Profile, t *testing.T, name string, tolerance float64) {
+func develop_inverse4(p *icc.Profile, lcms *CMSProfile, t *testing.T, name string, tolerance float64) {
 	var r, g, b float64 = 78.2471, -57.496, 10.4908
-	lcms := lcms_profile(t, name)
 	l, err := lcms.TransformFloatToDevice([]float64{r, g, b}, p.Header.RenderingIntent)
 	fmt.Println()
 	tr, err := p.CreateTransformerToDevice(p.Header.RenderingIntent, false)
@@ -332,28 +339,54 @@ func develop_inverse4(p *icc.Profile, t *testing.T, name string, tolerance float
 	cmyk := []float64{0, 0, 0, 0}
 	tr.TransformGeneralDebug(cmyk, []float64{r, g, b, 0}, transform_general_debug)
 	fmt.Println()
-	in_delta_rgb(t, name+":inverse", 3, []float64{r, g, b}, l, cmyk, tolerance, false)
+	in_delta_rgb(t, name+":inverse", 3, 4, []float64{r, g, b, 0}, l, cmyk, tolerance, false)
+}
+
+func develop_to_srgb4(p *icc.Profile, lcms *CMSProfile, t *testing.T, name string, tolerance float64) {
+	const c, m, y, k = 100, 0, 0, 0
+	inp := []float64{c, m, y, k}
+	l, err := lcms.TransformFloatToSRGB([]float64{c, m, y, k}, p.Header.RenderingIntent)
+	fmt.Println()
+	tr, err := p.CreateTransformerToSRGB(p.Header.RenderingIntent, 4, false, false, false)
+	require.NoError(t, err)
+	out := []float64{0, 0, 0, 0}
+	tr.TransformGeneralDebug(out, inp, transform_general_debug)
+	fmt.Println()
+	in_delta_rgb(t, name+": srgb", 4, 3, inp, l, out[:3], tolerance, true)
 }
 
 var _ = develop_pcs
 var _ = develop_pcs4
 var _ = develop_inverse4
+var _ = develop_to_srgb4
+var _ = develop_blackpoint
+
+func develop_blackpoint(p *icc.Profile, lcms *CMSProfile, t *testing.T) {
+	lbp, ok := lcms.DetectBlackPoint(p.Header.RenderingIntent)
+	bp := p.BlackPoint(p.Header.RenderingIntent, transform_general_debug)
+	if ok {
+		require.InDeltaSlice(t, []float64{lbp.X, lbp.Y, lbp.Z}, []float64{bp.X, bp.Y, bp.Z}, THRESHOLD16)
+	}
+}
 
 // Run this with ./custom-lcms.sh
 func TestDevelop(t *testing.T) {
-	const name = "cmyk.icc"
+	const name = srgb_xyz_profile_name
 	opt := options_for_profile(name)
 	p := profile(t, name)
+	lcms := lcms_profile(t, name)
+	// develop_blackpoint(p, lcms, t)
 	if p.Header.DataColorSpace == icc.ColorSpaceCMYK {
-		// develop_pcs4(p, t, name, opt.pcs_tolerance)
-		if !opt.skip_inv {
-			develop_inverse4(p, t, name, opt.inv_tolerance)
-		}
-	} else {
-		develop_pcs(p, t, name, opt.pcs_tolerance)
+		// develop_pcs4(p, lcms, t, name, opt.pcs_tolerance)
 		// if !opt.skip_inv {
-		// 	develop_inverse(p, t, name, opt.inv_tolerance)
+		// 	develop_inverse4(p, lcms, t, name, opt.inv_tolerance)
 		// }
-		develop_to_srgb(p, t, name, opt.srgb_tolerance)
+		develop_to_srgb4(p, lcms, t, name, opt.srgb_tolerance)
+	} else {
+		develop_pcs(p, lcms, t, name, opt.pcs_tolerance)
+		// if !opt.skip_inv {
+		// 	develop_inverse(p, lcms, t, name, opt.inv_tolerance)
+		// }
+		develop_to_srgb(p, lcms, t, name, opt.srgb_tolerance)
 	}
 }

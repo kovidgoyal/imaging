@@ -161,6 +161,11 @@ func (p *Profile) find_conversion_tag(forward bool, rendering_intent RenderingIn
 	return ans, nil
 }
 
+func (p *Profile) should_apply_blackpoint(intent RenderingIntent) bool {
+	// See _cmsLinkProfiles() in cmscnvrt.c
+	return (intent == PerceptualRenderingIntent || intent == SaturationRenderingIntent) && p.Header.Version.Major >= 4
+}
+
 func (p *Profile) CreateTransformerToDevice(rendering_intent RenderingIntent, optimize bool) (ans *Pipeline, err error) {
 	num_output_channels := len(p.Header.DataColorSpace.BlackPoint())
 	if num_output_channels == 0 {
@@ -176,7 +181,7 @@ func (p *Profile) CreateTransformerToDevice(rendering_intent RenderingIntent, op
 	}()
 	ans = &Pipeline{}
 
-	if (rendering_intent == PerceptualRenderingIntent || rendering_intent == SaturationRenderingIntent) && p.Header.Version.Major >= 4 {
+	if p.should_apply_blackpoint(rendering_intent) {
 		var PCS_blackpoint XYZType // 0, 0, 0
 		output_blackpoint := p.BlackPoint(rendering_intent, nil)
 		if PCS_blackpoint != output_blackpoint {
@@ -299,16 +304,18 @@ func (p *Profile) CreateTransformerToSRGB(rendering_intent RenderingIntent, inpu
 		return nil, fmt.Errorf("transformer to PCS %s not suitable for %d input channels", ans.String(), input_channels)
 	}
 	input_colorspace := p.Header.ProfileConnectionSpace
-	var sRGB_blackpoint XYZType // 0, 0, 0
-	input_blackpoint := p.BlackPoint(rendering_intent, nil)
-	if input_blackpoint != sRGB_blackpoint {
-		if input_colorspace == ColorSpaceLab {
-			ans.Append(transform_for_pcs_colorspace(input_colorspace, true))
-			ans.Append(NewLABtoXYZ(p.PCSIlluminant))
-			ans.Append(NewXYZToNormalized())
-			input_colorspace = ColorSpaceXYZ
+	if p.should_apply_blackpoint(rendering_intent) {
+		var sRGB_blackpoint XYZType // 0, 0, 0
+		input_blackpoint := p.BlackPoint(rendering_intent, nil)
+		if input_blackpoint != sRGB_blackpoint {
+			if input_colorspace == ColorSpaceLab {
+				ans.Append(transform_for_pcs_colorspace(input_colorspace, true))
+				ans.Append(NewLABtoXYZ(p.PCSIlluminant))
+				ans.Append(NewXYZToNormalized())
+				input_colorspace = ColorSpaceXYZ
+			}
+			ans.Append(NewBlackPointCorrection(p.PCSIlluminant, input_blackpoint, sRGB_blackpoint))
 		}
-		ans.Append(NewBlackPointCorrection(p.PCSIlluminant, input_blackpoint, sRGB_blackpoint))
 	}
 	ans.Append(transform_for_pcs_colorspace(input_colorspace, true))
 	switch input_colorspace {
@@ -368,6 +375,9 @@ func points_for_transformer_comparison(input_channels, num_points_per_input_chan
 	ans := make([]unit_float, 0, sz)
 	current_point := make([]int, input_channels)
 	factor := 1 / unit_float(num_points_per_input_channel-1)
+	if input_channels == 4 {
+		factor *= 100 // CMYK
+	}
 	iterate_hypercube(current_point, 0, m, n, func(p []int) {
 		for _, x := range current_point {
 			ans = append(ans, unit_float(x)*factor)
