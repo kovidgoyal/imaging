@@ -174,12 +174,12 @@ func convert_to_srgb(tr *icc.Pipeline, image_any image.Image) (ans image.Image, 
 		d := imaging.NewNRGB(b)
 		ans = d
 		f = func(start, limit int) {
-			for y := b.Min.Y + start; y < b.Min.Y+limit; y++ {
-				ybase := (y - img.Rect.Min.Y) * img.YStride
-				row := d.Pix[d.Stride*(y-b.Min.Y):]
+			for y := start; y < limit; y++ {
+				ybase := y * img.YStride
+				row := d.Pix[d.Stride*y:]
 				for x := b.Min.X; x < b.Max.X; x++ {
-					iy := ybase + (x - img.Rect.Min.X)
-					ic := img.COffset(x, y)
+					iy := ybase + (x - b.Min.X)
+					ic := img.COffset(x, y+b.Min.Y)
 					r, g, b := color.YCbCrToRGB(img.Y[iy], img.Cb[ic], img.Cr[ic])
 					fr, fg, fb := t(f8(r), f8(g), f8(b))
 					row[0], row[1], row[2] = f8i(fr), f8i(fg), f8i(fb)
