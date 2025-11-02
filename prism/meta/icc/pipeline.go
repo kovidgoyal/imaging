@@ -83,6 +83,8 @@ func (p *Pipeline) finalize(optimize bool) {
 	}
 }
 
+func (p *Pipeline) Finalize(optimize bool) { p.finalize(optimize) }
+
 func (p *Pipeline) insert(idx int, c ChannelTransformer) {
 	if is_nil(c) {
 		return

@@ -16,10 +16,6 @@ func (c NRGBColor) AsSharp() string {
 	return fmt.Sprintf("#%02X%02X%02X", c.R, c.G, c.B)
 }
 
-func (c NRGBColor) String() string {
-	return fmt.Sprintf("NRGBColor{%02X %02X %02X}", c.R, c.G, c.B)
-}
-
 func (c NRGBColor) RGBA() (r, g, b, a uint32) {
 	r = uint32(c.R)
 	r |= r << 8
@@ -43,8 +39,13 @@ type NRGB struct {
 }
 
 func nrgbModel(c color.Color) color.Color {
-	if _, ok := c.(NRGBColor); ok {
+	switch q := c.(type) {
+	case NRGBColor:
 		return c
+	case color.NRGBA:
+		return NRGBColor{q.R, q.G, q.B}
+	case color.NRGBA64:
+		return NRGBColor{uint8(q.R >> 8), uint8(q.G >> 8), uint8(q.B >> 8)}
 	}
 	r, g, b, a := c.RGBA()
 	switch a {
@@ -91,11 +92,9 @@ func (p *NRGB) Set(x, y int, c color.Color) {
 		return
 	}
 	i := p.PixOffset(x, y)
-	c1 := NRGBModel.Convert(c).(NRGBColor)
 	s := p.Pix[i : i+3 : i+3] // Small cap improves performance, see https://golang.org/issue/27857
-	s[0] = c1.R
-	s[1] = c1.G
-	s[2] = c1.B
+	q := nrgbModel(c).(NRGBColor)
+	s[0], s[1], s[2] = q.R, q.G, q.B
 }
 
 func (p *NRGB) SetRGBA64(x, y int, c color.RGBA64) {

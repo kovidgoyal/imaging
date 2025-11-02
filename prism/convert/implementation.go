@@ -18,16 +18,19 @@ func premultiply8(fr float64, a uint8) uint8 {
 	return f8i(fr * float64(a) / math.MaxUint8)
 }
 
-func unpremultiply8(r, a uint8) float64 {
-	return float64((uint16(r) * math.MaxUint8) / uint16(a))
+// unpremultiply and convert to normalized float
+func unpremultiply8(r_, a_ uint8) float64 {
+	r, a := uint16(r_), uint16(a_)
+	return float64((r*math.MaxUint8)/a) / math.MaxUint8
 }
 
+// unpremultiply and convert to normalized float
 func unpremultiply(r, a uint32) float64 {
-	return float64((r * math.MaxUint16) / a)
+	return float64((r*math.MaxUint16)/a) / math.MaxUint16
 }
 
-func premultiply(r float64, a uint32) uint16 {
-	return uint16((r * float64(a)) / math.MaxUint16)
+func premultiply(fr float64, a uint32) uint16 {
+	return f16i(fr * float64(a) / math.MaxUint16)
 }
 
 func f8(x uint8) float64    { return float64(x) / math.MaxUint8 }
@@ -35,26 +38,7 @@ func f8i(x float64) uint8   { return uint8(x * math.MaxUint8) }
 func f16(x uint16) float64  { return float64(x) / math.MaxUint16 }
 func f16i(x float64) uint16 { return uint16(x * math.MaxUint16) }
 
-// Convert to SRGB based on the supplied ICC color profile. The result
-// may be either the original image unmodified if no color
-// conversion was needed, the original image modified, or a new image (when the original image
-// is not in a supported format).
-func ConvertToSRGB(p *icc.Profile, image_any image.Image) (ans image.Image, err error) {
-	if p.IsSRGB() {
-		return image_any, nil
-	}
-	num_channels := 3
-	if _, is_cmyk := image_any.(*image.CMYK); is_cmyk {
-		num_channels = 4
-	}
-	tr, err := p.CreateTransformerToSRGB(p.Header.RenderingIntent, num_channels, true, true, true)
-	if err != nil {
-		return nil, err
-	}
-	return convert_to_srgb(tr, image_any)
-}
-
-func convert_to_srgb(tr *icc.Pipeline, image_any image.Image) (ans image.Image, err error) {
+func convert(tr *icc.Pipeline, image_any image.Image) (ans image.Image, err error) {
 	t := tr.Transform
 	b := image_any.Bounds()
 	width, height := b.Dx(), b.Dy()
@@ -112,8 +96,8 @@ func convert_to_srgb(tr *icc.Pipeline, image_any image.Image) (ans image.Image, 
 				row := img.Pix[img.Stride*y:]
 				_ = row[4*(width-1)]
 				for range width {
-					r := row[0:3:3]
-					if a := row[4]; a != 0 {
+					r := row[0:4:4]
+					if a := row[3]; a != 0 {
 						fr, fg, fb := t(unpremultiply8(r[0], a), unpremultiply8(r[1], a), unpremultiply8(r[2], a))
 						r[0], r[1], r[2] = premultiply8(fr, a), premultiply8(fg, a), premultiply8(fb, a)
 					}
@@ -128,11 +112,11 @@ func convert_to_srgb(tr *icc.Pipeline, image_any image.Image) (ans image.Image, 
 				_ = row[8*(width-1)]
 				for range width {
 					s := row[0:8:8]
-					a := uint32(uint16(s[6])<<8 | uint16(s[7]))
+					a := uint32(s[6])<<8 | uint32(s[7])
 					if a != 0 {
-						fr := unpremultiply(uint32(uint16(s[0])<<8|uint16(s[1])), a)
-						fg := unpremultiply(uint32(uint16(s[2])<<8|uint16(s[3])), a)
-						fb := unpremultiply(uint32(uint16(s[4])<<8|uint16(s[5])), a)
+						fr := unpremultiply((uint32(s[0])<<8 | uint32(s[1])), a)
+						fg := unpremultiply((uint32(s[2])<<8 | uint32(s[3])), a)
+						fb := unpremultiply((uint32(s[4])<<8 | uint32(s[5])), a)
 						fr, fg, fb = t(fr, fg, fb)
 						r, g, b := premultiply(fr, a), premultiply(fg, a), premultiply(fb, a)
 						s[0], s[1] = uint8(r>>8), uint8(r)
@@ -149,24 +133,30 @@ func convert_to_srgb(tr *icc.Pipeline, image_any image.Image) (ans image.Image, 
 			if a != 0 {
 				fr, fg, fb := unpremultiply(r, a), unpremultiply(g, a), unpremultiply(b, a)
 				fr, fg, fb = t(fr, fg, fb)
-				img.Palette[i] = &color.NRGBA64{R: f16i(fr), G: f16i(fg), B: f16i(fb)}
+				img.Palette[i] = color.NRGBA64{R: f16i(fr), G: f16i(fg), B: f16i(fb), A: uint16(a)}
 			}
 		}
 		return
 	case *image.CMYK:
 		g := tr.TransformGeneral
+		d := imaging.NewNRGB(b)
+		ans = d
 		f = func(start, limit int) {
 			var inp, outp [4]float64
 			i, o := inp[:], outp[:]
 			for y := start; y < limit; y++ {
 				row := img.Pix[img.Stride*y:]
+				drow := d.Pix[img.Stride*y:]
 				_ = row[4*(width-1)]
+				_ = drow[3*(width-1)]
 				for range width {
 					r := row[0:4:4]
 					inp[0], inp[1], inp[2], inp[3] = f8(r[0]), f8(r[1]), f8(r[2]), f8(r[3])
 					g(o, i)
-					r[0], r[1], r[2], r[3] = f8i(o[0]), f8i(o[1]), f8i(o[2]), f8i(o[3])
+					r = drow[0:3:3]
+					r[0], r[1], r[2] = f8i(o[0]), f8i(o[1]), f8i(o[2])
 					row = row[4:]
+					drow = drow[3:]
 				}
 			}
 		}
@@ -180,9 +170,11 @@ func convert_to_srgb(tr *icc.Pipeline, image_any image.Image) (ans image.Image, 
 				for x := b.Min.X; x < b.Max.X; x++ {
 					iy := ybase + (x - b.Min.X)
 					ic := img.COffset(x, y+b.Min.Y)
-					r, g, b := color.YCbCrToRGB(img.Y[iy], img.Cb[ic], img.Cr[ic])
-					fr, fg, fb := t(f8(r), f8(g), f8(b))
-					row[0], row[1], row[2] = f8i(fr), f8i(fg), f8i(fb)
+					// We use this rather than color.YCbCrToRGB for greater accuracy
+					r, g, bb, _ := color.YCbCr{img.Y[iy], img.Cb[ic], img.Cr[ic]}.RGBA()
+					fr, fg, fb := t(f16(uint16(r)), f16(uint16(g)), f16(uint16(bb)))
+					rr := row[0:3:3]
+					rr[0], rr[1], rr[2] = f8i(fr), f8i(fg), f8i(fb)
 					row = row[3:]
 				}
 			}

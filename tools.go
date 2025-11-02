@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"image"
 	"image/color"
+	"image/draw"
 	"math"
+	"slices"
 )
 
 // New creates a new image with the specified width and height, and fills it with the specified color.
@@ -39,6 +41,78 @@ func Clone(img image.Image) *image.NRGBA {
 		panic(err)
 	}
 	return dst
+}
+
+// Clone an image preserving it's type for all known image types or returning an NRGBA64 image otherwise
+func ClonePreservingType(src image.Image) image.Image {
+	switch src := src.(type) {
+	case *image.RGBA:
+		dst := *src
+		dst.Pix = slices.Clone(src.Pix)
+		return &dst
+	case *image.RGBA64:
+		dst := *src
+		dst.Pix = slices.Clone(src.Pix)
+		return &dst
+	case *image.NRGBA:
+		dst := *src
+		dst.Pix = slices.Clone(src.Pix)
+		return &dst
+	case *NRGB:
+		dst := *src
+		dst.Pix = slices.Clone(src.Pix)
+		return &dst
+	case *image.NRGBA64:
+		dst := *src
+		dst.Pix = slices.Clone(src.Pix)
+		return &dst
+	case *image.Gray:
+		dst := *src
+		dst.Pix = slices.Clone(src.Pix)
+		return &dst
+	case *image.Gray16:
+		dst := *src
+		dst.Pix = slices.Clone(src.Pix)
+		return &dst
+	case *image.Alpha:
+		dst := *src
+		dst.Pix = slices.Clone(src.Pix)
+		return &dst
+	case *image.Alpha16:
+		dst := *src
+		dst.Pix = slices.Clone(src.Pix)
+		return &dst
+	case *image.CMYK:
+		dst := *src
+		dst.Pix = slices.Clone(src.Pix)
+		return &dst
+	case *image.Paletted:
+		dst := *src
+		dst.Pix = slices.Clone(src.Pix)
+		dst.Palette = slices.Clone(src.Palette)
+		return &dst
+	case *image.YCbCr:
+		dst := *src
+		dst.Y = slices.Clone(src.Y)
+		dst.Cb = slices.Clone(src.Cb)
+		dst.Cr = slices.Clone(src.Cr)
+		return &dst
+	case *image.NYCbCrA:
+		dst := *src
+		dst.Y = slices.Clone(src.Y)
+		dst.Cb = slices.Clone(src.Cb)
+		dst.Cr = slices.Clone(src.Cr)
+		dst.A = slices.Clone(src.A)
+		return &dst
+	// For any other image type, fall back to a generic copy.
+	// This creates an NRGBA image, which may not be the original type,
+	// but ensures the image data is preserved.
+	default:
+		b := src.Bounds()
+		dst := image.NewNRGBA64(b)
+		draw.Draw(dst, b, src, b.Min, draw.Src)
+		return dst
+	}
 }
 
 // Anchor is the anchor point for image alignment.
