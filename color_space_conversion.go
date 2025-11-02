@@ -1,4 +1,4 @@
-package convert
+package imaging
 
 import (
 	"fmt"
@@ -8,7 +8,6 @@ import (
 	"math"
 
 	"github.com/kovidgoyal/go-parallel"
-	"github.com/kovidgoyal/imaging"
 	"github.com/kovidgoyal/imaging/prism/meta/icc"
 )
 
@@ -37,7 +36,7 @@ func convert(tr *icc.Pipeline, image_any image.Image) (ans image.Image, err erro
 	ans = image_any
 	var f func(start, limit int)
 	switch img := image_any.(type) {
-	case *imaging.NRGB:
+	case *NRGB:
 		f = func(start, limit int) {
 			for y := start; y < limit; y++ {
 				row := img.Pix[img.Stride*y:]
@@ -144,7 +143,7 @@ func convert(tr *icc.Pipeline, image_any image.Image) (ans image.Image, err erro
 		return
 	case *image.CMYK:
 		g := tr.TransformGeneral
-		d := imaging.NewNRGB(b)
+		d := NewNRGB(b)
 		ans = d
 		f = func(start, limit int) {
 			var inp, outp [4]float64
@@ -166,7 +165,7 @@ func convert(tr *icc.Pipeline, image_any image.Image) (ans image.Image, err erro
 			}
 		}
 	case *image.YCbCr:
-		d := imaging.NewNRGB(b)
+		d := NewNRGB(b)
 		ans = d
 		f = func(start, limit int) {
 			for y := start; y < limit; y++ {

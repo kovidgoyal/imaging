@@ -1,4 +1,4 @@
-package convert
+package imaging
 
 import (
 	"fmt"
@@ -8,7 +8,6 @@ import (
 	"math"
 	"testing"
 
-	"github.com/kovidgoyal/imaging"
 	"github.com/kovidgoyal/imaging/prism/meta/icc"
 	"github.com/stretchr/testify/require"
 )
@@ -102,7 +101,7 @@ func populate_test_image(img image.Image, dr, dg, db uint8) image.Image {
 	r := img.Bounds()
 	offset := r.Min.Y + r.Min.X
 	c := func(base uint8) color.Color {
-		return imaging.NRGBColor{R: base + dr, G: base + 1 + dg, B: base + 2 + db}
+		return NRGBColor{R: base + dr, G: base + 1 + dg, B: base + 2 + db}
 	}
 	if p, ok := img.(*image.Paletted); ok {
 		max_base := uint8(0)
@@ -175,12 +174,12 @@ func new_unknown_image(r image.Rectangle) *unknown_image {
 func (p *unknown_image) PixOffset(x, y int) int {
 	return (y-p.Rect.Min.Y)*p.Stride + (x-p.Rect.Min.X)*3
 }
-func (p *unknown_image) ColorModel() color.Model { return imaging.NRGBModel }
+func (p *unknown_image) ColorModel() color.Model { return NRGBModel }
 func (p *unknown_image) Bounds() image.Rectangle { return p.Rect }
 func (p *unknown_image) At(x, y int) color.Color {
 	i := p.PixOffset(x, y)
 	s := p.Pix[i : i+3 : i+3]
-	return imaging.NRGBColor{R: s[0], G: s[1], B: s[2]}
+	return NRGBColor{R: s[0], G: s[1], B: s[2]}
 }
 
 func (p *unknown_image) set(x, y int, c color.Color) {
@@ -189,7 +188,7 @@ func (p *unknown_image) set(x, y int, c color.Color) {
 	}
 	i := p.PixOffset(x, y)
 	s := p.Pix[i : i+3 : i+3]
-	q := imaging.NRGBModel.Convert(c).(imaging.NRGBColor)
+	q := NRGBModel.Convert(c).(NRGBColor)
 	s[0], s[1], s[2] = q.R, q.G, q.B
 }
 
@@ -210,12 +209,12 @@ func new_unknown_image_with_set(r image.Rectangle) *unknown_image_with_set {
 func (p *unknown_image_with_set) PixOffset(x, y int) int {
 	return (y-p.Rect.Min.Y)*p.Stride + (x-p.Rect.Min.X)*3
 }
-func (p *unknown_image_with_set) ColorModel() color.Model { return imaging.NRGBModel }
+func (p *unknown_image_with_set) ColorModel() color.Model { return NRGBModel }
 func (p *unknown_image_with_set) Bounds() image.Rectangle { return p.Rect }
 func (p *unknown_image_with_set) At(x, y int) color.Color {
 	i := p.PixOffset(x, y)
 	s := p.Pix[i : i+3 : i+3]
-	return imaging.NRGBColor{R: s[0], G: s[1], B: s[2]}
+	return NRGBColor{R: s[0], G: s[1], B: s[2]}
 }
 
 func (p *unknown_image_with_set) Set(x, y int, c color.Color) {
@@ -224,7 +223,7 @@ func (p *unknown_image_with_set) Set(x, y int, c color.Color) {
 	}
 	i := p.PixOffset(x, y)
 	s := p.Pix[i : i+3 : i+3]
-	q := imaging.NRGBModel.Convert(c).(imaging.NRGBColor)
+	q := NRGBModel.Convert(c).(NRGBColor)
 	s[0], s[1], s[2] = q.R, q.G, q.B
 }
 
@@ -245,13 +244,13 @@ func TestProfileApplication(t *testing.T) {
 			p.Append(ct)
 			p.Finalize(true)
 			img = populate_test_image(img, 0, 0, 0)
-			cimg := imaging.ClonePreservingType(img)
+			cimg := ClonePreservingType(img)
 			cimg, err := convert(p, cimg)
 			require.NoError(t, err)
 			image_compare(t, img, cimg, ct, allowed_diff)
 		})
 	}
-	run(imaging.NewNRGB(r), 0)
+	run(NewNRGB(r), 0)
 	run(image.NewNRGBA(r), 0)
 	run(image.NewNRGBA64(r), 0)
 	run(image.NewRGBA(r), 0)
