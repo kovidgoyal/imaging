@@ -33,12 +33,21 @@ func (localFS) Open(name string) (io.ReadCloser, error)    { return os.Open(name
 
 var fs fileSystem = localFS{}
 
+type ColorSpaceType int
+
+const (
+	NO_CHANGE_OF_COLORSPACE ColorSpaceType = iota
+	SRGB_COLORSPACE
+)
+
 type decodeConfig struct {
-	autoOrientation bool
+	autoOrientation  bool
+	outputColorspace ColorSpaceType
 }
 
 var defaultDecodeConfig = decodeConfig{
-	autoOrientation: true,
+	autoOrientation:  true,
+	outputColorspace: SRGB_COLORSPACE,
 }
 
 // DecodeOption sets an optional parameter for the Decode and Open functions.
@@ -53,6 +62,15 @@ func AutoOrientation(enabled bool) DecodeOption {
 	}
 }
 
+// ColorSpace returns a DecodeOption that sets the colorspace that the
+// opened image will be in. Defaults to sRGB. If the image has an embedded ICC
+// color profile it is automatically used to convert colors to sRGB if needed.
+func ColorSpace(cs ColorSpaceType) DecodeOption {
+	return func(c *decodeConfig) {
+		c.outputColorspace = cs
+	}
+}
+
 // Decode reads an image from r.
 func Decode(r io.Reader, opts ...DecodeOption) (image.Image, error) {
 	cfg := defaultDecodeConfig
@@ -61,20 +79,22 @@ func Decode(r io.Reader, opts ...DecodeOption) (image.Image, error) {
 		option(&cfg)
 	}
 
-	if !cfg.autoOrientation {
+	if !cfg.autoOrientation && cfg.outputColorspace == NO_CHANGE_OF_COLORSPACE {
 		img, _, err := image.Decode(r)
 		return img, err
 	}
 	md, r, err := autometa.Load(r)
 	var oval orientation = orientationUnspecified
-	if err == nil && md != nil && len(md.ExifData) > 6 {
-		exif_data, err := exif.Decode(bytes.NewReader(md.ExifData))
-		if err == nil {
-			orient, err := exif_data.Get(exif.Orientation)
-			if err == nil && orient != nil {
-				x, err := strconv.ParseUint(orient.String(), 10, 0)
-				if err == nil && x > 0 && x < 9 {
-					oval = orientation(int(x))
+	if cfg.autoOrientation {
+		if err == nil && md != nil && len(md.ExifData) > 6 {
+			exif_data, err := exif.Decode(bytes.NewReader(md.ExifData))
+			if err == nil {
+				orient, err := exif_data.Get(exif.Orientation)
+				if err == nil && orient != nil {
+					x, err := strconv.ParseUint(orient.String(), 10, 0)
+					if err == nil && x > 0 && x < 9 {
+						oval = orientation(int(x))
+					}
 				}
 			}
 		}
@@ -83,6 +103,18 @@ func Decode(r io.Reader, opts ...DecodeOption) (image.Image, error) {
 	img, _, err := image.Decode(r)
 	if err != nil {
 		return nil, err
+	}
+	if md != nil && cfg.outputColorspace == SRGB_COLORSPACE {
+		p, perr := md.ICCProfile()
+		if perr != nil {
+			return nil, perr
+		}
+		if p != nil {
+			img, err = ConvertToSRGB(p, img)
+			if err != nil {
+				return nil, err
+			}
+		}
 	}
 
 	return fixOrientation(img, oval), nil
@@ -94,9 +126,6 @@ func Decode(r io.Reader, opts ...DecodeOption) (image.Image, error) {
 //
 //	// Load an image from file.
 //	img, err := imaging.Open("test.jpg")
-//
-//	// Load an image and transform it depending on the EXIF orientation tag (if present).
-//	img, err := imaging.Open("test.jpg", imaging.AutoOrientation(true))
 func Open(filename string, opts ...DecodeOption) (image.Image, error) {
 	file, err := fs.Open(filename)
 	if err != nil {
