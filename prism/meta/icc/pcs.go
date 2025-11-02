@@ -215,18 +215,18 @@ type LABtoXYZ struct {
 	t func(l, a, b unit_float) (x, y, z unit_float)
 }
 
-func NewLABtoXYZ(whitepoint XYZType) LABtoXYZ {
+func NewLABtoXYZ(whitepoint XYZType) *LABtoXYZ {
 	c := colorconv.NewConvertColor(whitepoint.X, whitepoint.Y, whitepoint.Z, 1)
-	return LABtoXYZ{c, c.LabToXYZ}
+	return &LABtoXYZ{c, c.LabToXYZ}
 }
 
-func (c LABtoXYZ) Transform(l, a, b unit_float) (unit_float, unit_float, unit_float) {
+func (c *LABtoXYZ) Transform(l, a, b unit_float) (unit_float, unit_float, unit_float) {
 	return c.t(l, a, b)
 }
-func (m LABtoXYZ) TransformGeneral(o, i []unit_float)   { tg33(m.Transform, o, i) }
-func (n LABtoXYZ) IOSig() (int, int)                    { return 3, 3 }
-func (n LABtoXYZ) String() string                       { return fmt.Sprintf("%T%s", n, n.c.String()) }
-func (n LABtoXYZ) Iter(f func(ChannelTransformer) bool) { f(n) }
+func (m *LABtoXYZ) TransformGeneral(o, i []unit_float)   { tg33(m.Transform, o, i) }
+func (n *LABtoXYZ) IOSig() (int, int)                    { return 3, 3 }
+func (n *LABtoXYZ) String() string                       { return fmt.Sprintf("%T%s", n, n.c.String()) }
+func (n *LABtoXYZ) Iter(f func(ChannelTransformer) bool) { f(n) }
 
 type XYZtoLAB struct {
 	c *colorconv.ConvertColor
@@ -246,22 +246,22 @@ func (n *XYZtoLAB) IOSig() (int, int)                    { return 3, 3 }
 func (n *XYZtoLAB) String() string                       { return fmt.Sprintf("%T%s", n, n.c.String()) }
 func (n *XYZtoLAB) Iter(f func(ChannelTransformer) bool) { f(n) }
 
-type CMYKToRGB int
+type NormalisedCMYKToRGB int
 
-func NewCMYKToRGB() *CMYKToRGB {
-	a := CMYKToRGB(0)
+func NewCMYKToRGB() *NormalisedCMYKToRGB {
+	a := NormalisedCMYKToRGB(0)
 	return &a
 }
 
-func (c *CMYKToRGB) Transform(l, a, b unit_float) (unit_float, unit_float, unit_float) {
+func (c *NormalisedCMYKToRGB) Transform(l, a, b unit_float) (unit_float, unit_float, unit_float) {
 	panic("need 4 inputs cannot use Transform, must use TransformGeneral")
 }
-func (m *CMYKToRGB) TransformGeneral(o, i []unit_float) {
+func (m *NormalisedCMYKToRGB) TransformGeneral(o, i []unit_float) {
 	k := 1 - i[3]
 	o[0] = (1 - i[0]) * k
 	o[1] = (1 - i[1]) * k
 	o[2] = (1 - i[2]) * k
 }
-func (n *CMYKToRGB) IOSig() (int, int)                    { return 4, 3 }
-func (n *CMYKToRGB) String() string                       { return "CMYKToRGB" }
-func (n *CMYKToRGB) Iter(f func(ChannelTransformer) bool) { f(n) }
+func (n *NormalisedCMYKToRGB) IOSig() (int, int)                    { return 4, 3 }
+func (n *NormalisedCMYKToRGB) String() string                       { return "NormalisedCMYKToRGB" }
+func (n *NormalisedCMYKToRGB) Iter(f func(ChannelTransformer) bool) { f(n) }

@@ -216,9 +216,6 @@ func (p *Profile) CreateTransformerToDevice(rendering_intent RenderingIntent, op
 			// case, see _cmsReadOutputLUT() in cmsio1.c
 			ans.UseTrilinearInsteadOfTetrahedral()
 		}
-		if p.Header.DataColorSpace == ColorSpaceCMYK {
-			ans.Append(&Scaling4{"NormalizedToCMYK", 100.})
-		}
 	} else {
 		err = p.create_matrix_trc_transformer(forward, chromatic_adaptation, ans)
 	}
@@ -237,9 +234,6 @@ func (p *Profile) createTransformerToPCS(rendering_intent RenderingIntent) (ans 
 		return nil, err
 	}
 	if a2b != nil {
-		if p.Header.DataColorSpace == ColorSpaceCMYK {
-			ans.Append(&Scaling4{"CMYKtoNormalized", 1 / 100.})
-		}
 		ans.Append(a2b)
 		ans.Append(chromatic_adaptation)
 		if ans.has_lut16type_tag && p.Header.ProfileConnectionSpace == ColorSpaceLab {
@@ -375,9 +369,6 @@ func points_for_transformer_comparison(input_channels, num_points_per_input_chan
 	ans := make([]unit_float, 0, sz)
 	current_point := make([]int, input_channels)
 	factor := 1 / unit_float(num_points_per_input_channel-1)
-	if input_channels == 4 {
-		factor *= 100 // CMYK
-	}
 	iterate_hypercube(current_point, 0, m, n, func(p []int) {
 		for _, x := range current_point {
 			ans = append(ans, unit_float(x)*factor)
