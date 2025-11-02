@@ -172,15 +172,39 @@ func convert(tr *icc.Pipeline, image_any image.Image) (ans image.Image, err erro
 			for y := start; y < limit; y++ {
 				ybase := y * img.YStride
 				row := d.Pix[d.Stride*y:]
+				yy := y + b.Min.Y
 				for x := b.Min.X; x < b.Max.X; x++ {
 					iy := ybase + (x - b.Min.X)
-					ic := img.COffset(x, y+b.Min.Y)
+					ic := img.COffset(x, yy)
 					// We use this rather than color.YCbCrToRGB for greater accuracy
 					r, g, bb, _ := color.YCbCr{img.Y[iy], img.Cb[ic], img.Cr[ic]}.RGBA()
 					fr, fg, fb := t(f16(uint16(r)), f16(uint16(g)), f16(uint16(bb)))
 					rr := row[0:3:3]
 					rr[0], rr[1], rr[2] = f8i(fr), f8i(fg), f8i(fb)
 					row = row[3:]
+				}
+			}
+		}
+	case *image.NYCbCrA:
+		d := image.NewNRGBA(b)
+		ans = d
+		f = func(start, limit int) {
+			for y := start; y < limit; y++ {
+				ybase := y * img.YStride
+				row := d.Pix[d.Stride*y:]
+				yy := y + b.Min.Y
+				for x := b.Min.X; x < b.Max.X; x++ {
+					rr := row[0:4:4]
+					rr[3] = img.A[img.AOffset(x, yy)]
+					if rr[3] != 0 {
+						iy := ybase + (x - b.Min.X)
+						ic := img.COffset(x, yy)
+						// We use this rather than color.YCbCrToRGB for greater accuracy
+						r, g, bb, _ := color.YCbCr{img.Y[iy], img.Cb[ic], img.Cr[ic]}.RGBA()
+						fr, fg, fb := t(f16(uint16(r)), f16(uint16(g)), f16(uint16(bb)))
+						rr[0], rr[1], rr[2] = f8i(fr), f8i(fg), f8i(fb)
+						row = row[4:]
+					}
 				}
 			}
 		}

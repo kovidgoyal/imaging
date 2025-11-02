@@ -29,6 +29,21 @@ func pixel_setter(img_ image.Image) func(x, y int, c color.Color) {
 			img.Cb[ci] = cc.Cb
 			img.Cr[ci] = cc.Cr
 		}
+	case *image.NYCbCrA:
+		if img.SubsampleRatio != image.YCbCrSubsampleRatio444 {
+			panic("setting not supported for YCbCr images with non 4:4:4 sampling")
+		}
+		return func(x, y int, c color.Color) {
+			cc := color.YCbCrModel.Convert(c).(color.YCbCr)
+			yi := img.YOffset(x, y)
+			ci := img.COffset(x, y)
+			a := img.AOffset(x, y)
+			img.Y[yi] = cc.Y
+			img.Cb[ci] = cc.Cb
+			img.Cr[ci] = cc.Cr
+			img.A[a] = 0xff
+		}
+
 	case draw.Image:
 		return img.Set
 	}
@@ -173,4 +188,5 @@ func TestProfileApplication(t *testing.T) {
 	run(image.NewCMYK(r), 0)
 	run(image.NewYCbCr(r, image.YCbCrSubsampleRatio444), 0)
 	run(image.NewPaletted(r, make(color.Palette, 256)), 0)
+	run(image.NewNYCbCrA(r, image.YCbCrSubsampleRatio444), 0)
 }
