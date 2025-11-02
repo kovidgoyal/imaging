@@ -35,7 +35,7 @@ func pixel_setter(img_ image.Image) func(x, y int, c color.Color) {
 	panic(fmt.Sprintf("unhandled image type to set colors in: %T", img_))
 }
 
-func image_compare(t *testing.T, a, b image.Image, ct *icc.Translation) {
+func image_compare(t *testing.T, a, b image.Image, ct icc.ChannelTransformer, allowed_diff uint) {
 	wa, ha := a.Bounds().Dx(), a.Bounds().Dy()
 	wb, hb := b.Bounds().Dx(), b.Bounds().Dy()
 	require.Equal(t, wa, wb)
@@ -47,19 +47,38 @@ func image_compare(t *testing.T, a, b image.Image, ct *icc.Translation) {
 	}
 	cvt := func(x float64) uint { return uint(x * maxval) }
 	f := func(x uint16) float64 { return float64(x) / math.MaxUint16 }
+	max_diff := struct {
+		d                      uint
+		x, y                   int
+		orig, actual, expected []uint
+	}{}
+	md := func(a, b []uint) (ans uint) {
+		for i, x := range a {
+			y := b[i]
+			d := icc.IfElse(x > y, x-y, y-x)
+			ans = max(ans, d)
+		}
+		return
+	}
+	cc := func(c color.Color) color.NRGBA64 { return color.NRGBA64Model.Convert(c).(color.NRGBA64) }
 	for y := range ha {
 		ya, yb := a.Bounds().Min.Y+y, b.Bounds().Min.Y+y
 		for x := range wa {
 			xa, xb := a.Bounds().Min.X+x, b.Bounds().Min.X+x
-			ac, bc := a.At(xa, ya), b.At(xb, yb)
-			qa := color.NRGBA64Model.Convert(ac).(color.NRGBA64)
-			qb := color.NRGBA64Model.Convert(bc).(color.NRGBA64)
+			qa, qb := cc(a.At(xa, ya)), cc(b.At(xb, yb))
 			orig := []float64{f(qa.R), f(qa.G), f(qa.B)}
 			actual := []uint{cvt(f(qb.R)), cvt(f(qb.G)), cvt(f(qb.B))}
 			r, g, b := ct.Transform(orig[0], orig[1], orig[2])
 			expected := []uint{cvt(r), cvt(g), cvt(b)}
-			require.Equal(t, expected, actual, fmt.Sprintf("pixel at x=%d y=%d orig=%.6v", x, y, []uint{cvt(orig[0]), cvt(orig[1]), cvt(orig[2])}))
+			dd := md(actual, expected)
+			if dd > max_diff.d {
+				max_diff.d = dd
+				max_diff.x, max_diff.y = x, y
+				max_diff.actual, max_diff.expected = actual, expected
+				max_diff.orig = []uint{cvt(orig[0]), cvt(orig[1]), cvt(orig[2])}
+			}
 		}
+		require.LessOrEqual(t, max_diff.d, allowed_diff, fmt.Sprintf("pixel at x=%d y=%d orig=%v\n%v != %v", max_diff.x, max_diff.y, max_diff.orig, max_diff.expected, max_diff.actual))
 	}
 }
 
@@ -82,6 +101,17 @@ func populate_test_image(img image.Image, dr, dg, db uint8) image.Image {
 		p.Palette = p.Palette[:max_base+1]
 		return img
 	}
+	if p, ok := img.(*image.CMYK); ok {
+		for y := range r.Dy() {
+			row := p.Pix[y*p.Stride:]
+			for x := range r.Dx() {
+				base := uint8(x + y)
+				row[0], row[1], row[2], row[3] = base, base+1, base+2, base+3
+				row = row[4:]
+			}
+		}
+		return img
+	}
 	s := pixel_setter(img)
 	for y := r.Min.Y; y < r.Max.Y; y++ {
 		for x := r.Min.X; x < r.Max.X; x++ {
@@ -92,16 +122,39 @@ func populate_test_image(img image.Image, dr, dg, db uint8) image.Image {
 	return img
 }
 
+type NormalisedCMYKToRGB int
+
+func NewCMYKToRGB() *NormalisedCMYKToRGB {
+	a := NormalisedCMYKToRGB(0)
+	return &a
+}
+
+func (c *NormalisedCMYKToRGB) Transform(l, a, b float64) (float64, float64, float64) {
+	panic("need 4 inputs cannot use Transform, must use TransformGeneral")
+}
+func (m *NormalisedCMYKToRGB) TransformGeneral(o, i []float64) {
+	k := 1 - i[3]
+	o[0] = (1 - i[0]) * k
+	o[1] = (1 - i[1]) * k
+	o[2] = (1 - i[2]) * k
+}
+func (n *NormalisedCMYKToRGB) IOSig() (int, int)                        { return 4, 3 }
+func (n *NormalisedCMYKToRGB) String() string                           { return "NormalisedCMYKToRGB" }
+func (n *NormalisedCMYKToRGB) Iter(f func(icc.ChannelTransformer) bool) { f(n) }
+
 func TestProfileApplication(t *testing.T) {
 	r := image.Rect(-11, -7, -11+13, -7+37)
-	ct := &icc.Translation{6 / 255., 7 / 255., 8 / 255.}
-	run := func(img image.Image) {
+	run := func(img image.Image, allowed_diff uint) {
 		t.Run(fmt.Sprintf("%T", img), func(t *testing.T) {
 			t.Parallel()
 			_, is_cmyk := img.(*image.CMYK)
 			p := &icc.Pipeline{}
+			var ct icc.ChannelTransformer
 			if is_cmyk {
-				p.Append(icc.NewCMYKToRGB())
+				p.Append(NewCMYKToRGB())
+				ct = icc.NewScaling("", 0.5)
+			} else {
+				ct = &icc.Translation{6 / 255., 7 / 255., 8 / 255.}
 			}
 			p.Append(ct)
 			p.Finalize(true)
@@ -109,14 +162,15 @@ func TestProfileApplication(t *testing.T) {
 			cimg := imaging.ClonePreservingType(img)
 			cimg, err := convert(p, cimg)
 			require.NoError(t, err)
-			image_compare(t, img, cimg, ct)
+			image_compare(t, img, cimg, ct, allowed_diff)
 		})
 	}
-	run(imaging.NewNRGB(r))
-	run(image.NewNRGBA(r))
-	run(image.NewNRGBA64(r))
-	run(image.NewRGBA(r))
-	run(image.NewRGBA64(r))
-	run(image.NewYCbCr(r, image.YCbCrSubsampleRatio444))
-	run(image.NewPaletted(r, make(color.Palette, 256)))
+	run(imaging.NewNRGB(r), 0)
+	run(image.NewNRGBA(r), 0)
+	run(image.NewNRGBA64(r), 0)
+	run(image.NewRGBA(r), 0)
+	run(image.NewRGBA64(r), 0)
+	run(image.NewCMYK(r), 0)
+	run(image.NewYCbCr(r, image.YCbCrSubsampleRatio444), 0)
+	run(image.NewPaletted(r, make(color.Palette, 256)), 0)
 }

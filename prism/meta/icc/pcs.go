@@ -32,6 +32,8 @@ func (m *Scaling) AsMatrix3() *Matrix3 { return NewScalingMatrix3(m.s) }
 
 func (m *Scaling) TransformGeneral(o, i []unit_float) { tg33(m.Transform, o, i) }
 
+func NewScaling(name string, s unit_float) *Scaling { return &Scaling{name, s} }
+
 type Scaling4 struct {
 	name string
 	s    unit_float
@@ -245,23 +247,3 @@ func (m *XYZtoLAB) TransformGeneral(o, i []unit_float)   { tg33(m.Transform, o, 
 func (n *XYZtoLAB) IOSig() (int, int)                    { return 3, 3 }
 func (n *XYZtoLAB) String() string                       { return fmt.Sprintf("%T%s", n, n.c.String()) }
 func (n *XYZtoLAB) Iter(f func(ChannelTransformer) bool) { f(n) }
-
-type NormalisedCMYKToRGB int
-
-func NewCMYKToRGB() *NormalisedCMYKToRGB {
-	a := NormalisedCMYKToRGB(0)
-	return &a
-}
-
-func (c *NormalisedCMYKToRGB) Transform(l, a, b unit_float) (unit_float, unit_float, unit_float) {
-	panic("need 4 inputs cannot use Transform, must use TransformGeneral")
-}
-func (m *NormalisedCMYKToRGB) TransformGeneral(o, i []unit_float) {
-	k := 1 - i[3]
-	o[0] = (1 - i[0]) * k
-	o[1] = (1 - i[1]) * k
-	o[2] = (1 - i[2]) * k
-}
-func (n *NormalisedCMYKToRGB) IOSig() (int, int)                    { return 4, 3 }
-func (n *NormalisedCMYKToRGB) String() string                       { return "NormalisedCMYKToRGB" }
-func (n *NormalisedCMYKToRGB) Iter(f func(ChannelTransformer) bool) { f(n) }

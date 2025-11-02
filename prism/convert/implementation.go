@@ -14,10 +14,6 @@ import (
 
 var _ = fmt.Print
 
-func premultiply8(fr float64, a uint8) uint8 {
-	return f8i(fr * float64(a) / math.MaxUint8)
-}
-
 // unpremultiply and convert to normalized float
 func unpremultiply8(r_, a_ uint8) float64 {
 	r, a := uint16(r_), uint16(a_)
@@ -27,10 +23,6 @@ func unpremultiply8(r_, a_ uint8) float64 {
 // unpremultiply and convert to normalized float
 func unpremultiply(r, a uint32) float64 {
 	return float64((r*math.MaxUint16)/a) / math.MaxUint16
-}
-
-func premultiply(fr float64, a uint32) uint16 {
-	return f16i(fr * float64(a) / math.MaxUint16)
 }
 
 func f8(x uint8) float64    { return float64(x) / math.MaxUint8 }
@@ -159,7 +151,7 @@ func convert(tr *icc.Pipeline, image_any image.Image) (ans image.Image, err erro
 			i, o := inp[:], outp[:]
 			for y := start; y < limit; y++ {
 				row := img.Pix[img.Stride*y:]
-				drow := d.Pix[img.Stride*y:]
+				drow := d.Pix[d.Stride*y:]
 				_ = row[4*(width-1)]
 				_ = drow[3*(width-1)]
 				for range width {
@@ -167,7 +159,7 @@ func convert(tr *icc.Pipeline, image_any image.Image) (ans image.Image, err erro
 					inp[0], inp[1], inp[2], inp[3] = f8(r[0]), f8(r[1]), f8(r[2]), f8(r[3])
 					g(o, i)
 					r = drow[0:3:3]
-					r[0], r[1], r[2] = f8i(o[0]), f8i(o[1]), f8i(o[2])
+					r[0], r[1], r[2] = f8i(outp[0]), f8i(outp[1]), f8i(outp[2])
 					row = row[4:]
 					drow = drow[3:]
 				}
