@@ -43,7 +43,8 @@ func pixel_setter(img_ image.Image) func(x, y int, c color.Color) {
 			img.Cr[ci] = cc.Cr
 			img.A[a] = 0xff
 		}
-
+	case *unknown_image:
+		return img.set
 	case draw.Image:
 		return img.Set
 	}
@@ -157,6 +158,76 @@ func (n *NormalisedCMYKToRGB) IOSig() (int, int)                        { return
 func (n *NormalisedCMYKToRGB) String() string                           { return "NormalisedCMYKToRGB" }
 func (n *NormalisedCMYKToRGB) Iter(f func(icc.ChannelTransformer) bool) { f(n) }
 
+type unknown_image struct {
+	Pix    []uint8
+	Stride int
+	Rect   image.Rectangle
+}
+
+func new_unknown_image(r image.Rectangle) *unknown_image {
+	return &unknown_image{
+		Pix:    make([]uint8, 3*r.Dx()*r.Dy()),
+		Stride: 3 * r.Dx(),
+		Rect:   r,
+	}
+}
+
+func (p *unknown_image) PixOffset(x, y int) int {
+	return (y-p.Rect.Min.Y)*p.Stride + (x-p.Rect.Min.X)*3
+}
+func (p *unknown_image) ColorModel() color.Model { return imaging.NRGBModel }
+func (p *unknown_image) Bounds() image.Rectangle { return p.Rect }
+func (p *unknown_image) At(x, y int) color.Color {
+	i := p.PixOffset(x, y)
+	s := p.Pix[i : i+3 : i+3]
+	return imaging.NRGBColor{R: s[0], G: s[1], B: s[2]}
+}
+
+func (p *unknown_image) set(x, y int, c color.Color) {
+	if !(image.Point{x, y}.In(p.Rect)) {
+		return
+	}
+	i := p.PixOffset(x, y)
+	s := p.Pix[i : i+3 : i+3]
+	q := imaging.NRGBModel.Convert(c).(imaging.NRGBColor)
+	s[0], s[1], s[2] = q.R, q.G, q.B
+}
+
+type unknown_image_with_set struct {
+	Pix    []uint8
+	Stride int
+	Rect   image.Rectangle
+}
+
+func new_unknown_image_with_set(r image.Rectangle) *unknown_image_with_set {
+	return &unknown_image_with_set{
+		Pix:    make([]uint8, 3*r.Dx()*r.Dy()),
+		Stride: 3 * r.Dx(),
+		Rect:   r,
+	}
+}
+
+func (p *unknown_image_with_set) PixOffset(x, y int) int {
+	return (y-p.Rect.Min.Y)*p.Stride + (x-p.Rect.Min.X)*3
+}
+func (p *unknown_image_with_set) ColorModel() color.Model { return imaging.NRGBModel }
+func (p *unknown_image_with_set) Bounds() image.Rectangle { return p.Rect }
+func (p *unknown_image_with_set) At(x, y int) color.Color {
+	i := p.PixOffset(x, y)
+	s := p.Pix[i : i+3 : i+3]
+	return imaging.NRGBColor{R: s[0], G: s[1], B: s[2]}
+}
+
+func (p *unknown_image_with_set) Set(x, y int, c color.Color) {
+	if !(image.Point{x, y}.In(p.Rect)) {
+		return
+	}
+	i := p.PixOffset(x, y)
+	s := p.Pix[i : i+3 : i+3]
+	q := imaging.NRGBModel.Convert(c).(imaging.NRGBColor)
+	s[0], s[1], s[2] = q.R, q.G, q.B
+}
+
 func TestProfileApplication(t *testing.T) {
 	r := image.Rect(-11, -7, -11+13, -7+37)
 	run := func(img image.Image, allowed_diff uint) {
@@ -186,6 +257,8 @@ func TestProfileApplication(t *testing.T) {
 	run(image.NewRGBA(r), 0)
 	run(image.NewRGBA64(r), 0)
 	run(image.NewCMYK(r), 0)
+	run(new_unknown_image(r), 0)
+	run(new_unknown_image_with_set(r), 0)
 	run(image.NewYCbCr(r, image.YCbCrSubsampleRatio444), 0)
 	run(image.NewPaletted(r, make(color.Palette, 256)), 0)
 	run(image.NewNYCbCrA(r, image.YCbCrSubsampleRatio444), 0)
