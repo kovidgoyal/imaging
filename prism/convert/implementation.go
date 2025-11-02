@@ -91,39 +91,52 @@ func convert(tr *icc.Pipeline, image_any image.Image) (ans image.Image, err erro
 			}
 		}
 	case *image.RGBA:
+		d := image.NewNRGBA(b)
+		ans = d
 		f = func(start, limit int) {
 			for y := start; y < limit; y++ {
 				row := img.Pix[img.Stride*y:]
+				drow := d.Pix[d.Stride*y:]
 				_ = row[4*(width-1)]
+				_ = drow[4*(width-1)]
 				for range width {
 					r := row[0:4:4]
+					dr := drow[0:4:4]
+					dr[3] = r[3]
 					if a := row[3]; a != 0 {
 						fr, fg, fb := t(unpremultiply8(r[0], a), unpremultiply8(r[1], a), unpremultiply8(r[2], a))
-						r[0], r[1], r[2] = premultiply8(fr, a), premultiply8(fg, a), premultiply8(fb, a)
+						dr[0], dr[1], dr[2] = f8i(fr), f8i(fg), f8i(fb)
 					}
 					row = row[4:]
+					drow = drow[4:]
 				}
 			}
 		}
 	case *image.RGBA64:
+		d := image.NewNRGBA64(b)
+		ans = d
 		f = func(start, limit int) {
 			for y := start; y < limit; y++ {
 				row := img.Pix[img.Stride*y:]
+				drow := d.Pix[d.Stride*y:]
 				_ = row[8*(width-1)]
+				_ = drow[8*(width-1)]
 				for range width {
-					s := row[0:8:8]
+					s, dr := row[0:8:8], drow[0:8:8]
+					dr[6], dr[7] = s[6], s[7]
 					a := uint32(s[6])<<8 | uint32(s[7])
 					if a != 0 {
 						fr := unpremultiply((uint32(s[0])<<8 | uint32(s[1])), a)
 						fg := unpremultiply((uint32(s[2])<<8 | uint32(s[3])), a)
 						fb := unpremultiply((uint32(s[4])<<8 | uint32(s[5])), a)
 						fr, fg, fb = t(fr, fg, fb)
-						r, g, b := premultiply(fr, a), premultiply(fg, a), premultiply(fb, a)
-						s[0], s[1] = uint8(r>>8), uint8(r)
-						s[2], s[3] = uint8(g>>8), uint8(g)
-						s[4], s[5] = uint8(b>>8), uint8(b)
+						r, g, b := f16i(fr), f16i(fg), f16i(fb)
+						dr[0], dr[1] = uint8(r>>8), uint8(r)
+						dr[2], dr[3] = uint8(g>>8), uint8(g)
+						dr[4], dr[5] = uint8(b>>8), uint8(b)
 					}
 					row = row[8:]
+					drow = drow[8:]
 				}
 			}
 		}

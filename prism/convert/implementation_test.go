@@ -98,7 +98,11 @@ func TestProfileApplication(t *testing.T) {
 	run := func(img image.Image) {
 		t.Run(fmt.Sprintf("%T", img), func(t *testing.T) {
 			t.Parallel()
+			_, is_cmyk := img.(*image.CMYK)
 			p := &icc.Pipeline{}
+			if is_cmyk {
+				p.Append(icc.NewCMYKToRGB())
+			}
 			p.Append(ct)
 			p.Finalize(true)
 			img = populate_test_image(img, 0, 0, 0)
