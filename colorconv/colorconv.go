@@ -299,26 +299,24 @@ func chromaticAdaptationMatrix(sourceWhite, targetWhite Vec3) Mat3 {
 			{-0.7502, 1.7135, 0.0367},
 			{0.0389, -0.0685, 1.0296},
 		}
-		invBradford = Mat3{
-			{0.9869929, -0.1470543, 0.1599627},
-			{0.4323053, 0.5183603, 0.0492912},
-			{-0.0085287, 0.0400428, 0.9684867},
+		bradford_inverted = Mat3{
+			{0.9869929054667121, -0.1470542564209901, 0.1599626516637312},
+			{0.4323052697233945, 0.5183602715367774, 0.049291228212855594},
+			{-0.008528664575177326, 0.04004282165408486, 0.96848669578755},
 		}
 	)
 
 	// Convert whites to LMS using Bradford
 	srcL, srcM, srcS := mulMat3Vec(bradford, sourceWhite)
 	tgtL, tgtM, tgtS := mulMat3Vec(bradford, targetWhite)
-	// diag of ratios
-	var ratios = Vec3{tgtL / srcL, tgtM / srcM, tgtS / srcS}
 	// Build diag matrix in-between
 	diag := Mat3{
-		{ratios[0], 0, 0},
-		{0, ratios[1], 0},
-		{0, 0, ratios[2]},
+		{tgtL / srcL, 0, 0},
+		{0, tgtM / srcM, 0},
+		{0, 0, tgtS / srcS},
 	}
 	// adapt = invBradford * diag * bradford
-	tmp := mulMat3(diag, bradford)     // diag*B
-	adapt := mulMat3(invBradford, tmp) // invB * (diag*B)
+	tmp := mulMat3(diag, bradford)           // diag*B
+	adapt := mulMat3(bradford_inverted, tmp) // invB * (diag*B)
 	return adapt
 }
