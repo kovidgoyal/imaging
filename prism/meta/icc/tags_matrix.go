@@ -96,6 +96,18 @@ func (m *Matrix3) Transpose() Matrix3 {
 	}
 }
 
+func (m *Matrix3) Scale(s unit_float) {
+	m[0][0] *= s
+	m[0][1] *= s
+	m[0][2] *= s
+	m[1][0] *= s
+	m[1][1] *= s
+	m[1][2] *= s
+	m[2][0] *= s
+	m[2][1] *= s
+	m[2][2] *= s
+}
+
 func Dot(v1, v2 [3]unit_float) unit_float {
 	return v1[0]*v2[0] + v1[1]*v2[1] + v1[2]*v2[2]
 }

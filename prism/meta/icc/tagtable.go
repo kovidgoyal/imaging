@@ -236,11 +236,7 @@ func (t *TagTable) load_rgb_matrix(forward bool) (ans *Matrix3, err error) {
 	m[2][0], m[2][1], m[2][2] = rc.Z, bc.Z, gc.Z
 	// stored in 2.15 format so need to scale, see
 	// BuildRGBInputMatrixShaper in lcms
-	for r := range 3 {
-		for c := range 3 {
-			m[r][c] *= MAX_ENCODEABLE_XYZ_INVERSE
-		}
-	}
+	m.Scale(MAX_ENCODEABLE_XYZ_INVERSE)
 
 	if is_identity_matrix(&m) {
 		return nil, nil
