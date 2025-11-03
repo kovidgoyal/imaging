@@ -39,7 +39,10 @@ func (p *Profile) DeviceModelDescription() (string, error) {
 	return p.TagTable.getDeviceModelDescription()
 }
 
-func (p *Profile) get_effective_chromatic_adaption(forward bool) (ans *Matrix3, err error) {
+func (p *Profile) get_effective_chromatic_adaption(forward bool, intent RenderingIntent) (ans *Matrix3, err error) {
+	if intent != AbsoluteColorimetricRenderingIntent { // ComputeConversion() in lcms
+		return nil, nil
+	}
 	pcs_whitepoint := p.Header.ParsedPCSIlluminant()
 	x, err := p.TagTable.get_parsed(MediaWhitePointTagSignature, p.Header.DataColorSpace, p.Header.ProfileConnectionSpace)
 	if err != nil {
@@ -204,7 +207,7 @@ func (p *Profile) CreateTransformerToDevice(rendering_intent RenderingIntent, op
 	if err != nil {
 		return nil, err
 	}
-	chromatic_adaptation, err := p.get_effective_chromatic_adaption(forward)
+	chromatic_adaptation, err := p.get_effective_chromatic_adaption(forward, rendering_intent)
 	if err != nil {
 		return nil, err
 	}
@@ -229,7 +232,7 @@ func (p *Profile) createTransformerToPCS(rendering_intent RenderingIntent) (ans 
 	if err != nil {
 		return nil, err
 	}
-	chromatic_adaptation, err := p.get_effective_chromatic_adaption(forward)
+	chromatic_adaptation, err := p.get_effective_chromatic_adaption(forward, rendering_intent)
 	if err != nil {
 		return nil, err
 	}

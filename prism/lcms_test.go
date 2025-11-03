@@ -44,6 +44,14 @@ var profiles = map[string]opt{
 	"lcms-stress.icc": {skip_inv: true, pcs_tolerance: 2 * THRESHOLD16, srgb_tolerance: 4 * THRESHOLD16},
 	// CMYK profile using LAB space
 	"cmyk.icc": {pcs_tolerance: 2 * THRESHOLD16, inv_tolerance: 0.05 * THRESHOLD8, srgb_tolerance: 0.2 * THRESHOLD8},
+	// Adobe RGB matrix/TRC PCS=XYZ profile
+	"adobergb.icc": {inv_tolerance: 0.2 * THRESHOLD8, srgb_tolerance: 0.5 * THRESHOLD8},
+	// Apple Display P3 matrix/TRC PCS=XYZ
+	"display-p3-v4-with-v2-desc.icc": {srgb_tolerance: 0.45 * THRESHOLD8},
+	// Apple Display P3 matrix/TRC PCS=XYZ
+	"displayp3.icc": {srgb_tolerance: 0.45 * THRESHOLD8},
+	// Adobe RGB matrix/TRC PCS=XYZ profile
+	"prophoto.icc": {inv_tolerance: 0.1 * THRESHOLD8, srgb_tolerance: 0.7 * THRESHOLD8},
 }
 
 // testDir returns the absolute path to the directory containing the test file.
@@ -394,11 +402,11 @@ func develop_blackpoint(p *icc.Profile, lcms *CMSProfile, t *testing.T) {
 
 // Run this with ./custom-lcms.sh
 func TestDevelop(t *testing.T) {
-	const name = "cmyk.icc"
+	const name = "prophoto.icc"
 	opt := options_for_profile(name)
 	p := profile(t, name)
 	lcms := lcms_profile(t, name)
-	develop_blackpoint(p, lcms, t)
+	// develop_blackpoint(p, lcms, t)
 	if p.Header.DataColorSpace == icc.ColorSpaceCMYK {
 		develop_pcs4(p, lcms, t, name, opt.pcs_tolerance)
 		// if !opt.skip_inv {
@@ -406,7 +414,7 @@ func TestDevelop(t *testing.T) {
 		// }
 		// develop_to_srgb4(p, lcms, t, name, opt.srgb_tolerance)
 	} else {
-		develop_pcs(p, lcms, t, name, opt.pcs_tolerance)
+		// develop_pcs(p, lcms, t, name, opt.pcs_tolerance)
 		// if !opt.skip_inv {
 		// 	develop_inverse(p, lcms, t, name, opt.inv_tolerance)
 		// }
