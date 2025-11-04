@@ -11,13 +11,16 @@ var _ = fmt.Println
 
 // Data represents the metadata for an image.
 type Data struct {
-	Format           ImageFormat
-	PixelWidth       uint32
-	PixelHeight      uint32
-	BitsPerComponent uint32
-	ExifData         []byte
-	iccProfileData   []byte
-	iccProfileErr    error
+	Format              ImageFormat
+	PixelWidth          uint32
+	PixelHeight         uint32
+	BitsPerComponent    uint32
+	ExifData            []byte
+	iccProfileData      []byte
+	iccProfileErr       error
+	HasFrames           bool
+	NumFrames, NumPlays int
+	CICP                CodingIndependentCodePoints
 }
 
 // ICCProfile returns an extracted ICC profile from this metadata.

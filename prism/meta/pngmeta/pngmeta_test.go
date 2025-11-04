@@ -14,6 +14,11 @@ func write(w io.Writer, x uint32) {
 	_ = binary.Write(w, binary.BigEndian, x)
 }
 
+func write_header(w io.Writer, chunk_len uint32, hdr string) {
+	write(w, chunk_len)
+	io.WriteString(w, hdr)
+}
+
 func TestExtractMetadata(t *testing.T) {
 
 	compressICCProfileData := func(data []byte) []byte {
@@ -35,7 +40,7 @@ func TestExtractMetadata(t *testing.T) {
 		profileName := []byte("SomeProfile")
 
 		write(dst, uint32(len(profileName)+2+len(compressedICCData)))
-		dst.Write(chunkTypeiCCP[:])
+		io.WriteString(dst, chunkTypeiCCP)
 		dst.Write(profileName)
 		dst.WriteByte(0x00)
 		dst.WriteByte(0x00)
@@ -75,8 +80,7 @@ func TestExtractMetadata(t *testing.T) {
 		data := &bytes.Buffer{}
 		data.Write(pngSignature[:])
 
-		write(data, 13)
-		data.Write(chunkTypeIHDR[:])
+		write_header(data, 13, chunkTypeIHDR)
 		headerData := [13]byte{0, 0, 0, 15, 0, 0, 0, 16, 8}
 		data.Write(headerData[:])
 		dummyCRC := uint32(0)
@@ -116,8 +120,7 @@ func TestExtractMetadata(t *testing.T) {
 		data := &bytes.Buffer{}
 		data.Write(pngSignature[:])
 
-		write(data, 13)
-		data.Write(chunkTypeIHDR[:])
+		write_header(data, 13, chunkTypeIHDR)
 		headerData := [13]byte{0, 0, 0, 15, 0, 0, 0, 16, 8}
 		data.Write(headerData[:])
 		dummyCRC := uint32(0)
@@ -163,8 +166,7 @@ func TestExtractMetadata(t *testing.T) {
 		data := &bytes.Buffer{}
 		data.Write(pngSignature[:])
 
-		write(data, 13)
-		data.Write(chunkTypeIHDR[:])
+		write_header(data, 13, chunkTypeIHDR)
 		headerData := [13]byte{0, 0, 0, 15, 0, 0, 0, 16, 8}
 		data.Write(headerData[:])
 		dummyCRC := uint32(0)
@@ -217,8 +219,7 @@ func TestExtractMetadata(t *testing.T) {
 		data := &bytes.Buffer{}
 		data.Write(pngSignature[:])
 
-		write(data, 13)
-		data.Write(chunkTypeIHDR[:])
+		write_header(data, 13, chunkTypeIHDR)
 		headerData := [13]byte{0, 0, 0, 16, 0, 0, 0, 16, 8}
 		data.Write(headerData[:])
 		dummyCRC := uint32(0)
@@ -227,8 +228,20 @@ func TestExtractMetadata(t *testing.T) {
 		iccProfileData := []byte{1, 2, 3, 4}
 		writeICCProfileChunk(data, compressICCProfileData(iccProfileData))
 
-		write(data, 4)
-		data.Write(chunkTypeIDAT[:])
+		write_header(data, 8, chunkTypeacTL)
+		write(data, 1)
+		write(data, 1)
+		write(data, dummyCRC)
+
+		write_header(data, 4, chunkTypecICP)
+		write(data, 0)
+		write(data, dummyCRC)
+
+		write_header(data, 4, chunkTypeeXIf)
+		write(data, 0)
+		write(data, dummyCRC)
+
+		write_header(data, 4, chunkTypeIDAT)
 		imageData := []byte{5, 6, 7, 8}
 		data.Write(imageData)
 		write(data, dummyCRC)
@@ -243,7 +256,7 @@ func TestExtractMetadata(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Expected chunk data to follow metadata but got error: %v", err)
 		} else {
-			if expected, actual := (chunkHeader{4, chunkTypeIDAT}), ch; expected != actual {
+			if expected, actual := (chunkHeader{4, [4]byte([]byte(chunkTypeIDAT))}), ch; expected != actual {
 				t.Fatalf("Expected chunk %v but got %v", expected, actual)
 			}
 		}
@@ -253,15 +266,13 @@ func TestExtractMetadata(t *testing.T) {
 		data := &bytes.Buffer{}
 		data.Write(pngSignature[:])
 
-		write(data, 13)
-		data.Write(chunkTypeIHDR[:])
+		write_header(data, 13, chunkTypeIHDR)
 		headerData := [13]byte{}
 		data.Write(headerData[:])
 		dummyCRC := uint32(0)
 		write(data, dummyCRC)
 
-		write(data, 999)
-		data.Write(chunkTypeIDAT[:])
+		write_header(data, 999, chunkTypeIDAT)
 		imageData := []byte{1, 2, 3, 4}
 		data.Write(imageData)
 

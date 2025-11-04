@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"unsafe"
 
 	"github.com/kovidgoyal/imaging/prism/meta"
 	"github.com/kovidgoyal/imaging/streams"
@@ -59,10 +60,10 @@ func ExtractMetadata(r io.Reader) (md *meta.Data, err error) {
 			err = fmt.Errorf("panic while extracting image metadata: %v", r)
 		}
 	}()
-
+	cicp_found := false
 	allMetadataExtracted := func() bool {
 		iccData, iccErr := md.ICCProfileData()
-		return metadataExtracted && (iccData != nil || iccErr != nil)
+		return metadataExtracted && md.HasFrames && md.ExifData != nil && (iccData != nil || iccErr != nil) && cicp_found
 	}
 
 	pngSig := [8]byte{}
@@ -93,7 +94,7 @@ parseChunks:
 			return nil, err
 		}
 
-		switch ch.ChunkType {
+		switch unsafe.String(unsafe.SliceData(ch.ChunkType[:]), 4) {
 
 		case chunkTypeIHDR:
 			if chunk, err = read_chunk(r, ch.Length); err != nil {
@@ -107,6 +108,42 @@ parseChunks:
 			}
 			md.BitsPerComponent = uint32(chunk[0])
 			metadataExtracted = true
+			if allMetadataExtracted() {
+				break parseChunks
+			}
+
+		case chunkTypeeXIf:
+			if chunk, err = read_chunk(r, ch.Length); err != nil {
+				return nil, err
+			}
+			md.ExifData = chunk
+			if allMetadataExtracted() {
+				break parseChunks
+			}
+
+		case chunkTypecICP:
+			if chunk, err = read_chunk(r, ch.Length); err != nil {
+				return nil, err
+			}
+			md.CICP.ColorPrimaries, md.CICP.TransferCharacteristics = chunk[0], chunk[1]
+			md.CICP.MatrixCoefficients, md.CICP.VideoFullRange = chunk[2], chunk[3]
+			cicp_found = true
+			if allMetadataExtracted() {
+				break parseChunks
+			}
+		case chunkTypeacTL:
+			if chunk, err = read_chunk(r, ch.Length); err != nil {
+				return nil, err
+			}
+			md.HasFrames = true
+			var num_frames, num_plays uint32
+			if err = decode(&num_frames); err != nil {
+				return nil, err
+			}
+			if err = decode(&num_plays); err != nil {
+				return nil, err
+			}
+			md.NumFrames, md.NumPlays = int(num_frames), int(num_plays)
 			if allMetadataExtracted() {
 				break parseChunks
 			}
