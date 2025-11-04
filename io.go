@@ -3,6 +3,7 @@ package imaging
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"image"
 	"image/draw"
 	"image/gif"
@@ -15,6 +16,7 @@ import (
 	"strings"
 
 	"github.com/kovidgoyal/imaging/prism/meta/autometa"
+	"github.com/kovidgoyal/imaging/prism/meta/icc"
 	"github.com/rwcarlsen/goexif/exif"
 
 	"golang.org/x/image/bmp"
@@ -106,18 +108,31 @@ func Decode(r io.Reader, opts ...DecodeOption) (image.Image, error) {
 		return nil, err
 	}
 	if md != nil && cfg.outputColorspace == SRGB_COLORSPACE {
-		p, perr := md.ICCProfile()
-		if perr != nil {
-			return nil, perr
-		}
-		if p != nil {
-			img, err = ConvertToSRGB(p, img)
-			if err != nil {
+		var p *icc.Pipeline
+		check_icc := true
+		if md.CICP.IsSet {
+			p = md.CICP.PipelineToSRGB()
+			if p == nil {
+				return nil, fmt.Errorf("cannot convert colorspace, unknown %s", md.CICP)
+			}
+			check_icc = false
+			if img, err = convert(p, img); err != nil {
 				return nil, err
 			}
 		}
+		if check_icc {
+			profile, err := md.ICCProfile()
+			if err != nil {
+				return nil, err
+			}
+			if p != nil {
+				img, err = ConvertToSRGB(profile, img)
+				if err != nil {
+					return nil, err
+				}
+			}
+		}
 	}
-
 	return fixOrientation(img, oval), nil
 }
 

@@ -183,6 +183,9 @@ func (c *UniformFunctionTransformer) TransformGeneral(o, i []unit_float) {
 		o[k] = c.f(x)
 	}
 }
+func NewUniformFunctionTransformer(name string, f func(unit_float) unit_float) *UniformFunctionTransformer {
+	return &UniformFunctionTransformer{name, f}
+}
 
 type XYZtosRGB struct {
 	c *colorconv.ConvertColor

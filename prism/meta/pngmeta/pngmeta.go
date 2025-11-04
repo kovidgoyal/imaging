@@ -60,10 +60,9 @@ func ExtractMetadata(r io.Reader) (md *meta.Data, err error) {
 			err = fmt.Errorf("panic while extracting image metadata: %v", r)
 		}
 	}()
-	cicp_found := false
 	allMetadataExtracted := func() bool {
 		iccData, iccErr := md.ICCProfileData()
-		return metadataExtracted && md.HasFrames && md.ExifData != nil && (iccData != nil || iccErr != nil) && cicp_found
+		return metadataExtracted && md.HasFrames && md.ExifData != nil && (iccData != nil || iccErr != nil) && md.CICP.IsSet
 	}
 
 	pngSig := [8]byte{}
@@ -127,7 +126,7 @@ parseChunks:
 			}
 			md.CICP.ColorPrimaries, md.CICP.TransferCharacteristics = chunk[0], chunk[1]
 			md.CICP.MatrixCoefficients, md.CICP.VideoFullRange = chunk[2], chunk[3]
-			cicp_found = true
+			md.CICP.IsSet = true
 			if allMetadataExtracted() {
 				break parseChunks
 			}
