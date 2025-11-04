@@ -23,6 +23,8 @@ import (
 type Vec3 [3]float64
 type Mat3 [3][3]float64
 
+var whiteD65 = Vec3{0.95047, 1.00000, 1.08883}
+
 func (m *Mat3) String() string {
 	return fmt.Sprintf("Matrix3{ %.6v %.6v %.6v }", m[0], m[1], m[2])
 }
@@ -48,7 +50,6 @@ func (cc *ConvertColor) AddPreviousMatrix(a, b, c [3]float64) {
 }
 
 func NewConvertColor(whitepoint_x, whitepoint_y, whitepoint_z, scale float64) (ans *ConvertColor) {
-	var whiteD65 = Vec3{0.95047, 1.00000, 1.08883}
 	ans = &ConvertColor{whitepoint: Vec3{whitepoint_x, whitepoint_y, whitepoint_z}}
 	adapt := chromaticAdaptationMatrix(ans.whitepoint, whiteD65)
 	// sRGB (linear) transform matrix from CIE XYZ (D65)
@@ -188,12 +189,11 @@ func ff(t float64) float64 {
 	return t/(3*delta*delta) + 4.0/29.0
 }
 
-// XYZToLab converts XYZ (relative to whitepoint, Y=1) into CIELAB (whitepoint).
-func (c *ConvertColor) XYZToLab(X, Y, Z float64) (L, a, b float64) {
+func xyz_to_lab(wt Vec3, X, Y, Z float64) (L, a, b float64) {
 	// Normalize by white
-	xr := X / c.whitepoint[0]
-	yr := Y / c.whitepoint[1]
-	zr := Z / c.whitepoint[2]
+	xr := X / wt[0]
+	yr := Y / wt[1]
+	zr := Z / wt[2]
 
 	fx := ff(xr)
 	fy := ff(yr)
@@ -203,6 +203,12 @@ func (c *ConvertColor) XYZToLab(X, Y, Z float64) (L, a, b float64) {
 	a = 500.0 * (fx - fy)
 	b = 200.0 * (fy - fz)
 	return
+
+}
+
+// XYZToLab converts XYZ (relative to whitepoint, Y=1) into CIELAB (whitepoint).
+func (c *ConvertColor) XYZToLab(X, Y, Z float64) (L, a, b float64) {
+	return xyz_to_lab(c.whitepoint, X, Y, Z)
 }
 
 // linearToSRGBComp applies the sRGB (gamma) companding function to a linear component.
@@ -217,6 +223,146 @@ func linearToSRGBComp(c float64) float64 {
 	default:
 		return 1.055*math.Pow(c, 1.0/2.4) - 0.055
 	}
+}
+
+// Convert sRGB to linear light
+func srgbToLinear(c float64) float64 {
+	c = clamp01(c)
+	// sRGB transfer function inverse
+	if c <= 0.04045 {
+		return c / 12.92
+	}
+	return math.Pow((c+0.055)/1.055, 2.4)
+}
+
+// Converts linear RGB to CIE XYZ using sRGB D65 matrix.
+// Input r,g,b must be linear-light (not gamma-encoded).
+func rgbToXYZ(r, g, b float64) (x, y, z float64) {
+	// sRGB (linear) to XYZ (D65), matrix from IEC 61966-2-1
+	x = 0.4124564*r + 0.3575761*g + 0.1804375*b
+	y = 0.2126729*r + 0.7151522*g + 0.0721750*b
+	z = 0.0193339*r + 0.1191920*g + 0.9503041*b
+	return
+}
+
+func SrgbToLab(r, g, b float64) (L, a, B float64) {
+	// convert gamma-encoded sRGB to linear
+	r = srgbToLinear(r)
+	g = srgbToLinear(g)
+	b = srgbToLinear(b)
+	x, y, z := rgbToXYZ(r, g, b)
+	return xyz_to_lab(whiteD65, x, y, z)
+}
+
+// h' (in degrees 0..360)
+func hp(aPrime, b float64) float64 {
+	if aPrime == 0 && b == 0 {
+		return 0.0
+	}
+	angle := math.Atan2(b, aPrime) * (180.0 / math.Pi)
+	if angle < 0 {
+		angle += 360.0
+	}
+	return angle
+}
+
+// DeltaE2000 computes the CIEDE2000 color-difference between two Lab colors.
+// Implementation follows the formula from Sharma et al., 2005.
+func DeltaE2000(L1, a1, b1, L2, a2, b2 float64) float64 {
+	// Weighting factors
+	kL, kC, kH := 1.0, 1.0, 1.0
+
+	// Step 1: Compute C' and h'
+	C1 := math.Hypot(a1, b1)
+	C2 := math.Hypot(a2, b2)
+	// mean C'
+	Cbar := (C1 + C2) / 2.0
+
+	// compute G
+	Cbar7 := math.Pow(Cbar, 7)
+	G := 0.5 * (1 - math.Sqrt(Cbar7/(Cbar7+math.Pow(25.0, 7))))
+
+	// a' values
+	ap1 := (1 + G) * a1
+	ap2 := (1 + G) * a2
+
+	// C' recalculated
+	C1p := math.Hypot(ap1, b1)
+	C2p := math.Hypot(ap2, b2)
+
+	h1p := hp(ap1, b1)
+	h2p := hp(ap2, b2)
+
+	// delta L'
+	dLp := L2 - L1
+	// delta C'
+	dCp := C2p - C1p
+
+	// delta h'
+	var dhp float64
+	if C1p*C2p == 0 {
+		dhp = 0
+	} else {
+		diff := h2p - h1p
+		if math.Abs(diff) <= 180 {
+			dhp = diff
+		} else if diff > 180 {
+			dhp = diff - 360
+		} else {
+			dhp = diff + 360
+		}
+	}
+	// convert to radians for the formula
+	dHp := 2 * math.Sqrt(C1p*C2p) * math.Sin((dhp*math.Pi/180.0)/2.0)
+
+	// average L', C', h'
+	LpBar := (L1 + L2) / 2.0
+	CpBar := (C1p + C2p) / 2.0
+
+	var hpBar float64
+	if C1p*C2p == 0 {
+		hpBar = h1p + h2p
+	} else {
+		diff := math.Abs(h1p - h2p)
+		if diff <= 180 {
+			hpBar = (h1p + h2p) / 2.0
+		} else if (h1p + h2p) < 360 {
+			hpBar = (h1p + h2p + 360) / 2.0
+		} else {
+			hpBar = (h1p + h2p - 360) / 2.0
+		}
+	}
+
+	// T
+	T := 1 - 0.17*math.Cos((hpBar-30)*math.Pi/180.0) +
+		0.24*math.Cos((2*hpBar)*math.Pi/180.0) +
+		0.32*math.Cos((3*hpBar+6)*math.Pi/180.0) -
+		0.20*math.Cos((4*hpBar-63)*math.Pi/180.0)
+
+	// delta theta
+	dTheta := 30 * math.Exp(-((hpBar-275)/25)*((hpBar-275)/25))
+	// R_C
+	Rc := 2 * math.Sqrt(math.Pow(CpBar, 7)/(math.Pow(CpBar, 7)+math.Pow(25.0, 7)))
+	// S_L, S_C, S_H
+	Sl := 1 + ((0.015 * (LpBar - 50) * (LpBar - 50)) / math.Sqrt(20+((LpBar-50)*(LpBar-50))))
+	Sc := 1 + 0.045*CpBar
+	Sh := 1 + 0.015*CpBar*T
+	// R_T
+	RT := -math.Sin(2*dTheta*math.Pi/180.0) * Rc
+
+	// finally
+	dL := dLp / (kL * Sl)
+	dC := dCp / (kC * Sc)
+	dH := dHp / (kH * Sh)
+
+	return math.Sqrt(dL*dL + dC*dC + dH*dH + RT*dC*dH)
+}
+
+// DeltaEBetweenSrgb takes two sRGB colors (0..1) and returns the Delta E (CIEDE2000).
+func DeltaEBetweenSrgb(r1, g1, b1, r2, g2, b2 float64) float64 {
+	L1, a1, b1 := SrgbToLab(r1, g1, b1)
+	L2, a2, b2 := SrgbToLab(r2, g2, b2)
+	return DeltaE2000(L1, a1, b1, L2, a2, b2)
 }
 
 // inGamut checks whether r,g,b are all inside [0,1]
