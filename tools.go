@@ -43,6 +43,13 @@ func Clone(img image.Image) *image.NRGBA {
 	return dst
 }
 
+func AsNRGBA(src image.Image) *image.NRGBA {
+	if nrgba, ok := src.(*image.NRGBA); ok {
+		return nrgba
+	}
+	return Clone(src)
+}
+
 // Clone an image preserving it's type for all known image types or returning an NRGBA64 image otherwise
 func ClonePreservingType(src image.Image) image.Image {
 	switch src := src.(type) {
