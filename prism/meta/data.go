@@ -41,6 +41,9 @@ func (md *Data) Exif() (*exif.Exif, error) {
 	if md.exifErr != nil {
 		return nil, md.exifErr
 	}
+	if md.exif != nil {
+		return md.exif, nil
+	}
 	if len(md.exifData) == 0 {
 		return nil, nil
 	}
@@ -53,6 +56,22 @@ func (md *Data) SetExifData(data []byte) {
 	defer md.mutex.Unlock()
 	md.exifData = data
 	md.exifErr = nil
+	md.exif = nil
+}
+
+func (md *Data) SetExif(e *exif.Exif) {
+	md.mutex.Lock()
+	defer md.mutex.Unlock()
+	md.exifData = nil
+	md.exifErr = nil
+	md.exif = e
+}
+
+func (md *Data) SetExifError(e error) {
+	md.mutex.Lock()
+	defer md.mutex.Unlock()
+	md.exifData = nil
+	md.exifErr = e
 	md.exif = nil
 }
 

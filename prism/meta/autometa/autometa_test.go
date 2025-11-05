@@ -2,24 +2,30 @@ package autometa
 
 import (
 	"bytes"
-	"crypto/rand"
 	"fmt"
 	"io"
+	"os"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 var _ = fmt.Println
 
 func TestLoad(t *testing.T) {
 
-	t.Run("returns original image data when format is unrecognised", func(t *testing.T) {
-		randomBytes := make([]byte, 16)
-		_, err := rand.Read(randomBytes)
-		if err != nil {
-			panic(err)
-		}
+	t.Run("recognizes EXIF data in TIFF", func(t *testing.T) {
+		data, err := os.ReadFile("orientation_2.tiff")
+		require.NoError(t, err)
+		input := bytes.NewReader(data)
+		md, _, err := Load(input)
+		require.NoError(t, err)
+		require.NotNil(t, md)
+	})
 
-		input := bytes.NewReader(randomBytes)
+	t.Run("returns original image data when format is unrecognised", func(t *testing.T) {
+		data := []byte("not an image format simply some plain text")
+		input := bytes.NewReader(data)
 
 		md, stream, err := Load(input)
 
@@ -35,15 +41,7 @@ func TestLoad(t *testing.T) {
 		}
 
 		returnedBytes, err := io.ReadAll(stream)
-		if err != nil {
-			t.Errorf("Expected to be able to read %d bytes from returned stream but got error: %v", len(randomBytes), err)
-		}
-		if expected, actual := len(randomBytes), len(returnedBytes); expected != actual {
-			t.Fatalf("Expected returned stream to contain %d bytes but found %d", expected, actual)
-		}
-
-		if !bytes.Equal(randomBytes, returnedBytes) {
-			t.Errorf("Expected returned stream to contain original image data but was different.\n\nExpected:%v\nActual:%v\n", randomBytes, returnedBytes)
-		}
+		require.NoError(t, err)
+		require.Equal(t, data, returnedBytes)
 	})
 }
