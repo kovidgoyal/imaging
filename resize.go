@@ -12,10 +12,7 @@ type indexWeight struct {
 
 func precomputeWeights(dstSize, srcSize int, filter ResampleFilter) [][]indexWeight {
 	du := float64(srcSize) / float64(dstSize)
-	scale := du
-	if scale < 1.0 {
-		scale = 1.0
-	}
+	scale := max(1.0, du)
 	ru := math.Ceil(scale * filter.Support)
 
 	out := make([][]indexWeight, dstSize)
