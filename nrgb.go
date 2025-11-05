@@ -154,15 +154,30 @@ type scanner_rgb struct {
 	opaque_base_uint []uint8
 }
 
-func (s scanner_rgb) Bytes_per_channel() int  { return 1 }
-func (s scanner_rgb) Num_of_channels() int    { return 3 }
-func (s scanner_rgb) Bounds() image.Rectangle { return s.image.Bounds() }
+func (s scanner_rgb) Bytes_per_channel() int                 { return 1 }
+func (s scanner_rgb) Num_of_channels() int                   { return 3 }
+func (s scanner_rgb) Bounds() image.Rectangle                { return s.image.Bounds() }
+func (s scanner_rgb) NewImage(r image.Rectangle) image.Image { return NewNRGB(r) }
 
 func blend(dest []uint8, base []float64, r, g, b, a uint8) {
 	alpha := float64(a) / 255.0
 	dest[0] = uint8(alpha*float64(r) + (1.0-alpha)*base[0])
 	dest[1] = uint8(alpha*float64(g) + (1.0-alpha)*base[1])
 	dest[2] = uint8(alpha*float64(b) + (1.0-alpha)*base[2])
+}
+
+func (s *scanner_rgb) ReverseRow(img image.Image, row int) {
+	d := img.(*NRGB)
+	pos := row * d.Stride
+	r := d.Pix[pos : pos+d.Stride : pos+d.Stride]
+	reverse3(r)
+}
+
+func (s *scanner_rgb) ScanRow(x1, y1, x2, y2 int, img image.Image, row int) {
+	d := img.(*NRGB)
+	pos := row * d.Stride
+	r := d.Pix[pos : pos+d.Stride : pos+d.Stride]
+	s.Scan(x1, y1, x2, y2, r)
 }
 
 func newScannerRGB(img image.Image, opaque_base NRGBColor) *scanner_rgb {

@@ -2,6 +2,7 @@ package imaging
 
 import (
 	"image"
+	"image/color"
 	"math"
 	"runtime"
 	"testing"
@@ -141,7 +142,36 @@ func TestReverse(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run("", func(t *testing.T) {
-			reverse(tc.pix)
+			reverse4(tc.pix)
+			if !compareBytes(tc.pix, tc.want, 0) {
+				t.Fatalf("got pix %v want %v", tc.pix, tc.want)
+			}
+		})
+	}
+	testCases = []struct {
+		pix  []uint8
+		want []uint8
+	}{
+		{
+			pix:  []uint8{},
+			want: []uint8{},
+		},
+		{
+			pix:  []uint8{1, 2, 3},
+			want: []uint8{1, 2, 3},
+		},
+		{
+			pix:  []uint8{1, 2, 3, 5, 6, 7},
+			want: []uint8{5, 6, 7, 1, 2, 3},
+		},
+		{
+			pix:  []uint8{1, 2, 3, 5, 6, 7, 9, 10, 11},
+			want: []uint8{9, 10, 11, 5, 6, 7, 1, 2, 3},
+		},
+	}
+	for _, tc := range testCases {
+		t.Run("", func(t *testing.T) {
+			reverse3(tc.pix)
 			if !compareBytes(tc.pix, tc.want, 0) {
 				t.Fatalf("got pix %v want %v", tc.pix, tc.want)
 			}
@@ -154,6 +184,29 @@ func compareNRGBA(img1, img2 *image.NRGBA, delta int) bool {
 		return false
 	}
 	return compareBytes(img1.Pix, img2.Pix, delta)
+}
+
+func delta16(a, b uint16) int { return absint(int(a) - int(b)) }
+
+func compare_colors(ac, bc color.Color, delta int) bool {
+	a := color.NRGBA64Model.Convert(ac).(color.NRGBA64)
+	b := color.NRGBA64Model.Convert(bc).(color.NRGBA64)
+	return !(delta16(a.R, b.R) > delta || delta16(a.G, b.G) > delta || delta16(a.B, b.B) > delta || delta16(a.A, b.A) > delta)
+}
+
+func compareImages(img1, img2 image.Image, delta int) bool {
+	if !img1.Bounds().Eq(img2.Bounds()) {
+		return false
+	}
+	for y := img1.Bounds().Min.Y; y < img1.Bounds().Max.Y; y++ {
+		for x := img1.Bounds().Min.X; x < img1.Bounds().Max.X; x++ {
+			ac, bc := img1.At(x, y), img2.At(x, y)
+			if !compare_colors(ac, bc, delta) {
+				return false
+			}
+		}
+	}
+	return true
 }
 
 func compareBytes(a, b []uint8, delta int) bool {

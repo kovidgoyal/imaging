@@ -10,7 +10,7 @@ func TestFlipH(t *testing.T) {
 	testCases := []struct {
 		name string
 		src  image.Image
-		want *image.NRGBA
+		want image.Image
 	}{
 		{
 			"FlipH 2x3",
@@ -24,7 +24,7 @@ func TestFlipH(t *testing.T) {
 				},
 			},
 			&image.NRGBA{
-				Rect:   image.Rect(0, 0, 2, 3),
+				Rect:   image.Rect(-1, -1, 1, 2),
 				Stride: 2 * 4,
 				Pix: []uint8{
 					0xcc, 0xdd, 0xee, 0xff, 0x00, 0x11, 0x22, 0x33,
@@ -33,12 +33,33 @@ func TestFlipH(t *testing.T) {
 				},
 			},
 		},
+		{
+			"FlipH 2x3 NRGB",
+			&NRGB{
+				Rect:   image.Rect(-1, -1, 1, 2),
+				Stride: 2 * 3,
+				Pix: []uint8{
+					0x00, 0x11, 0x22, 0xcc, 0xdd, 0xee,
+					0xff, 0x00, 0x00, 0x00, 0xff, 0x00,
+					0x00, 0x00, 0xff, 0x00, 0x00, 0x00,
+				},
+			},
+			&NRGB{
+				Rect:   image.Rect(-1, -1, 1, 2),
+				Stride: 2 * 3,
+				Pix: []uint8{
+					0xcc, 0xdd, 0xee, 0x00, 0x11, 0x22,
+					0x00, 0xff, 0x00, 0xff, 0x00, 0x00,
+					0x00, 0x00, 0x00, 0x00, 0x00, 0xff,
+				},
+			},
+		},
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			got := FlipH(tc.src)
-			if !compareNRGBA(got, tc.want, 0) {
-				t.Fatalf("got result %#v want %#v", got, tc.want)
+			if !compareImages(got, tc.want, 0) {
+				t.Fatalf("got result:\n%#v\nwant:\n%#v", got, tc.want)
 			}
 		})
 	}
@@ -69,7 +90,7 @@ func TestFlipV(t *testing.T) {
 				},
 			},
 			&image.NRGBA{
-				Rect:   image.Rect(0, 0, 2, 3),
+				Rect:   image.Rect(-1, -1, 1, 2),
 				Stride: 2 * 4,
 				Pix: []uint8{
 					0x00, 0x00, 0xff, 0x00, 0x00, 0x00, 0x00, 0xff,
@@ -82,7 +103,7 @@ func TestFlipV(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			got := FlipV(tc.src)
-			if !compareNRGBA(got, tc.want, 0) {
+			if !compareImages(got, tc.want, 0) {
 				t.Fatalf("got result %#v want %#v", got, tc.want)
 			}
 		})
@@ -114,7 +135,7 @@ func TestTranspose(t *testing.T) {
 				},
 			},
 			&image.NRGBA{
-				Rect:   image.Rect(0, 0, 3, 2),
+				Rect:   image.Rect(-1, -1, 2, 1),
 				Stride: 3 * 4,
 				Pix: []uint8{
 					0x00, 0x11, 0x22, 0x33, 0xff, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff, 0x00,
@@ -126,7 +147,7 @@ func TestTranspose(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			got := Transpose(tc.src)
-			if !compareNRGBA(got, tc.want, 0) {
+			if !compareImages(got, tc.want, 0) {
 				t.Fatalf("got result %#v want %#v", got, tc.want)
 			}
 		})
@@ -144,7 +165,7 @@ func TestTransverse(t *testing.T) {
 	testCases := []struct {
 		name string
 		src  image.Image
-		want *image.NRGBA
+		want image.Image
 	}{
 		{
 			"Transverse 2x3",
@@ -158,7 +179,7 @@ func TestTransverse(t *testing.T) {
 				},
 			},
 			&image.NRGBA{
-				Rect:   image.Rect(0, 0, 3, 2),
+				Rect:   image.Rect(-1, -1, 2, 1),
 				Stride: 3 * 4,
 				Pix: []uint8{
 					0x00, 0x00, 0x00, 0xff, 0x00, 0xff, 0x00, 0x00, 0xcc, 0xdd, 0xee, 0xff,
@@ -170,8 +191,8 @@ func TestTransverse(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			got := Transverse(tc.src)
-			if !compareNRGBA(got, tc.want, 0) {
-				t.Fatalf("got result %#v want %#v", got, tc.want)
+			if !compareImages(got, tc.want, 0) {
+				t.Fatalf("got result:\n%#v\nwant:\n%#v", got, tc.want)
 			}
 		})
 	}
@@ -202,7 +223,7 @@ func TestRotate90(t *testing.T) {
 				},
 			},
 			&image.NRGBA{
-				Rect:   image.Rect(0, 0, 3, 2),
+				Rect:   image.Rect(-1, -1, 2, 1),
 				Stride: 3 * 4,
 				Pix: []uint8{
 					0xcc, 0xdd, 0xee, 0xff, 0x00, 0xff, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff,
@@ -214,7 +235,7 @@ func TestRotate90(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			got := Rotate90(tc.src)
-			if !compareNRGBA(got, tc.want, 0) {
+			if !compareImages(got, tc.want, 0) {
 				t.Fatalf("got result %#v want %#v", got, tc.want)
 			}
 		})
@@ -246,7 +267,7 @@ func TestRotate180(t *testing.T) {
 				},
 			},
 			&image.NRGBA{
-				Rect:   image.Rect(0, 0, 2, 3),
+				Rect:   image.Rect(-1, -1, 1, 2),
 				Stride: 2 * 4,
 				Pix: []uint8{
 					0x00, 0x00, 0x00, 0xff, 0x00, 0x00, 0xff, 0x00,
@@ -259,7 +280,7 @@ func TestRotate180(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			got := Rotate180(tc.src)
-			if !compareNRGBA(got, tc.want, 0) {
+			if !compareImages(got, tc.want, 0) {
 				t.Fatalf("got result %#v want %#v", got, tc.want)
 			}
 		})
@@ -291,7 +312,7 @@ func TestRotate270(t *testing.T) {
 				},
 			},
 			&image.NRGBA{
-				Rect:   image.Rect(0, 0, 3, 2),
+				Rect:   image.Rect(-1, -1, 2, 1),
 				Stride: 3 * 4,
 				Pix: []uint8{
 					0x00, 0x00, 0xff, 0x00, 0xff, 0x00, 0x00, 0x00, 0x00, 0x11, 0x22, 0x33,
@@ -303,7 +324,7 @@ func TestRotate270(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			got := Rotate270(tc.src)
-			if !compareNRGBA(got, tc.want, 0) {
+			if !compareImages(got, tc.want, 0) {
 				t.Fatalf("got result %#v want %#v", got, tc.want)
 			}
 		})
@@ -340,7 +361,7 @@ func TestRotate(t *testing.T) {
 			0,
 			color.Black,
 			&image.NRGBA{
-				Rect:   image.Rect(0, 0, 4, 4),
+				Rect:   image.Rect(-1, -1, 3, 3),
 				Stride: 4 * 4,
 				Pix: []uint8{
 					0xff, 0x00, 0x00, 0xff, 0xff, 0x00, 0x00, 0xff, 0xff, 0x00, 0x00, 0xff, 0xff, 0x00, 0x00, 0xff,
@@ -365,7 +386,7 @@ func TestRotate(t *testing.T) {
 			90,
 			color.Black,
 			&image.NRGBA{
-				Rect:   image.Rect(0, 0, 4, 4),
+				Rect:   image.Rect(-1, -1, 3, 3),
 				Stride: 4 * 4,
 				Pix: []uint8{
 					0xff, 0x00, 0x00, 0xff, 0x00, 0xff, 0x00, 0xff, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
@@ -390,7 +411,7 @@ func TestRotate(t *testing.T) {
 			180,
 			color.Black,
 			&image.NRGBA{
-				Rect:   image.Rect(0, 0, 4, 4),
+				Rect:   image.Rect(-1, -1, 3, 3),
 				Stride: 4 * 4,
 				Pix: []uint8{
 					0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
@@ -455,7 +476,7 @@ func TestRotate(t *testing.T) {
 			-90,
 			color.Black,
 			&image.NRGBA{
-				Rect:   image.Rect(0, 0, 2, 1),
+				Rect:   image.Rect(-1, -1, 1, 0),
 				Stride: 2 * 4,
 				Pix: []uint8{
 					0x00, 0xff, 0x00, 0xff, 0xff, 0x00, 0x00, 0xff,
@@ -475,7 +496,7 @@ func TestRotate(t *testing.T) {
 			-360 * 10,
 			color.Black,
 			&image.NRGBA{
-				Rect:   image.Rect(0, 0, 1, 2),
+				Rect:   image.Rect(-1, -1, 0, 1),
 				Stride: 1 * 4,
 				Pix: []uint8{
 					0x00, 0xff, 0x00, 0xff,
@@ -496,7 +517,7 @@ func TestRotate(t *testing.T) {
 			-360*10 + 90,
 			color.Black,
 			&image.NRGBA{
-				Rect:   image.Rect(0, 0, 2, 1),
+				Rect:   image.Rect(-1, -1, 1, 0),
 				Stride: 2 * 4,
 				Pix: []uint8{
 					0xff, 0x00, 0x00, 0xff, 0x00, 0xff, 0x00, 0xff,
@@ -516,7 +537,7 @@ func TestRotate(t *testing.T) {
 			-360*10 + 180,
 			color.Black,
 			&image.NRGBA{
-				Rect:   image.Rect(0, 0, 1, 2),
+				Rect:   image.Rect(-1, -1, 0, 1),
 				Stride: 1 * 4,
 				Pix: []uint8{
 					0x00, 0xff, 0x00, 0xff,
@@ -537,7 +558,7 @@ func TestRotate(t *testing.T) {
 			-360*10 + 270,
 			color.Black,
 			&image.NRGBA{
-				Rect:   image.Rect(0, 0, 2, 1),
+				Rect:   image.Rect(-1, -1, 1, 0),
 				Stride: 2 * 4,
 				Pix: []uint8{
 					0x00, 0xff, 0x00, 0xff, 0xff, 0x00, 0x00, 0xff,
@@ -557,7 +578,7 @@ func TestRotate(t *testing.T) {
 			360 * 10,
 			color.Black,
 			&image.NRGBA{
-				Rect:   image.Rect(0, 0, 1, 2),
+				Rect:   image.Rect(-1, -1, 0, 1),
 				Stride: 1 * 4,
 				Pix: []uint8{
 					0x00, 0xff, 0x00, 0xff,
@@ -578,7 +599,7 @@ func TestRotate(t *testing.T) {
 			360*10 + 90,
 			color.Black,
 			&image.NRGBA{
-				Rect:   image.Rect(0, 0, 2, 1),
+				Rect:   image.Rect(-1, -1, 1, 0),
 				Stride: 2 * 4,
 				Pix: []uint8{
 					0xff, 0x00, 0x00, 0xff, 0x00, 0xff, 0x00, 0xff,
@@ -598,7 +619,7 @@ func TestRotate(t *testing.T) {
 			360*10 + 180,
 			color.Black,
 			&image.NRGBA{
-				Rect:   image.Rect(0, 0, 1, 2),
+				Rect:   image.Rect(-1, -1, 0, 1),
 				Stride: 1 * 4,
 				Pix: []uint8{
 					0x00, 0xff, 0x00, 0xff,
@@ -619,7 +640,7 @@ func TestRotate(t *testing.T) {
 			360*10 + 270,
 			color.Black,
 			&image.NRGBA{
-				Rect:   image.Rect(0, 0, 2, 1),
+				Rect:   image.Rect(-1, -1, 1, 0),
 				Stride: 2 * 4,
 				Pix: []uint8{
 					0x00, 0xff, 0x00, 0xff, 0xff, 0x00, 0x00, 0xff,
@@ -630,7 +651,7 @@ func TestRotate(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			got := Rotate(tc.src, tc.angle, tc.bg)
-			if !compareNRGBA(got, tc.want, 0) {
+			if !compareImages(got, tc.want, 0) {
 				t.Fatalf("got result %#v want %#v", got, tc.want)
 			}
 		})

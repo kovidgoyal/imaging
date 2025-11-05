@@ -49,7 +49,7 @@ func clamp(x float64) uint8 {
 	return 0
 }
 
-func reverse(pix []uint8) {
+func reverse4(pix []uint8) {
 	if len(pix) <= 4 {
 		return
 	}
@@ -64,6 +64,23 @@ func reverse(pix []uint8) {
 		pi[3], pj[3] = pj[3], pi[3]
 		i += 4
 		j -= 4
+	}
+}
+
+func reverse3(pix []uint8) {
+	if len(pix) <= 3 {
+		return
+	}
+	i := 0
+	j := len(pix) - 3
+	for i < j {
+		pi := pix[i : i+3 : i+3]
+		pj := pix[j : j+3 : j+3]
+		pi[0], pj[0] = pj[0], pi[0]
+		pi[1], pj[1] = pj[1], pi[1]
+		pi[2], pj[2] = pj[2], pi[2]
+		i += 3
+		j -= 3
 	}
 }
 

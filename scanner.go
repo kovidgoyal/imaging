@@ -14,6 +14,9 @@ type scanner struct {
 func (s scanner) Bytes_per_channel() int  { return 1 }
 func (s scanner) Num_of_channels() int    { return 4 }
 func (s scanner) Bounds() image.Rectangle { return s.image.Bounds() }
+func (s scanner) NewImage(r image.Rectangle) image.Image {
+	return image.NewNRGBA(r)
+}
 
 func newScanner(img image.Image) *scanner {
 	s := &scanner{
@@ -30,12 +33,26 @@ func newScanner(img image.Image) *scanner {
 	return s
 }
 
+func (s *scanner) ReverseRow(img image.Image, row int) {
+	d := img.(*image.NRGBA)
+	pos := row * d.Stride
+	r := d.Pix[pos : pos+d.Stride : pos+d.Stride]
+	reverse4(r)
+}
+
+func (s *scanner) ScanRow(x1, y1, x2, y2 int, img image.Image, row int) {
+	d := img.(*image.NRGBA)
+	pos := row * d.Stride
+	r := d.Pix[pos : pos+d.Stride : pos+d.Stride]
+	s.Scan(x1, y1, x2, y2, r)
+}
+
 // scan scans the given rectangular region of the image into dst.
 func (s *scanner) Scan(x1, y1, x2, y2 int, dst []uint8) {
 	switch img := s.image.(type) {
 	case *NRGB:
-		j := 0
 		if x2 == x1+1 {
+			j := 0
 			i := y1*img.Stride + x1*3
 			for y := y1; y < y2; y++ {
 				d := dst[j : j+4 : j+4]
@@ -287,9 +304,12 @@ func (s *scanner) Scan(x1, y1, x2, y2 int, dst []uint8) {
 
 type Scanner interface {
 	Scan(x1, y1, x2, y2 int, dst []uint8)
+	ScanRow(x1, y1, x2, y2 int, img image.Image, row int)
 	Bytes_per_channel() int
 	Num_of_channels() int
 	Bounds() image.Rectangle
+	ReverseRow(image.Image, int)
+	NewImage(r image.Rectangle) image.Image
 }
 
 func NewNRGBAScanner(source_image image.Image) Scanner {
