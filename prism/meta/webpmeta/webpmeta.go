@@ -131,15 +131,25 @@ func parseWebpExtended(r io.Reader, md *meta.Data, chunkLen uint32) error {
 		return err
 	}
 	hasProfile := h[0]&(1<<5) != 0
+	hasExif := h[0]&(1<<3) != 0
+	animated := h[0]&(1<<1) != 0
 	h = h[4:]
 	w := uint32(h[0]) | uint32(h[1])<<8 | uint32(h[2])<<16
 	ht := uint32(h[3]) | uint32(h[4])<<8 | uint32(h[5])<<16
 	md.PixelWidth = w + 1
 	md.PixelHeight = ht + 1
 	md.BitsPerComponent = bitsPerComponent
+	md.HasFrames = animated
+	if !hasProfile && !hasExif {
+		return nil
+	}
+	if err := skip(r, chunkLen-10); err != nil {
+		return err
+	}
 
 	if hasProfile {
-		data, err := readICCP(r, chunkLen)
+		// ICCP must be next
+		data, err := readICCP(r)
 		if err != nil {
 			md.SetICCProfileError(err)
 		} else {
@@ -147,15 +157,35 @@ func parseWebpExtended(r io.Reader, md *meta.Data, chunkLen uint32) error {
 		}
 	}
 
+	if hasExif {
+		for {
+			ch, err := readChunkHeader(r)
+			if err != nil {
+				if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
+					err = nil
+					break
+				}
+				return err
+			}
+			if ch.ChunkType == chunkTypeEXIF {
+				data := make([]byte, ch.Length)
+				if _, err := io.ReadFull(r, data); err != nil {
+					return err
+				}
+				md.SetExifData(data)
+				break
+			} else {
+				if err = skip(r, ch.Length); err != nil {
+					return err
+				}
+			}
+		}
+	}
+
 	return nil
 }
 
-func readICCP(r io.Reader, chunkLen uint32) ([]byte, error) {
-	// Skip to the end of the chunk.
-	if err := skip(r, chunkLen-10); err != nil {
-		return nil, err
-	}
-
+func readICCP(r io.Reader) ([]byte, error) {
 	// ICCP _must_ be the next chunk.
 	ch, err := readChunkHeader(r)
 	if err != nil {

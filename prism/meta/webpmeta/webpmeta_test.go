@@ -3,8 +3,11 @@ package webpmeta
 import (
 	"bytes"
 	"encoding/binary"
+	"os"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 var extractMetadata = ExtractMetadata
@@ -81,6 +84,16 @@ func TestExtractMetadata(t *testing.T) {
 				t.Errorf("Expected image bits per component of %d but got %d", expected, actual)
 			}
 		}
+	})
+
+	t.Run("EXIF", func(t *testing.T) {
+		data, err := os.ReadFile("orientation_2.webp")
+		require.NoError(t, err)
+		md, err := extractMetadata(bytes.NewReader(data))
+		require.NoError(t, err)
+		exif, err := md.Exif()
+		require.NoError(t, err)
+		require.NotNil(t, exif)
 	})
 
 	t.Run("returns all metadata", func(t *testing.T) {
