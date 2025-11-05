@@ -108,19 +108,17 @@ func fix_colors(images []image.Image, md *meta.Data, cfg *decodeConfig) ([]image
 }
 
 func fix_orientation(images []image.Image, md *meta.Data, cfg *decodeConfig) ([]image.Image, error) {
-	if md == nil || !cfg.autoOrientation {
+	if md == nil || !cfg.autoOrientation || len(md.ExifData) < 7 {
 		return images, nil
 	}
 	var oval orientation = orientationUnspecified
-	if cfg.autoOrientation && len(md.ExifData) > 6 {
-		exif_data, err := exif.Decode(bytes.NewReader(md.ExifData))
-		if err == nil {
-			orient, err := exif_data.Get(exif.Orientation)
-			if err == nil && orient != nil {
-				x, err := strconv.ParseUint(orient.String(), 10, 0)
-				if err == nil && x > 0 && x < 9 {
-					oval = orientation(int(x))
-				}
+	exif_data, err := exif.Decode(bytes.NewReader(md.ExifData))
+	if err == nil {
+		orient, err := exif_data.Get(exif.Orientation)
+		if err == nil && orient != nil {
+			x, err := strconv.ParseUint(orient.String(), 10, 0)
+			if err == nil && x > 0 && x < 9 {
+				oval = orientation(int(x))
 			}
 		}
 	}
