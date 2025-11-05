@@ -12,12 +12,12 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 
 	"github.com/kovidgoyal/imaging/prism/meta"
 	"github.com/kovidgoyal/imaging/prism/meta/autometa"
 	"github.com/rwcarlsen/goexif/exif"
+	exif_tiff "github.com/rwcarlsen/goexif/tiff"
 
 	"golang.org/x/image/bmp"
 	"golang.org/x/image/tiff"
@@ -114,10 +114,9 @@ func fix_orientation(images []image.Image, md *meta.Data, cfg *decodeConfig) ([]
 	var oval orientation = orientationUnspecified
 	if exif_data, err := exif.Decode(bytes.NewReader(md.ExifData)); err == nil {
 		orient, err := exif_data.Get(exif.Orientation)
-		if err == nil && orient != nil {
-			x, err := strconv.ParseUint(orient.String(), 10, 0)
-			if err == nil && x > 0 && x < 9 {
-				oval = orientation(int(x))
+		if err == nil && orient != nil && orient.Format() == exif_tiff.IntVal {
+			if x, err := orient.Int(0); err == nil && x > 0 && x < 9 {
+				oval = orientation(x)
 			}
 		}
 	} else {
