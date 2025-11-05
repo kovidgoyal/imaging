@@ -112,8 +112,7 @@ func fix_orientation(images []image.Image, md *meta.Data, cfg *decodeConfig) ([]
 		return images, nil
 	}
 	var oval orientation = orientationUnspecified
-	exif_data, err := exif.Decode(bytes.NewReader(md.ExifData))
-	if err == nil {
+	if exif_data, err := exif.Decode(bytes.NewReader(md.ExifData)); err == nil {
 		orient, err := exif_data.Get(exif.Orientation)
 		if err == nil && orient != nil {
 			x, err := strconv.ParseUint(orient.String(), 10, 0)
@@ -121,6 +120,8 @@ func fix_orientation(images []image.Image, md *meta.Data, cfg *decodeConfig) ([]
 				oval = orientation(int(x))
 			}
 		}
+	} else {
+		return nil, err
 	}
 	if oval != orientationUnspecified {
 		for i, img := range images {
