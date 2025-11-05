@@ -15,8 +15,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/kovidgoyal/imaging/prism/meta"
 	"github.com/kovidgoyal/imaging/prism/meta/autometa"
-	"github.com/kovidgoyal/imaging/prism/meta/icc"
 	"github.com/rwcarlsen/goexif/exif"
 
 	"golang.org/x/image/bmp"
@@ -74,19 +74,44 @@ func ColorSpace(cs ColorSpaceType) DecodeOption {
 	}
 }
 
-// Decode reads an image from r.
-func Decode(r io.Reader, opts ...DecodeOption) (image.Image, error) {
-	cfg := defaultDecodeConfig
-
-	for _, option := range opts {
-		option(&cfg)
+func fix_colors(images []image.Image, md *meta.Data, cfg *decodeConfig) ([]image.Image, error) {
+	var err error
+	if md == nil || cfg.outputColorspace != SRGB_COLORSPACE {
+		return images, nil
 	}
-
-	if !cfg.autoOrientation && cfg.outputColorspace == NO_CHANGE_OF_COLORSPACE {
-		img, _, err := image.Decode(r)
-		return img, err
+	if md.CICP.IsSet && !md.CICP.IsSRGB() {
+		p := md.CICP.PipelineToSRGB()
+		if p == nil {
+			return nil, fmt.Errorf("cannot convert colorspace, unknown %s", md.CICP)
+		}
+		for i, img := range images {
+			if img, err = convert(p, img); err != nil {
+				return nil, err
+			}
+			images[i] = img
+		}
+		return images, nil
 	}
-	md, r, err := autometa.Load(r)
+	profile, err := md.ICCProfile()
+	if err != nil {
+		return nil, err
+	}
+	if profile != nil {
+		for i, img := range images {
+			if img, err = ConvertToSRGB(profile, img); err != nil {
+				return nil, err
+			}
+			images[i] = img
+		}
+	}
+	return images, nil
+}
+
+func fix_orientation(images []image.Image, md *meta.Data, cfg *decodeConfig) ([]image.Image, error) {
+	var err error
+	if md == nil || !cfg.autoOrientation {
+		return images, nil
+	}
 	var oval orientation = orientationUnspecified
 	if cfg.autoOrientation {
 		if err == nil && md != nil && len(md.ExifData) > 6 {
@@ -102,38 +127,41 @@ func Decode(r io.Reader, opts ...DecodeOption) (image.Image, error) {
 			}
 		}
 	}
+	if oval != orientationUnspecified {
+		for i, img := range images {
+			images[i] = fixOrientation(img, oval)
+		}
+	}
+	return images, nil
+
+}
+
+// Decode reads an image from r.
+func Decode(r io.Reader, opts ...DecodeOption) (image.Image, error) {
+	cfg := defaultDecodeConfig
+
+	for _, option := range opts {
+		option(&cfg)
+	}
+
+	if !cfg.autoOrientation && cfg.outputColorspace == NO_CHANGE_OF_COLORSPACE {
+		img, _, err := image.Decode(r)
+		return img, err
+	}
+	md, r, err := autometa.Load(r)
 
 	img, _, err := image.Decode(r)
 	if err != nil {
 		return nil, err
 	}
-	if md != nil && cfg.outputColorspace == SRGB_COLORSPACE {
-		var p *icc.Pipeline
-		check_icc := true
-		if md.CICP.IsSet {
-			p = md.CICP.PipelineToSRGB()
-			if p == nil {
-				return nil, fmt.Errorf("cannot convert colorspace, unknown %s", md.CICP)
-			}
-			check_icc = false
-			if img, err = convert(p, img); err != nil {
-				return nil, err
-			}
-		}
-		if check_icc {
-			profile, err := md.ICCProfile()
-			if err != nil {
-				return nil, err
-			}
-			if p != nil {
-				img, err = ConvertToSRGB(profile, img)
-				if err != nil {
-					return nil, err
-				}
-			}
-		}
+	images := []image.Image{img}
+	if images, err = fix_colors(images, md, &cfg); err != nil {
+		return nil, err
 	}
-	return fixOrientation(img, oval), nil
+	if images, err = fix_orientation(images, md, &cfg); err != nil {
+		return nil, err
+	}
+	return images[0], nil
 }
 
 // Open loads an image from file.
