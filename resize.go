@@ -21,17 +21,11 @@ func precomputeWeights(dstSize, srcSize int, filter ResampleFilter) [][]indexWei
 	out := make([][]indexWeight, dstSize)
 	tmp := make([]indexWeight, 0, dstSize*int(ru+2)*2)
 
-	for v := 0; v < dstSize; v++ {
+	for v := range dstSize {
 		fu := (float64(v)+0.5)*du - 0.5
 
-		begin := int(math.Ceil(fu - ru))
-		if begin < 0 {
-			begin = 0
-		}
-		end := int(math.Floor(fu + ru))
-		if end > srcSize-1 {
-			end = srcSize - 1
-		}
+		begin := max(0, int(math.Ceil(fu-ru)))
+		end := min(int(math.Floor(fu+ru)), srcSize-1)
 
 		var sum float64
 		for u := begin; u <= end; u++ {

@@ -10,8 +10,16 @@ import (
 var _ = fmt.Println
 
 func ScannerForImage(img image.Image) Scanner {
-	switch img.(type) {
-	case *NRGB, *image.CMYK, *image.YCbCr:
+	switch img := img.(type) {
+	case *NRGB, *image.CMYK, *image.YCbCr, *image.Gray:
+		return NewNRGBScanner(img, NRGBColor{})
+	case *image.Paletted:
+		for _, x := range img.Palette {
+			_, _, _, a := x.RGBA()
+			if a < 0xffff {
+				return NewNRGBAScanner(img)
+			}
+		}
 		return NewNRGBScanner(img, NRGBColor{})
 	}
 	return NewNRGBAScanner(img)
