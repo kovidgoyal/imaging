@@ -197,8 +197,8 @@ func TestExtractMetadata(t *testing.T) {
 		if err != nil {
 			t.Errorf("Expected success but got error: %v", err)
 		}
-		if expected := exifSignature + exif; !bytes.Equal(md.ExifData, []byte(expected)) {
-			t.Fatalf("Unexpected EXIF data: %#v != %#v", expected, string(md.ExifData))
+		if expected := exifSignature + exif; !bytes.Equal(md.ExifData(), []byte(expected)) {
+			t.Fatalf("Unexpected EXIF data: %#v != %#v", expected, string(md.ExifData()))
 		}
 	})
 

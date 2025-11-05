@@ -60,9 +60,10 @@ func ExtractMetadata(r io.Reader) (md *meta.Data, err error) {
 			err = fmt.Errorf("panic while extracting image metadata: %v", r)
 		}
 	}()
+	found_exif := false
 	allMetadataExtracted := func() bool {
 		iccData, iccErr := md.ICCProfileData()
-		return metadataExtracted && md.HasFrames && md.ExifData != nil && (iccData != nil || iccErr != nil) && md.CICP.IsSet
+		return metadataExtracted && md.HasFrames && found_exif && (iccData != nil || iccErr != nil) && md.CICP.IsSet
 	}
 
 	pngSig := [8]byte{}
@@ -115,7 +116,8 @@ parseChunks:
 			if chunk, err = read_chunk(r, ch.Length); err != nil {
 				return nil, err
 			}
-			md.ExifData = chunk
+			found_exif = true
+			md.SetExifData(chunk)
 			if allMetadataExtracted() {
 				break parseChunks
 			}

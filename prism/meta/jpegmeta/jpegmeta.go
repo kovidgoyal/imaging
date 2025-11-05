@@ -145,7 +145,7 @@ parseSegments:
 	if !metadataExtracted {
 		return nil, fmt.Errorf("no metadata found")
 	}
-	md.ExifData = exif
+	md.SetExifData(exif)
 
 	// Incomplete or missing ICC profile
 	if len(iccProfileChunks) != iccProfileChunksExtracted {

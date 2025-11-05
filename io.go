@@ -1,7 +1,6 @@
 package imaging
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"image"
@@ -108,19 +107,21 @@ func fix_colors(images []image.Image, md *meta.Data, cfg *decodeConfig) ([]image
 }
 
 func fix_orientation(images []image.Image, md *meta.Data, cfg *decodeConfig) ([]image.Image, error) {
-	if md == nil || !cfg.autoOrientation || len(md.ExifData) < 7 {
+	if md == nil || !cfg.autoOrientation {
 		return images, nil
 	}
+	exif_data, err := md.Exif()
+	if err != nil {
+		return nil, err
+	}
 	var oval orientation = orientationUnspecified
-	if exif_data, err := exif.Decode(bytes.NewReader(md.ExifData)); err == nil {
+	if exif_data != nil {
 		orient, err := exif_data.Get(exif.Orientation)
 		if err == nil && orient != nil && orient.Format() == exif_tiff.IntVal {
 			if x, err := orient.Int(0); err == nil && x > 0 && x < 9 {
 				oval = orientation(x)
 			}
 		}
-	} else {
-		return nil, err
 	}
 	if oval != orientationUnspecified {
 		for i, img := range images {
