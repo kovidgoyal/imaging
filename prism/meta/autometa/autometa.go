@@ -5,6 +5,7 @@ import (
 	"io"
 
 	"github.com/kovidgoyal/imaging/prism/meta"
+	"github.com/kovidgoyal/imaging/prism/meta/gifmeta"
 	"github.com/kovidgoyal/imaging/prism/meta/jpegmeta"
 	"github.com/kovidgoyal/imaging/prism/meta/pngmeta"
 	"github.com/kovidgoyal/imaging/prism/meta/tiffmeta"
@@ -25,8 +26,9 @@ import (
 // stream still provides the full image data.
 func Load(r io.Reader) (md *meta.Data, imgStream io.Reader, err error) {
 	loaders := []func(io.Reader) (*meta.Data, error){
-		pngmeta.ExtractMetadata,
 		jpegmeta.ExtractMetadata,
+		pngmeta.ExtractMetadata,
+		gifmeta.ExtractMetadata,
 		webpmeta.ExtractMetadata,
 		tiffmeta.ExtractMetadata,
 	}
