@@ -249,7 +249,7 @@ func decode_rgb_ascii(br *bufio.Reader, h header) (ans []byte, err error) {
 	return
 }
 
-func DecodeNetPBMConfig(r io.Reader) (cfg image.Config, err error) {
+func DecodeConfig(r io.Reader) (cfg image.Config, err error) {
 	br := bufio.NewReader(r)
 	h, err := read_header(br)
 	if err != nil {
@@ -455,7 +455,7 @@ func decode_binary_data(br *bufio.Reader, h header) (ans image.Image, err error)
 
 // Decode decodes a PPM image from r and returns it as an image.Image.
 // Supports both P3 (ASCII) and P6 (binary) variants.
-func DecodeNetPBM(r io.Reader) (img image.Image, err error) {
+func Decode(r io.Reader) (img image.Image, err error) {
 	br := bufio.NewReader(r)
 	h, err := read_header(br)
 	if err != nil {
@@ -506,11 +506,11 @@ func DecodeNetPBM(r io.Reader) (img image.Image, err error) {
 
 // Register this decoder with Go's image package
 func init() {
-	image.RegisterFormat("pbm", "P1", DecodeNetPBM, DecodeNetPBMConfig)
-	image.RegisterFormat("pgm", "P2", DecodeNetPBM, DecodeNetPBMConfig)
-	image.RegisterFormat("ppm", "P3", DecodeNetPBM, DecodeNetPBMConfig)
-	image.RegisterFormat("pbm", "P4", DecodeNetPBM, DecodeNetPBMConfig)
-	image.RegisterFormat("pgm", "P5", DecodeNetPBM, DecodeNetPBMConfig)
-	image.RegisterFormat("ppm", "P6", DecodeNetPBM, DecodeNetPBMConfig)
-	image.RegisterFormat("pam", "P7", DecodeNetPBM, DecodeNetPBMConfig)
+	image.RegisterFormat("pbm", "P1", Decode, DecodeConfig)
+	image.RegisterFormat("pgm", "P2", Decode, DecodeConfig)
+	image.RegisterFormat("ppm", "P3", Decode, DecodeConfig)
+	image.RegisterFormat("pbm", "P4", Decode, DecodeConfig)
+	image.RegisterFormat("pgm", "P5", Decode, DecodeConfig)
+	image.RegisterFormat("ppm", "P6", Decode, DecodeConfig)
+	image.RegisterFormat("pam", "P7", Decode, DecodeConfig)
 }

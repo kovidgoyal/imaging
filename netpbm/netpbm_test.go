@@ -48,7 +48,7 @@ func open(path string) (image.Image, error) {
 		return nil, err
 	}
 	defer file.Close()
-	return DecodeNetPBM(file)
+	return Decode(file)
 }
 
 func png_open(path string) (image.Image, error) {
@@ -66,7 +66,7 @@ func open_config(path string) (image.Config, error) {
 		return image.Config{}, err
 	}
 	defer file.Close()
-	return DecodeNetPBMConfig(file)
+	return DecodeConfig(file)
 }
 
 func TestNetPBM(t *testing.T) {
