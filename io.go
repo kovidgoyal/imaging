@@ -12,9 +12,11 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/kovidgoyal/imaging/prism/meta"
 	"github.com/kovidgoyal/imaging/prism/meta/autometa"
+	"github.com/kovidgoyal/imaging/types"
 	"github.com/rwcarlsen/goexif/exif"
 	exif_tiff "github.com/rwcarlsen/goexif/tiff"
 
@@ -132,6 +134,27 @@ func fix_orientation(images []image.Image, md *meta.Data, cfg *decodeConfig) ([]
 
 }
 
+type Disposal int
+
+const (
+	DISPOSAL_NONE Disposal = iota
+	DISPOSAL_BACKGROUND
+	DISPOSAL_PREVIOUS
+)
+
+type Frame struct {
+	Image     image.Image
+	Disposal  Disposal
+	Delay     time.Duration
+	LoopCount uint // 0 means loop forever
+}
+
+type Image struct {
+	Frames                        []Frame
+	Metadata                      meta.Data
+	FirstFrameIncludedInAnimation bool
+}
+
 // Decode reads an image from r.
 func Decode(r io.Reader, opts ...DecodeOption) (image.Image, error) {
 	cfg := defaultDecodeConfig
@@ -184,53 +207,21 @@ func OpenConfig(filename string) (ans image.Config, format_name string, err erro
 	return image.DecodeConfig(file)
 }
 
-// Format is an image file format.
-type Format int
+type Format = types.Format
 
-// Image file formats.
 const (
-	JPEG Format = iota
-	PNG
-	GIF
-	TIFF
-	WEBP
-	BMP
-	PBM
-	PGM
-	PPM
-	PAM
+	UNKNOWN = types.UNKNOWN
+	JPEG    = types.JPEG
+	PNG     = types.PNG
+	GIF     = types.GIF
+	TIFF    = types.TIFF
+	WEBP    = types.WEBP
+	BMP     = types.BMP
+	PBM     = types.PBM
+	PGM     = types.PGM
+	PPM     = types.PPM
+	PAM     = types.PAM
 )
-
-var formatExts = map[string]Format{
-	"jpg":  JPEG,
-	"jpeg": JPEG,
-	"png":  PNG,
-	"gif":  GIF,
-	"tif":  TIFF,
-	"tiff": TIFF,
-	"webp": WEBP,
-	"bmp":  BMP,
-	"pbm":  PBM,
-	"pgm":  PGM,
-	"ppm":  PPM,
-	"pam":  PAM,
-}
-
-var formatNames = map[Format]string{
-	JPEG: "JPEG",
-	PNG:  "PNG",
-	GIF:  "GIF",
-	TIFF: "TIFF",
-	WEBP: "webp",
-	BMP:  "BMP",
-	PBM:  "PBM",
-	PGM:  "PGM",
-	PAM:  "PAM",
-}
-
-func (f Format) String() string {
-	return formatNames[f]
-}
 
 // ErrUnsupportedFormat means the given image format is not supported.
 var ErrUnsupportedFormat = errors.New("imaging: unsupported image format")
@@ -238,7 +229,7 @@ var ErrUnsupportedFormat = errors.New("imaging: unsupported image format")
 // FormatFromExtension parses image format from filename extension:
 // "jpg" (or "jpeg"), "png", "gif", "tif" (or "tiff") and "bmp" are supported.
 func FormatFromExtension(ext string) (Format, error) {
-	if f, ok := formatExts[strings.ToLower(strings.TrimPrefix(ext, "."))]; ok {
+	if f, ok := types.FormatExts[strings.ToLower(strings.TrimPrefix(ext, "."))]; ok {
 		return f, nil
 	}
 	return -1, ErrUnsupportedFormat

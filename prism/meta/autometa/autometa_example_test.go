@@ -98,7 +98,7 @@ func ExampleLoad_basicWebPMetadata() {
 	printMetadata(md, img)
 
 	// Output:
-	// Format: WebP
+	// Format: WEBP
 	// BitsPerComponent: 8
 	// PixelHeight: 1200
 	// PixelWidth: 1200

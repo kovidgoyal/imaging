@@ -7,10 +7,8 @@ import (
 
 	"github.com/kovidgoyal/imaging/prism/meta"
 	"github.com/kovidgoyal/imaging/streams"
+	"github.com/kovidgoyal/imaging/types"
 )
-
-// Format specifies the image format handled by this package
-var Format = meta.ImageFormat("WebP")
 
 // Signature is FourCC bytes in the RIFF chunk, "RIFF????WEBP"
 var webpSignature = [4]byte{'W', 'E', 'B', 'P'}
@@ -46,7 +44,7 @@ func Load(r io.Reader) (md *meta.Data, imgStream io.Reader, err error) {
 
 // Same as Load() except that no new stream is provided
 func ExtractMetadata(r io.Reader) (md *meta.Data, err error) {
-	md = &meta.Data{Format: Format}
+	md = &meta.Data{Format: types.WEBP}
 
 	defer func() {
 		if r := recover(); r != nil {

@@ -11,10 +11,8 @@ import (
 
 	"github.com/kovidgoyal/imaging/prism/meta"
 	"github.com/kovidgoyal/imaging/streams"
+	"github.com/kovidgoyal/imaging/types"
 )
-
-// Format specifies the image format handled by this package
-var Format = meta.ImageFormat("PNG")
 
 var pngSignature = [8]byte{0x89, 'P', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x0A}
 
@@ -50,7 +48,7 @@ func skip_chunk(r io.Reader, length uint32) (err error) {
 // Same as Load() except that no new stream is provided
 func ExtractMetadata(r io.Reader) (md *meta.Data, err error) {
 	metadataExtracted := false
-	md = &meta.Data{Format: Format}
+	md = &meta.Data{Format: types.PNG}
 
 	defer func() {
 		if r := recover(); r != nil {

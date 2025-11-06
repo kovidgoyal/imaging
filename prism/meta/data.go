@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	"github.com/kovidgoyal/imaging/prism/meta/icc"
+	"github.com/kovidgoyal/imaging/types"
 	"github.com/rwcarlsen/goexif/exif"
 )
 
@@ -13,7 +14,7 @@ var _ = fmt.Println
 
 // Data represents the metadata for an image.
 type Data struct {
-	Format              ImageFormat
+	Format              types.Format
 	PixelWidth          uint32
 	PixelHeight         uint32
 	BitsPerComponent    uint32

@@ -7,6 +7,7 @@ import (
 	"io"
 
 	"github.com/kovidgoyal/imaging/prism/meta"
+	"github.com/kovidgoyal/imaging/types"
 	"github.com/rwcarlsen/goexif/exif"
 	"golang.org/x/image/tiff"
 )
@@ -54,7 +55,7 @@ func ExtractMetadata(r_ io.Reader) (md *meta.Data, err error) {
 		return nil, err
 	}
 	md = &meta.Data{
-		Format: meta.ImageFormat("TIFF"), PixelWidth: uint32(c.Width), PixelHeight: uint32(c.Height),
+		Format: types.TIFF, PixelWidth: uint32(c.Width), PixelHeight: uint32(c.Height),
 		BitsPerComponent: uint32(BitsPerComponent(c)),
 	}
 	if _, err = r.Seek(pos, io.SeekStart); err != nil {

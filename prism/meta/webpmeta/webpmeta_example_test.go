@@ -71,7 +71,7 @@ func ExampleLoad_basicWebPVP8Metadata() {
 	printMetadata(md, img)
 
 	// Output:
-	// Format: WebP
+	// Format: WEBP
 	// BitsPerComponent: 8
 	// PixelHeight: 64
 	// PixelWidth: 64
@@ -99,7 +99,7 @@ func ExampleLoad_basicWebPVP8LMetadata() {
 	printMetadata(md, img)
 
 	// Output:
-	// Format: WebP
+	// Format: WEBP
 	// BitsPerComponent: 8
 	// PixelHeight: 64
 	// PixelWidth: 64
