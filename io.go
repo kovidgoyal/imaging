@@ -112,7 +112,7 @@ func fix_colors(images []*Frame, md *meta.Data, cfg *decodeConfig) error {
 	return nil
 }
 
-func fix_orientation(images []*Frame, md *meta.Data, cfg *decodeConfig) error {
+func fix_orientation(ans *Image, md *meta.Data, cfg *decodeConfig) error {
 	if md == nil || !cfg.autoOrientation {
 		return nil
 	}
@@ -130,8 +130,8 @@ func fix_orientation(images []*Frame, md *meta.Data, cfg *decodeConfig) error {
 		}
 	}
 	if oval != orientationUnspecified {
-		for _, img := range images {
-			img.Image = fixOrientation(img.Image, oval)
+		for _, img := range ans.Frames {
+			img.Image = fixOrientation(img.Image, ans.Metadata, oval)
 		}
 	}
 	return nil
@@ -215,7 +215,7 @@ func decode_all(r io.Reader, opts []DecodeOption) (ans *Image, err error) {
 			if err = fix_colors(ans.Frames, ans.Metadata, &cfg); err != nil {
 				return
 			}
-			if err = fix_orientation(ans.Frames, ans.Metadata, &cfg); err != nil {
+			if err = fix_orientation(ans, ans.Metadata, &cfg); err != nil {
 				return
 			}
 		}
@@ -318,6 +318,16 @@ func Open(filename string, opts ...DecodeOption) (image.Image, error) {
 	}
 	defer file.Close()
 	return Decode(file, opts...)
+}
+
+func OpenAll(filename string, opts ...DecodeOption) (*Image, error) {
+	file, err := fs.Open(filename)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+	ans, _, err := DecodeAll(file, opts...)
+	return ans, err
 }
 
 func OpenConfig(filename string) (ans image.Config, format_name string, err error) {
@@ -508,7 +518,7 @@ const (
 )
 
 // fixOrientation applies a transform to img corresponding to the given orientation flag.
-func fixOrientation(img image.Image, o orientation) image.Image {
+func fixOrientation(img image.Image, md *meta.Data, o orientation) image.Image {
 	switch o {
 	case orientationNormal:
 	case orientationFlipH:
@@ -517,14 +527,26 @@ func fixOrientation(img image.Image, o orientation) image.Image {
 		img = FlipV(img)
 	case orientationRotate90:
 		img = Rotate90(img)
+		if md != nil {
+			md.PixelWidth, md.PixelHeight = md.PixelHeight, md.PixelWidth
+		}
 	case orientationRotate180:
 		img = Rotate180(img)
 	case orientationRotate270:
 		img = Rotate270(img)
+		if md != nil {
+			md.PixelWidth, md.PixelHeight = md.PixelHeight, md.PixelWidth
+		}
 	case orientationTranspose:
 		img = Transpose(img)
+		if md != nil {
+			md.PixelWidth, md.PixelHeight = md.PixelHeight, md.PixelWidth
+		}
 	case orientationTransverse:
 		img = Transverse(img)
+		if md != nil {
+			md.PixelWidth, md.PixelHeight = md.PixelHeight, md.PixelWidth
+		}
 	}
 	return img
 }

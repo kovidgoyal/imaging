@@ -9,11 +9,12 @@ import (
 	"image/draw"
 	"image/png"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 var (
@@ -26,7 +27,7 @@ type badFS struct{}
 
 func (badFS) Create(name string) (io.WriteCloser, error) {
 	if name == "badFile.jpg" {
-		return badFile{ioutil.Discard}, nil
+		return badFile{io.Discard}, nil
 	}
 	return nil, errCreate
 }
@@ -50,11 +51,8 @@ type quantizer struct {
 func (q quantizer) Quantize(p color.Palette, m image.Image) color.Palette {
 	pal := make([]color.Color, len(p), cap(p))
 	copy(pal, p)
-	n := cap(p) - len(p)
-	if n > len(q.palette) {
-		n = len(q.palette)
-	}
-	for i := 0; i < n; i++ {
+	n := min(cap(p)-len(p), len(q.palette))
+	for i := range n {
 		pal = append(pal, q.palette[i])
 	}
 	return pal
@@ -93,7 +91,7 @@ func TestOpenSave(t *testing.T) {
 		},
 	}
 
-	dir, err := ioutil.TempDir("", "imaging")
+	dir, err := os.MkdirTemp("", "imaging")
 	if err != nil {
 		t.Fatalf("failed to create temporary directory: %v", err)
 	}
@@ -274,17 +272,19 @@ func TestAutoOrientation(t *testing.T) {
 		{"testdata/orientation_8.jpg"},
 	}
 	for _, tc := range testCases {
-		img, err := Open(tc.path, AutoOrientation(true))
+		img, err := OpenAll(tc.path)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if img.Bounds() != orig.Bounds() {
-			t.Fatalf("%s: got bounds %v want %v", tc.path, img.Bounds(), orig.Bounds())
+		if img.Frames[0].Image.Bounds() != orig.Bounds() {
+			t.Fatalf("%s: got bounds %v want %v", tc.path, img.Frames[0].Image.Bounds(), orig.Bounds())
 		}
-		imgBW := toBW(img)
+		imgBW := toBW(img.Frames[0].Image)
 		if !bytes.Equal(imgBW, origBW) {
 			t.Fatalf("%s: got bw data %v want %v", tc.path, imgBW, origBW)
 		}
+		require.Equal(t, orig.Bounds().Dx(), int(img.Metadata.PixelWidth))
+		require.Equal(t, orig.Bounds().Dy(), int(img.Metadata.PixelHeight))
 	}
 
 	if _, err := Decode(strings.NewReader("invalid data"), AutoOrientation(true)); err == nil {
