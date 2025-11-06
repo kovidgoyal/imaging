@@ -17,7 +17,12 @@ import (
 	_ "github.com/kovidgoyal/imaging/netpbm"
 	"github.com/kovidgoyal/imaging/prism/meta"
 	"github.com/kovidgoyal/imaging/prism/meta/autometa"
+	"github.com/kovidgoyal/imaging/prism/meta/gifmeta"
+	"github.com/kovidgoyal/imaging/prism/meta/tiffmeta"
+	"github.com/kovidgoyal/imaging/streams"
 	"github.com/kovidgoyal/imaging/types"
+
+	"github.com/kettek/apng"
 	"github.com/rwcarlsen/goexif/exif"
 	exif_tiff "github.com/rwcarlsen/goexif/tiff"
 
@@ -76,46 +81,44 @@ func ColorSpace(cs ColorSpaceType) DecodeOption {
 	}
 }
 
-func fix_colors(images []image.Image, md *meta.Data, cfg *decodeConfig) ([]image.Image, error) {
+func fix_colors(images []*Frame, md *meta.Data, cfg *decodeConfig) error {
 	var err error
 	if md == nil || cfg.outputColorspace != SRGB_COLORSPACE {
-		return images, nil
+		return nil
 	}
 	if md.CICP.IsSet && !md.CICP.IsSRGB() {
 		p := md.CICP.PipelineToSRGB()
 		if p == nil {
-			return nil, fmt.Errorf("cannot convert colorspace, unknown %s", md.CICP)
+			return fmt.Errorf("cannot convert colorspace, unknown %s", md.CICP)
 		}
-		for i, img := range images {
-			if img, err = convert(p, img); err != nil {
-				return nil, err
+		for _, f := range images {
+			if f.Image, err = convert(p, f.Image); err != nil {
+				return err
 			}
-			images[i] = img
 		}
-		return images, nil
+		return nil
 	}
 	profile, err := md.ICCProfile()
 	if err != nil {
-		return nil, err
+		return err
 	}
 	if profile != nil {
-		for i, img := range images {
-			if img, err = ConvertToSRGB(profile, img); err != nil {
-				return nil, err
+		for _, f := range images {
+			if f.Image, err = ConvertToSRGB(profile, f.Image); err != nil {
+				return err
 			}
-			images[i] = img
 		}
 	}
-	return images, nil
+	return nil
 }
 
-func fix_orientation(images []image.Image, md *meta.Data, cfg *decodeConfig) ([]image.Image, error) {
+func fix_orientation(images []*Frame, md *meta.Data, cfg *decodeConfig) error {
 	if md == nil || !cfg.autoOrientation {
-		return images, nil
+		return nil
 	}
 	exif_data, err := md.Exif()
 	if err != nil {
-		return nil, err
+		return err
 	}
 	var oval orientation = orientationUnspecified
 	if exif_data != nil {
@@ -127,33 +130,154 @@ func fix_orientation(images []image.Image, md *meta.Data, cfg *decodeConfig) ([]
 		}
 	}
 	if oval != orientationUnspecified {
-		for i, img := range images {
-			images[i] = fixOrientation(img, oval)
+		for _, img := range images {
+			img.Image = fixOrientation(img.Image, oval)
 		}
 	}
-	return images, nil
+	return nil
 
 }
 
-type Disposal int
-
-const (
-	DISPOSAL_NONE Disposal = iota
-	DISPOSAL_BACKGROUND
-	DISPOSAL_PREVIOUS
-)
-
 type Frame struct {
-	Image     image.Image
-	Disposal  Disposal
-	Delay     time.Duration
-	LoopCount uint // 0 means loop forever
+	Number      uint
+	X, Y        int
+	Image       image.Image
+	Delay       time.Duration
+	ComposeOnto uint
+	Replace     bool // Do a simple pixel replacement rather than a full alpha blend when compositing this frame
 }
 
 type Image struct {
-	Frames                        []Frame
-	Metadata                      meta.Data
-	FirstFrameIncludedInAnimation bool
+	Frames       []*Frame
+	Metadata     *meta.Data
+	LoopCount    uint        // 0 means loop forever, 1 means loop once, ...
+	DefaultImage image.Image // a "default image" for an animation that is not part of the animation
+}
+
+func format_from_decode_result(x string) Format {
+	switch x {
+	case "BMP":
+		return BMP
+	case "TIFF", "TIF":
+		return TIFF
+	}
+	return UNKNOWN
+}
+
+func (self *Image) populate_from_apng(p *apng.APNG) {
+	self.LoopCount = p.LoopCount
+	anchor_frame := uint(1)
+	for _, f := range p.Frames {
+		if f.IsDefault {
+			self.DefaultImage = f.Image
+			continue
+		}
+		n, d := f.DelayNumerator, f.DelayDenominator
+		if d <= 0 {
+			d = 100
+		}
+		n = max(0, n)
+		frame := Frame{Number: uint(len(self.Frames) + 1), Image: f.Image, X: f.XOffset, Y: f.YOffset,
+			Replace: f.BlendOp == apng.BLEND_OP_SOURCE,
+			Delay:   time.Duration(float64(time.Second) * float64(n) / float64(d))}
+		anchor_frame, frame.ComposeOnto = gifmeta.SetGIFFrameDisposal(frame.Number, anchor_frame, f.DisposeOp)
+		self.Frames = append(self.Frames, &frame)
+	}
+}
+
+func (self *Image) populate_from_gif(g *gif.GIF) {
+	min_gap := gifmeta.CalcMinimumGap(g.Delay)
+	anchor_frame := uint(1)
+	for i, img := range g.Image {
+		frame := Frame{Number: uint(len(self.Frames) + 1), Image: img, X: img.Bounds().Min.X, Y: img.Bounds().Min.Y,
+			Delay: gifmeta.CalculateFrameDelay(g.Delay[i], min_gap)}
+		anchor_frame, frame.ComposeOnto = gifmeta.SetGIFFrameDisposal(frame.Number, anchor_frame, g.Disposal[i])
+		self.Frames = append(self.Frames, &frame)
+	}
+	switch {
+	case g.LoopCount == 0:
+		self.LoopCount = 0
+	case g.LoopCount < 0:
+		self.LoopCount = 1
+	default:
+		self.LoopCount = uint(g.LoopCount) + 1
+	}
+}
+
+func decode_all(r io.Reader, opts []DecodeOption) (ans *Image, err error) {
+	cfg := defaultDecodeConfig
+	for _, option := range opts {
+		option(&cfg)
+	}
+
+	defer func() {
+		if ans != nil && err == nil && ans.Metadata != nil && (cfg.autoOrientation || cfg.outputColorspace != NO_CHANGE_OF_COLORSPACE) {
+			if err = fix_colors(ans.Frames, ans.Metadata, &cfg); err != nil {
+				return
+			}
+			if err = fix_orientation(ans.Frames, ans.Metadata, &cfg); err != nil {
+				return
+			}
+		}
+	}()
+	md, r, err := autometa.Load(r)
+	if md == nil {
+		if err != nil {
+			return nil, err
+		}
+		img, imgf, err := image.Decode(r)
+		if err != nil {
+			return nil, err
+		}
+		m := meta.Data{
+			PixelWidth:       uint32(img.Bounds().Dx()),
+			PixelHeight:      uint32(img.Bounds().Dy()),
+			Format:           format_from_decode_result(imgf),
+			BitsPerComponent: tiffmeta.BitsPerComponent(img.ColorModel()),
+		}
+		f := Frame{Image: img}
+		return &Image{Metadata: &m, Frames: []*Frame{&f}}, nil
+	}
+	ans = &Image{Metadata: md}
+	if md.HasFrames {
+		switch md.Format {
+		case GIF:
+			g, err := gif.DecodeAll(r)
+			if err != nil {
+				return nil, err
+			}
+			ans.populate_from_gif(g)
+		case PNG:
+			png, err := apng.DecodeAll(r)
+			if err != nil {
+				return nil, err
+			}
+			ans.populate_from_apng(&png)
+		case WEBP:
+			return nil, nil // animated WEBP not currently supported
+		}
+	} else {
+		img, _, err := image.Decode(r)
+		if err != nil {
+			return nil, err
+		}
+		ans.Metadata.PixelWidth = uint32(img.Bounds().Dx())
+		ans.Metadata.PixelHeight = uint32(img.Bounds().Dy())
+		ans.Frames = append(ans.Frames, &Frame{Image: img})
+	}
+	return
+}
+
+// Decode image from r including all animation frames if its an animated image.
+// Returns nil with no error when no supported image is found in r.
+// Also returns a reader that will yield all bytes from r so that this API does
+// not exhaust r.
+func DecodeAll(r io.Reader, opts ...DecodeOption) (ans *Image, s io.Reader, err error) {
+	s, err = streams.CallbackWithSeekable(r, func(r io.Reader) (err error) {
+		ans, err = decode_all(r, opts)
+		return
+	})
+	return
 }
 
 // Decode reads an image from r.
@@ -168,20 +292,17 @@ func Decode(r io.Reader, opts ...DecodeOption) (image.Image, error) {
 		img, _, err := image.Decode(r)
 		return img, err
 	}
-	md, r, err := autometa.Load(r)
-
-	img, _, err := image.Decode(r)
+	ans, err := decode_all(r, opts)
 	if err != nil {
 		return nil, err
 	}
-	images := []image.Image{img}
-	if images, err = fix_colors(images, md, &cfg); err != nil {
-		return nil, err
+	if ans == nil {
+		return nil, fmt.Errorf("unrecognised image format")
 	}
-	if images, err = fix_orientation(images, md, &cfg); err != nil {
-		return nil, err
+	if ans.DefaultImage != nil {
+		return ans.DefaultImage, nil
 	}
-	return images[0], nil
+	return ans.Frames[0].Image, nil
 }
 
 // Open loads an image from file.

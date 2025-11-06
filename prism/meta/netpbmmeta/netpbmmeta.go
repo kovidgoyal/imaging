@@ -3,6 +3,7 @@ package netpbmmeta
 import (
 	"fmt"
 	"io"
+	"strings"
 
 	"github.com/kovidgoyal/imaging/netpbm"
 	"github.com/kovidgoyal/imaging/prism/meta"
@@ -14,6 +15,9 @@ var _ = fmt.Print
 func ExtractMetadata(r io.Reader) (md *meta.Data, err error) {
 	c, fmt, err := netpbm.DecodeConfigAndFormat(r)
 	if err != nil {
+		if strings.Contains(err.Error(), "unsupported netPBM format") {
+			err = nil
+		}
 		return nil, err
 	}
 	md = &meta.Data{
