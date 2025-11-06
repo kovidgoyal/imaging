@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	_ "github.com/kovidgoyal/imaging/netpbm"
 	"github.com/kovidgoyal/imaging/prism/meta"
 	"github.com/kovidgoyal/imaging/prism/meta/autometa"
 	"github.com/kovidgoyal/imaging/types"

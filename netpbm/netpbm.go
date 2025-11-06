@@ -1,4 +1,4 @@
-package imaging
+package netpbm
 
 import (
 	"bufio"

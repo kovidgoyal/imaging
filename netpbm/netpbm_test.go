@@ -1,10 +1,11 @@
-package imaging
+package netpbm
 
 import (
 	"fmt"
 	"image"
 	"image/color"
 	"image/png"
+	"os"
 	"path/filepath"
 	"testing"
 )
@@ -42,7 +43,7 @@ func ensure_images_are_equal(img1, img2 image.Image) error {
 }
 
 func open(path string) (image.Image, error) {
-	file, err := fs.Open(path)
+	file, err := os.Open(path)
 	if err != nil {
 		return nil, err
 	}
@@ -51,7 +52,7 @@ func open(path string) (image.Image, error) {
 }
 
 func png_open(path string) (image.Image, error) {
-	file, err := fs.Open(path)
+	file, err := os.Open(path)
 	if err != nil {
 		return nil, err
 	}
@@ -60,7 +61,7 @@ func png_open(path string) (image.Image, error) {
 }
 
 func open_config(path string) (image.Config, error) {
-	file, err := fs.Open(path)
+	file, err := os.Open(path)
 	if err != nil {
 		return image.Config{}, err
 	}
