@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/kovidgoyal/go-parallel"
 	"github.com/kovidgoyal/imaging/nrgb"
 )
 
@@ -342,7 +343,7 @@ func rescale(v uint32, num, den uint32) uint32 {
 }
 
 func rescale_binary_data(b []uint8, num, den uint32) error {
-	return run_in_parallel_over_range(0, func(start, end int) {
+	return parallel.Run_in_parallel_over_range(0, func(start, end int) {
 		for i := start; i < end; i++ {
 			b[i] = uint8(rescale(uint32(b[i]), num, den))
 		}
@@ -353,7 +354,7 @@ func rescale_binary_data16(b []uint8, num, den uint32) error {
 	if len(b)&1 != 0 {
 		return fmt.Errorf("pixel data is not a multiple of two but uses 16 bits per channel")
 	}
-	return run_in_parallel_over_range(0, func(start, end int) {
+	return parallel.Run_in_parallel_over_range(0, func(start, end int) {
 		start *= 2
 		end *= 2
 		for i := start; i < end; i += 2 {
@@ -399,7 +400,7 @@ func decode_binary_data(br *bufio.Reader, h header) (ans image.Image, err error)
 		if h.maxval > 255 {
 			g := image.NewNRGBA64(r)
 			b := g.Pix
-			if err = run_in_parallel_over_range(0, func(start, end int) {
+			if err = parallel.Run_in_parallel_over_range(0, func(start, end int) {
 				for i := start; i < end; i++ {
 					src := binary_data[i*4 : i*4+4]
 					dest := b[i*8 : i*8+8]
@@ -413,7 +414,7 @@ func decode_binary_data(br *bufio.Reader, h header) (ans image.Image, err error)
 		}
 		g := image.NewNRGBA(r)
 		b := g.Pix
-		if err = run_in_parallel_over_range(0, func(start, end int) {
+		if err = parallel.Run_in_parallel_over_range(0, func(start, end int) {
 			for i := start; i < end; i++ {
 				src := binary_data[i*2 : i*2+2]
 				dest := b[i*4 : i*4+4]
@@ -428,7 +429,7 @@ func decode_binary_data(br *bufio.Reader, h header) (ans image.Image, err error)
 		if h.maxval > 255 {
 			g := image.NewNRGBA64(r)
 			b := g.Pix
-			if err = run_in_parallel_over_range(0, func(start, end int) {
+			if err = parallel.Run_in_parallel_over_range(0, func(start, end int) {
 				for i := start; i < end; i++ {
 					src := binary_data[i*6 : i*6+6]
 					dest := b[i*8 : i*8+8]
