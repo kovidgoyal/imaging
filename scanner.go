@@ -3,6 +3,9 @@ package imaging
 import (
 	"image"
 	"image/color"
+
+	"github.com/kovidgoyal/imaging/nrgb"
+	"github.com/kovidgoyal/imaging/types"
 )
 
 type scanner struct {
@@ -50,7 +53,7 @@ func (s *scanner) ScanRow(x1, y1, x2, y2 int, img image.Image, row int) {
 // scan scans the given rectangular region of the image into dst.
 func (s *scanner) Scan(x1, y1, x2, y2 int, dst []uint8) {
 	switch img := s.image.(type) {
-	case *NRGB:
+	case *nrgb.Image:
 		if x2 == x1+1 {
 			j := 0
 			i := y1*img.Stride + x1*3
@@ -302,16 +305,6 @@ func (s *scanner) Scan(x1, y1, x2, y2 int, dst []uint8) {
 	}
 }
 
-type Scanner interface {
-	Scan(x1, y1, x2, y2 int, dst []uint8)
-	ScanRow(x1, y1, x2, y2 int, img image.Image, row int)
-	Bytes_per_channel() int
-	Num_of_channels() int
-	Bounds() image.Rectangle
-	ReverseRow(image.Image, int)
-	NewImage(r image.Rectangle) image.Image
-}
-
-func NewNRGBAScanner(source_image image.Image) Scanner {
+func NewNRGBAScanner(source_image image.Image) types.Scanner {
 	return newScanner(source_image)
 }

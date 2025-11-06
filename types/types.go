@@ -2,6 +2,7 @@ package types
 
 import (
 	"fmt"
+	"image"
 )
 
 var _ = fmt.Print
@@ -54,4 +55,14 @@ var formatNames = map[Format]string{
 
 func (f Format) String() string {
 	return formatNames[f]
+}
+
+type Scanner interface {
+	Scan(x1, y1, x2, y2 int, dst []uint8)
+	ScanRow(x1, y1, x2, y2 int, img image.Image, row int)
+	Bytes_per_channel() int
+	Num_of_channels() int
+	Bounds() image.Rectangle
+	ReverseRow(image.Image, int)
+	NewImage(r image.Rectangle) image.Image
 }

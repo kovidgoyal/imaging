@@ -8,6 +8,7 @@ import (
 	"math"
 
 	"github.com/kovidgoyal/go-parallel"
+	"github.com/kovidgoyal/imaging/nrgb"
 	"github.com/kovidgoyal/imaging/prism/meta/icc"
 )
 
@@ -143,7 +144,7 @@ func convert(tr *icc.Pipeline, image_any image.Image) (ans image.Image, err erro
 		return
 	case *image.CMYK:
 		g := tr.TransformGeneral
-		d := NewNRGB(b)
+		d := nrgb.NewNRGB(b)
 		ans = d
 		f = func(start, limit int) {
 			var inp, outp [4]float64
@@ -165,7 +166,7 @@ func convert(tr *icc.Pipeline, image_any image.Image) (ans image.Image, err erro
 			}
 		}
 	case *image.YCbCr:
-		d := NewNRGB(b)
+		d := nrgb.NewNRGB(b)
 		ans = d
 		f = func(start, limit int) {
 			for y := start; y < limit; y++ {

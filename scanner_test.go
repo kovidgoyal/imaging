@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/kovidgoyal/imaging/nrgb"
 )
 
 var opaque_base = NRGBColor{}
@@ -29,7 +30,7 @@ func TestScanner(t *testing.T) {
 		{
 			name:   "NRGB",
 			img:    makeNRGBImage(rect, colors),
-			opaque: fillDrawImageOpaque(NewNRGB(rect), colors),
+			opaque: fillDrawImageOpaque(nrgb.NewNRGB(rect), colors),
 		},
 		{
 			name:   "NRGBA64",
@@ -130,7 +131,7 @@ func TestScanner(t *testing.T) {
 				return
 			}
 			r := tc.opaque.Bounds()
-			s := newScannerRGB(tc.opaque, opaque_base)
+			s := nrgb.NewNRGBScanner(tc.opaque, opaque_base)
 			for y := r.Min.Y; y < r.Max.Y; y++ {
 				buf := make([]byte, r.Dx()*3)
 				s.Scan(0, y-r.Min.Y, r.Dx(), y+1-r.Min.Y, buf)
@@ -175,7 +176,7 @@ func makeNRGBAImage(rect image.Rectangle, colors []color.Color) *image.NRGBA {
 }
 
 func makeNRGBImage(rect image.Rectangle, colors []color.Color) *NRGB {
-	img := NewNRGB(rect)
+	img := nrgb.NewNRGB(rect)
 	fillDrawImage(img, colors)
 	return img
 }
@@ -276,6 +277,13 @@ func readRow(img image.Image, y int) []uint8 {
 		i += 4
 	}
 	return row
+}
+
+func blend(dest []uint8, base []float64, r, g, b, a uint8) {
+	alpha := float64(a) / 255.0
+	dest[0] = uint8(alpha*float64(r) + (1.0-alpha)*base[0])
+	dest[1] = uint8(alpha*float64(g) + (1.0-alpha)*base[1])
+	dest[2] = uint8(alpha*float64(b) + (1.0-alpha)*base[2])
 }
 
 func readRowRgb(img image.Image, y int) []uint8 {

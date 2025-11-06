@@ -8,6 +8,7 @@ import (
 	"math"
 	"testing"
 
+	"github.com/kovidgoyal/imaging/nrgb"
 	"github.com/kovidgoyal/imaging/prism/meta/icc"
 	"github.com/stretchr/testify/require"
 )
@@ -174,7 +175,7 @@ func new_unknown_image(r image.Rectangle) *unknown_image {
 func (p *unknown_image) PixOffset(x, y int) int {
 	return (y-p.Rect.Min.Y)*p.Stride + (x-p.Rect.Min.X)*3
 }
-func (p *unknown_image) ColorModel() color.Model { return NRGBModel }
+func (p *unknown_image) ColorModel() color.Model { return nrgb.Model }
 func (p *unknown_image) Bounds() image.Rectangle { return p.Rect }
 func (p *unknown_image) At(x, y int) color.Color {
 	i := p.PixOffset(x, y)
@@ -188,7 +189,7 @@ func (p *unknown_image) set(x, y int, c color.Color) {
 	}
 	i := p.PixOffset(x, y)
 	s := p.Pix[i : i+3 : i+3]
-	q := NRGBModel.Convert(c).(NRGBColor)
+	q := nrgb.Model.Convert(c).(NRGBColor)
 	s[0], s[1], s[2] = q.R, q.G, q.B
 }
 
@@ -209,7 +210,7 @@ func new_unknown_image_with_set(r image.Rectangle) *unknown_image_with_set {
 func (p *unknown_image_with_set) PixOffset(x, y int) int {
 	return (y-p.Rect.Min.Y)*p.Stride + (x-p.Rect.Min.X)*3
 }
-func (p *unknown_image_with_set) ColorModel() color.Model { return NRGBModel }
+func (p *unknown_image_with_set) ColorModel() color.Model { return nrgb.Model }
 func (p *unknown_image_with_set) Bounds() image.Rectangle { return p.Rect }
 func (p *unknown_image_with_set) At(x, y int) color.Color {
 	i := p.PixOffset(x, y)
@@ -223,7 +224,7 @@ func (p *unknown_image_with_set) Set(x, y int, c color.Color) {
 	}
 	i := p.PixOffset(x, y)
 	s := p.Pix[i : i+3 : i+3]
-	q := NRGBModel.Convert(c).(NRGBColor)
+	q := nrgb.Model.Convert(c).(NRGBColor)
 	s[0], s[1], s[2] = q.R, q.G, q.B
 }
 
@@ -250,7 +251,7 @@ func TestProfileApplication(t *testing.T) {
 			image_compare(t, img, cimg, ct, allowed_diff)
 		})
 	}
-	run(NewNRGB(r), 0)
+	run(nrgb.NewNRGB(r), 0)
 	run(image.NewNRGBA(r), 0)
 	run(image.NewNRGBA64(r), 0)
 	run(image.NewRGBA(r), 0)

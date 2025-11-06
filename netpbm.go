@@ -9,6 +9,8 @@ import (
 	"io"
 	"strconv"
 	"strings"
+
+	"github.com/kovidgoyal/imaging/nrgb"
 )
 
 var _ = fmt.Print
@@ -254,7 +256,7 @@ func DecodeNetPBMConfig(r io.Reader) (cfg image.Config, err error) {
 	}
 	cfg.Width = int(h.width)
 	cfg.Height = int(h.height)
-	cfg.ColorModel = NRGBModel
+	cfg.ColorModel = nrgb.Model
 	switch h.data_type {
 	case blackwhite, grayscale:
 		if h.has_alpha {
@@ -281,7 +283,7 @@ func DecodeNetPBMConfig(r io.Reader) (cfg image.Config, err error) {
 			if h.maxval > 255 {
 				cfg.ColorModel = color.NRGBA64Model
 			} else {
-				cfg.ColorModel = NRGBModel
+				cfg.ColorModel = nrgb.Model
 			}
 		}
 	}
@@ -438,7 +440,7 @@ func decode_binary_data(br *bufio.Reader, h header) (ans image.Image, err error)
 			}
 			return g, nil
 		}
-		return NewNRGBWithContiguousRGBPixels(binary_data, 0, 0, r.Dx(), r.Dy())
+		return nrgb.NewNRGBWithContiguousRGBPixels(binary_data, 0, 0, r.Dx(), r.Dy())
 	case 4:
 		// RGB with alpha
 		if h.maxval <= 255 {
@@ -470,7 +472,7 @@ func DecodeNetPBM(r io.Reader) (img image.Image, err error) {
 			return nil, err
 		}
 		if h.maxval <= 255 {
-			return NewNRGBWithContiguousRGBPixels(vals, 0, 0, int(h.width), int(h.height))
+			return nrgb.NewNRGBWithContiguousRGBPixels(vals, 0, 0, int(h.width), int(h.height))
 		}
 		return &image.NRGBA64{Pix: vals, Stride: int(h.width) * 8, Rect: image.Rect(0, 0, int(h.width), int(h.height))}, nil
 	case "P4":
