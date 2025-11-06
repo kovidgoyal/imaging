@@ -7,6 +7,7 @@ import (
 	"github.com/kovidgoyal/imaging/prism/meta"
 	"github.com/kovidgoyal/imaging/prism/meta/gifmeta"
 	"github.com/kovidgoyal/imaging/prism/meta/jpegmeta"
+	"github.com/kovidgoyal/imaging/prism/meta/netpbmmeta"
 	"github.com/kovidgoyal/imaging/prism/meta/pngmeta"
 	"github.com/kovidgoyal/imaging/prism/meta/tiffmeta"
 	"github.com/kovidgoyal/imaging/prism/meta/webpmeta"
@@ -31,6 +32,7 @@ func Load(r io.Reader) (md *meta.Data, imgStream io.Reader, err error) {
 		gifmeta.ExtractMetadata,
 		webpmeta.ExtractMetadata,
 		tiffmeta.ExtractMetadata,
+		netpbmmeta.ExtractMetadata,
 	}
 	for _, loader := range loaders {
 		r, err = streams.CallbackWithSeekable(r, func(r io.Reader) (err error) {

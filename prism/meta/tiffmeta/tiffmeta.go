@@ -14,7 +14,7 @@ import (
 
 var _ = fmt.Print
 
-func BitsPerComponent(c image.Config) int {
+func BitsPerComponent(c image.Config) uint32 {
 	switch c.ColorModel {
 	case color.RGBAModel, color.NRGBAModel, color.YCbCrModel, color.CMYKModel:
 		return 8
@@ -56,7 +56,7 @@ func ExtractMetadata(r_ io.Reader) (md *meta.Data, err error) {
 	}
 	md = &meta.Data{
 		Format: types.TIFF, PixelWidth: uint32(c.Width), PixelHeight: uint32(c.Height),
-		BitsPerComponent: uint32(BitsPerComponent(c)),
+		BitsPerComponent: BitsPerComponent(c),
 	}
 	if _, err = r.Seek(pos, io.SeekStart); err != nil {
 		return nil, err
