@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"image"
 	"image/color"
+	"image/png"
 	"path/filepath"
 	"testing"
 )
@@ -40,6 +41,33 @@ func ensure_images_are_equal(img1, img2 image.Image) error {
 	return nil
 }
 
+func open(path string) (image.Image, error) {
+	file, err := fs.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+	return DecodeNetPBM(file)
+}
+
+func png_open(path string) (image.Image, error) {
+	file, err := fs.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+	return png.Decode(file)
+}
+
+func open_config(path string) (image.Config, error) {
+	file, err := fs.Open(path)
+	if err != nil {
+		return image.Config{}, err
+	}
+	defer file.Close()
+	return DecodeNetPBMConfig(file)
+}
+
 func TestNetPBM(t *testing.T) {
 	files := make([]string, 0, 16)
 	for _, ext := range []string{"pbm", "pbm", "ppm", "pam"} {
@@ -50,18 +78,18 @@ func TestNetPBM(t *testing.T) {
 		files = append(files, pbm...)
 	}
 	for _, f := range files {
-		a, err := Open(f)
+		a, err := open(f)
 		if err != nil {
 			t.Fatal(fmt.Errorf("%s: %w", f, err))
 		}
-		c, _, err := OpenConfig(f)
+		c, err := open_config(f)
 		if err != nil {
 			t.Fatal(fmt.Errorf("%s: %w", f, err))
 		}
 		if c.Width != a.Bounds().Dx() || c.Height != a.Bounds().Dy() || c.ColorModel != a.ColorModel() {
 			t.Fatalf("%s: DecodeConfig and Decode disagree: %v != %v %v", f, c, a.Bounds(), a.ColorModel())
 		}
-		b, err := Open(f + ".png")
+		b, err := png_open(f + ".png")
 		if err != nil {
 			t.Fatal(fmt.Errorf("%s.png: %w", f, err))
 		}
