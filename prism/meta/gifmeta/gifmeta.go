@@ -46,7 +46,7 @@ func CalcMinimumGap(gaps []int) (min_gap int) {
 
 func CalculateFrameDelay(delay, min_gap int) time.Duration {
 	delay_ms := max(min_gap, delay)
-	return time.Duration(delay_ms) * time.Millisecond
+	return time.Duration(delay_ms) * 10 * time.Millisecond
 }
 
 func SetGIFFrameDisposal(number, anchor_frame uint, disposal byte) (uint, uint) {
