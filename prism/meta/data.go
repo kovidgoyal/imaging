@@ -18,16 +18,17 @@ type Data struct {
 	PixelWidth          uint32
 	PixelHeight         uint32
 	BitsPerComponent    uint32
-	exifData            []byte
-	exif                *exif.Exif
-	exifErr             error
-	iccProfileData      []byte
-	iccProfileErr       error
-	iccProfile          *icc.Profile
 	HasFrames           bool
 	NumFrames, NumPlays int
 	CICP                CodingIndependentCodePoints
-	mutex               sync.Mutex
+
+	mutex          sync.Mutex
+	exifData       []byte
+	exif           *exif.Exif
+	exifErr        error
+	iccProfileData []byte
+	iccProfileErr  error
+	iccProfile     *icc.Profile
 }
 
 // Returns an extracted EXIF metadata object from this metadata.
