@@ -7,7 +7,11 @@ import (
 	"image/png"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
+
+	"github.com/kovidgoyal/imaging/types"
+	"github.com/stretchr/testify/require"
 )
 
 var _ = fmt.Print
@@ -60,13 +64,13 @@ func png_open(path string) (image.Image, error) {
 	return png.Decode(file)
 }
 
-func open_config(path string) (image.Config, error) {
+func open_config(path string) (image.Config, types.Format, error) {
 	file, err := os.Open(path)
 	if err != nil {
-		return image.Config{}, err
+		return image.Config{}, 0, err
 	}
 	defer file.Close()
-	return DecodeConfig(file)
+	return DecodeConfigAndFormat(file)
 }
 
 func TestNetPBM(t *testing.T) {
@@ -83,13 +87,15 @@ func TestNetPBM(t *testing.T) {
 		if err != nil {
 			t.Fatal(fmt.Errorf("%s: %w", f, err))
 		}
-		c, err := open_config(f)
+		c, ft, err := open_config(f)
 		if err != nil {
 			t.Fatal(fmt.Errorf("%s: %w", f, err))
 		}
 		if c.Width != a.Bounds().Dx() || c.Height != a.Bounds().Dy() || c.ColorModel != a.ColorModel() {
 			t.Fatalf("%s: DecodeConfig and Decode disagree: %v != %v %v", f, c, a.Bounds(), a.ColorModel())
 		}
+		_, ext, _ := strings.Cut(f, ".")
+		require.Equal(t, ft.String(), strings.ToUpper(ext))
 		b, err := png_open(f + ".png")
 		if err != nil {
 			t.Fatal(fmt.Errorf("%s.png: %w", f, err))

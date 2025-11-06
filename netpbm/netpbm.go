@@ -12,6 +12,7 @@ import (
 
 	"github.com/kovidgoyal/go-parallel"
 	"github.com/kovidgoyal/imaging/nrgb"
+	"github.com/kovidgoyal/imaging/types"
 )
 
 var _ = fmt.Print
@@ -249,11 +250,11 @@ func decode_rgb_ascii(br *bufio.Reader, h header) (ans []byte, err error) {
 	return
 }
 
-func DecodeConfig(r io.Reader) (cfg image.Config, err error) {
+func DecodeConfigAndFormat(r io.Reader) (cfg image.Config, fmt types.Format, err error) {
 	br := bufio.NewReader(r)
 	h, err := read_header(br)
 	if err != nil {
-		return cfg, err
+		return cfg, types.UNKNOWN, err
 	}
 	cfg.Width = int(h.width)
 	cfg.Height = int(h.height)
@@ -288,6 +289,21 @@ func DecodeConfig(r io.Reader) (cfg image.Config, err error) {
 			}
 		}
 	}
+	switch h.format {
+	case "P7":
+		fmt = types.PAM
+	case "P1", "P4":
+		fmt = types.PBM
+	case "P2", "P5":
+		fmt = types.PGM
+	case "P3", "P6":
+		fmt = types.PPM
+	}
+	return
+}
+
+func DecodeConfig(r io.Reader) (cfg image.Config, err error) {
+	cfg, _, err = DecodeConfigAndFormat(r)
 	return
 }
 
