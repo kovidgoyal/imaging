@@ -52,8 +52,10 @@ func ExtractMetadata(r io.Reader) (md *meta.Data, err error) {
 		}
 	}()
 
-	if err := verifySignature(r); err != nil {
+	if is_webp, err := verifySignature(r); err != nil {
 		return nil, err
+	} else if !is_webp {
+		return nil, nil
 	}
 	format, chunkLen, err := readWebPFormat(r)
 	if err != nil {
@@ -201,22 +203,22 @@ func readICCP(r io.Reader) ([]byte, error) {
 	return data, nil
 }
 
-func verifySignature(r io.Reader) error {
+func verifySignature(r io.Reader) (bool, error) {
 	ch, err := readChunkHeader(r)
 	if err != nil {
-		return err
+		return false, err
 	}
 	if ch.ChunkType != chunkTypeRIFF {
-		return errors.New("missing RIFF header")
+		return false, nil
 	}
 	var fourcc [4]byte
 	if _, err := io.ReadFull(r, fourcc[:]); err != nil {
-		return err
+		return false, err
 	}
 	if fourcc != webpSignature {
-		return errors.New("not a WEBP file")
+		return false, nil
 	}
-	return nil
+	return true, nil
 }
 
 func readWebPFormat(r io.Reader) (format webpFormat, length uint32, err error) {

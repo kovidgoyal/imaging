@@ -2,9 +2,9 @@ package tiffmeta
 
 import (
 	"fmt"
-	"image"
 	"image/color"
 	"io"
+	"strings"
 
 	"github.com/kovidgoyal/imaging/prism/meta"
 	"github.com/kovidgoyal/imaging/types"
@@ -14,8 +14,8 @@ import (
 
 var _ = fmt.Print
 
-func BitsPerComponent(c image.Config) uint32 {
-	switch c.ColorModel {
+func BitsPerComponent(c color.Model) uint32 {
+	switch c {
 	case color.RGBAModel, color.NRGBAModel, color.YCbCrModel, color.CMYKModel:
 		return 8
 	case color.GrayModel:
@@ -32,7 +32,7 @@ func BitsPerComponent(c image.Config) uint32 {
 		// We can check the bit depth by converting a color from the model to RGBA.
 		// The `Convert` method is part of the color.Model interface.
 		// A fully opaque red color is used for this check.
-		r, g, b, a := c.ColorModel.Convert(color.RGBA{R: 255, A: 255}).RGBA()
+		r, g, b, a := c.Convert(color.RGBA{R: 255, A: 255}).RGBA()
 
 		// The values returned by RGBA() are 16-bit alpha-premultiplied values (0-65535).
 		// If the highest value is <= 255, it's an 8-bit model.
@@ -52,11 +52,14 @@ func ExtractMetadata(r_ io.Reader) (md *meta.Data, err error) {
 	}
 	c, err := tiff.DecodeConfig(r)
 	if err != nil {
+		if strings.Contains(err.Error(), "malformed header") {
+			err = nil
+		}
 		return nil, err
 	}
 	md = &meta.Data{
 		Format: types.TIFF, PixelWidth: uint32(c.Width), PixelHeight: uint32(c.Height),
-		BitsPerComponent: BitsPerComponent(c),
+		BitsPerComponent: BitsPerComponent(c.ColorModel),
 	}
 	if _, err = r.Seek(pos, io.SeekStart); err != nil {
 		return nil, err

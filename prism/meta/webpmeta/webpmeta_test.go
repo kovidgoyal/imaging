@@ -17,26 +17,18 @@ func TestExtractMetadata(t *testing.T) {
 		data := &bytes.Buffer{}
 		data.Write([]byte("NOT A RIFF SIGNATURE"))
 
-		_, err := extractMetadata(data)
-
-		if err == nil {
-			t.Errorf("Expected error but succeeded")
-		} else if expected, actual := "missing RIFF header", err.Error(); expected != actual {
-			t.Errorf("Expected error '%s' but got '%s'", expected, actual)
-		}
+		md, err := extractMetadata(data)
+		require.Nil(t, md)
+		require.Nil(t, err)
 	})
 
 	t.Run("returns error with missing WEBP signature", func(t *testing.T) {
 		data := &bytes.Buffer{}
 		data.Write([]byte("RIFF....NOTP"))
 
-		_, err := extractMetadata(data)
-
-		if err == nil {
-			t.Errorf("Expected error but succeeded")
-		} else if expected, actual := "not a WEBP file", err.Error(); expected != actual {
-			t.Errorf("Expected error '%s' but got '%s'", expected, actual)
-		}
+		md, err := extractMetadata(data)
+		require.Nil(t, md)
+		require.Nil(t, err)
 	})
 
 	t.Run("returns error if basic metadata is not found", func(t *testing.T) {

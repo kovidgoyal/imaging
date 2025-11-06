@@ -6,6 +6,8 @@ import (
 	"encoding/binary"
 	"io"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 var extractMetadata = ExtractMetadata
@@ -54,10 +56,10 @@ func TestExtractMetadata(t *testing.T) {
 		data := &bytes.Buffer{}
 		data.Write([]byte("NOT A PNG SIGNATURE"))
 
-		_, err := extractMetadata(data)
+		md, err := extractMetadata(data)
 
 		if err == nil {
-			t.Errorf("Expected error but succeeded")
+			require.Nil(t, md)
 		} else if expected, actual := "invalid PNG signature", err.Error(); expected != actual {
 			t.Errorf("Expected error '%s' but got '%s'", expected, actual)
 		}

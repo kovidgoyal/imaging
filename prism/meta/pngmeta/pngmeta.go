@@ -69,7 +69,7 @@ func ExtractMetadata(r io.Reader) (md *meta.Data, err error) {
 		return nil, err
 	}
 	if pngSig != pngSignature {
-		return nil, fmt.Errorf("invalid PNG signature")
+		return nil, nil
 	}
 	var chunk []byte
 

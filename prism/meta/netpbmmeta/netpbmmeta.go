@@ -18,7 +18,7 @@ func ExtractMetadata(r io.Reader) (md *meta.Data, err error) {
 	}
 	md = &meta.Data{
 		Format: fmt, PixelWidth: uint32(c.Width), PixelHeight: uint32(c.Height),
-		BitsPerComponent: tiffmeta.BitsPerComponent(c),
+		BitsPerComponent: tiffmeta.BitsPerComponent(c.ColorModel),
 	}
 	return md, nil
 }

@@ -2,8 +2,10 @@ package jpegmeta
 
 import (
 	"bytes"
-	"github.com/kovidgoyal/imaging/prism/meta"
 	"testing"
+
+	"github.com/kovidgoyal/imaging/prism/meta"
+	"github.com/stretchr/testify/require"
 )
 
 var extractMetadata = ExtractMetadata
@@ -65,10 +67,10 @@ func TestExtractMetadata(t *testing.T) {
 		data := &bytes.Buffer{}
 		data.Write([]byte{0xFF, byte(markerTypeEndOfImage)})
 
-		_, err := extractMetadata(data)
+		md, err := extractMetadata(data)
 
 		if err == nil {
-			t.Errorf("Expected an error but succeeded")
+			require.Nil(t, md)
 		} else if expected, actual := "stream does not begin with start-of-image", err.Error(); expected != actual {
 			t.Errorf("Expected error '%s' but got '%s'", expected, actual)
 		}

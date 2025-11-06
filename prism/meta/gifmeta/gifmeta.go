@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"image/gif"
 	"io"
+	"strings"
+	"time"
 
 	"github.com/kovidgoyal/imaging/prism/meta"
 	"github.com/kovidgoyal/imaging/types"
@@ -14,6 +16,9 @@ var _ = fmt.Print
 func ExtractMetadata(r io.Reader) (md *meta.Data, err error) {
 	c, err := gif.DecodeConfig(r)
 	if err != nil {
+		if strings.Contains(err.Error(), "gif: can't recognize format") {
+			err = nil
+		}
 		return nil, err
 	}
 	md = &meta.Data{
@@ -21,4 +26,42 @@ func ExtractMetadata(r io.Reader) (md *meta.Data, err error) {
 		BitsPerComponent: 8, HasFrames: true,
 	}
 	return md, nil
+}
+
+func CalcMinimumGap(gaps []int) (min_gap int) {
+	// Some broken GIF images have all zero gaps, browsers with their usual
+	// idiot ideas render these with a default 100ms gap https://bugzilla.mozilla.org/show_bug.cgi?id=125137
+	// Browsers actually force a 100ms gap at any zero gap frame, but that
+	// just means it is impossible to deliberately use zero gap frames for
+	// sophisticated blending, so we dont do that.
+	max_gap := 0
+	for _, g := range gaps {
+		max_gap = max(max_gap, g)
+	}
+	if max_gap <= 0 {
+		min_gap = 10
+	}
+	return min_gap
+}
+
+func CalculateFrameDelay(delay, min_gap int) time.Duration {
+	delay_ms := max(min_gap, delay)
+	return time.Duration(delay_ms) * time.Millisecond
+}
+
+func SetGIFFrameDisposal(number, anchor_frame uint, disposal byte) (uint, uint) {
+	compose_onto := uint(0)
+	if number > 1 {
+		switch disposal {
+		case gif.DisposalNone:
+			compose_onto = number - 1
+			anchor_frame = number
+		case gif.DisposalBackground:
+			// see https://github.com/golang/go/issues/20694
+			anchor_frame = number
+		case gif.DisposalPrevious:
+			compose_onto = anchor_frame
+		}
+	}
+	return anchor_frame, uint(compose_onto)
 }

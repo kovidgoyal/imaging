@@ -30,14 +30,7 @@ func TestLoad(t *testing.T) {
 		md, stream, err := Load(input)
 
 		if err == nil {
-			t.Fatalf("Expected error but succeeded")
-		}
-		if expected, actual := "unrecognised image format", err.Error(); expected != actual {
-			t.Errorf("Expected error '%s' but was '%s'", expected, actual)
-		}
-
-		if md != nil {
-			t.Errorf("Expected no metadata to be returned but was %+v", md)
+			require.Nil(t, md)
 		}
 
 		returnedBytes, err := io.ReadAll(stream)

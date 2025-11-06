@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"strings"
 
 	"github.com/kovidgoyal/go-parallel"
 	"github.com/kovidgoyal/imaging/prism/meta"
@@ -22,9 +23,6 @@ var iccProfileIdentifier = []byte("ICC_PROFILE\x00")
 // reading from it will produce the same results as fully reading the input
 // stream. This provides a convenient way to load the full image after loading
 // the metadata.
-//
-// An error is returned if basic metadata could not be extracted. The returned
-// stream still provides the full image data.
 func Load(r io.Reader) (md *meta.Data, imgStream io.Reader, err error) {
 	imgStream, err = streams.CallbackWithSeekable(r, func(r io.Reader) (err error) {
 		md, err = ExtractMetadata(r)
@@ -61,10 +59,13 @@ func ExtractMetadata(r io.Reader) (md *meta.Data, err error) {
 
 	soiSegment, err := segReader.ReadSegment()
 	if err != nil {
+		if strings.Contains(err.Error(), "invalid marker identifier") {
+			err = nil
+		}
 		return nil, err
 	}
 	if soiSegment.Marker.Type != markerTypeStartOfImage {
-		return nil, fmt.Errorf("stream does not begin with start-of-image")
+		return nil, nil
 	}
 
 parseSegments:
