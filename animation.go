@@ -67,13 +67,28 @@ func (self *Image) populate_from_webp(p *webp.AnimatedWEBP) {
 	_, _, _, a := bg.RGBA()
 	bg_is_fully_transparent := a == 0
 	var prev_dispose bool
-	for _, f := range p.Frames {
+	for i, f := range p.Frames {
 		frame := Frame{
 			Number: uint(len(self.Frames) + 1), Image: NormalizeOrigin(f.Frame),
 			X: 2 * int(f.Header.FrameX), Y: 2 * int(f.Header.FrameY),
 			Replace: f.Header.BlendBitSet,
 			Delay:   time.Millisecond * time.Duration(f.Header.FrameDuration),
 		}
+		// we want the first frame to have the same size as the canvas, which
+		// is not always true in WebP
+		if i == 0 && (frame.Image.Bounds().Dx() < int(self.Metadata.PixelWidth) || frame.Image.Bounds().Dy() < int(self.Metadata.PixelHeight) || frame.X != 0 || frame.Y != 0) {
+			img := image.NewNRGBA(image.Rect(0, 0, int(self.Metadata.PixelWidth), int(self.Metadata.PixelHeight)))
+			dest := image.Rect(frame.X, frame.Y, frame.X+frame.Image.Bounds().Dx(), frame.Y+frame.Image.Bounds().Dy())
+			if !bg_is_fully_transparent {
+				draw.Draw(img, img.Bounds(), bg, image.Point{}, draw.Src)
+				draw.Draw(img, dest, frame.Image, image.Point{}, draw.Over)
+			} else {
+				draw.Draw(img, dest, frame.Image, image.Point{}, draw.Src)
+			}
+			frame.Image = img
+			frame.X, frame.Y = 0, 0
+		}
+
 		frame.ComposeOnto = frame.Number - 1
 		if prev_dispose {
 			// According to the spec dispose only affects the area of the
@@ -107,6 +122,7 @@ func (self *Image) populate_from_webp(p *webp.AnimatedWEBP) {
 				}
 			}
 		}
+
 		prev_dispose = f.Header.DisposalBitSet
 		self.Frames = append(self.Frames, &frame)
 	}
