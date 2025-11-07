@@ -67,6 +67,11 @@ func (self *Image) populate_from_gif(g *gif.GIF) {
 			frame.ComposeOnto = frame.Number - 1
 		case gif.DisposalPrevious:
 			frame.ComposeOnto = prev_compose_onto
+		case gif.DisposalBackground:
+			// this is in contravention of the GIF spec but browsers and
+			// gif2apng both do this, so follow them. Test image for this
+			// is apple.gif
+			frame.ComposeOnto = frame.Number - 1
 		}
 		prev_disposal, prev_compose_onto = g.Disposal[i], frame.ComposeOnto
 		self.Frames = append(self.Frames, &frame)
