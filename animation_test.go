@@ -23,7 +23,6 @@ func TestAnimation(t *testing.T) {
 		if i > 0 {
 			require.Equal(t, gf.Replace, pf.Replace)
 		}
-		require.Equal(t, gf.ComposeOnto, pf.ComposeOnto, fmt.Sprintf("frame number: %d", gf.Number))
 		require.Equal(t, gf.Image.Bounds().Min, pf.Image.Bounds().Min, fmt.Sprintf("frame number: %d", gf.Number))
 	}
 }

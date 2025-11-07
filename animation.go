@@ -55,3 +55,16 @@ func (self *Image) populate_from_gif(g *gif.GIF) {
 		self.LoopCount = uint(g.LoopCount) + 1
 	}
 }
+
+func (self *Image) Clone() *Image {
+	ans := *self
+	if ans.DefaultImage != nil {
+		ans.DefaultImage = ClonePreservingType(ans.DefaultImage)
+	}
+	for i, f := range self.Frames {
+		nf := *f
+		nf.Image = ClonePreservingType(f.Image)
+		ans.Frames[i] = &nf
+	}
+	return &ans
+}
