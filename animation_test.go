@@ -9,6 +9,15 @@ import (
 
 var _ = fmt.Print
 
+func assert_disposal(t *testing.T, img *Image, onto ...uint) {
+	t.Helper()
+	actual := make([]uint, len(img.Frames))
+	for i, f := range img.Frames {
+		actual[i] = f.ComposeOnto
+	}
+	require.Equal(t, onto, actual)
+}
+
 func TestAnimation(t *testing.T) {
 	gif, err := OpenAll("testdata/animated.gif")
 	require.NoError(t, err)
@@ -25,4 +34,10 @@ func TestAnimation(t *testing.T) {
 		}
 		require.Equal(t, gf.Image.Bounds().Min, pf.Image.Bounds().Min, fmt.Sprintf("frame number: %d", gf.Number))
 	}
+
+	assert_disposal(t, png, 0x0, 0x1, 0x2, 0x3, 0x4, 0x5, 0x5, 0x7, 0x8, 0x9, 0x9, 0xb)
+	gif, err = OpenAll("testdata/apple.gif")
+	require.NoError(t, err)
+	// this tests the background == none disposal behavior
+	assert_disposal(t, gif, 0, 1, 2, 3, 4, 5, 6, 7)
 }
