@@ -180,7 +180,16 @@ func (self *Image) populate_from_apng(p *apng.APNG) {
 		frame := Frame{Number: uint(len(self.Frames) + 1), Image: f.Image, X: f.XOffset, Y: f.YOffset,
 			Replace: f.BlendOp == apng.BLEND_OP_SOURCE,
 			Delay:   time.Duration(float64(time.Second) * float64(n) / float64(d))}
-		anchor_frame, frame.ComposeOnto = gifmeta.SetGIFFrameDisposal(frame.Number, anchor_frame, f.DisposeOp)
+		dp := uint8(gif.DisposalNone)
+		switch f.DisposeOp {
+		case apng.DISPOSE_OP_BACKGROUND:
+			dp = gif.DisposalBackground
+		case apng.DISPOSE_OP_NONE:
+			dp = gif.DisposalNone
+		case apng.DISPOSE_OP_PREVIOUS:
+			dp = gif.DisposalPrevious
+		}
+		anchor_frame, frame.ComposeOnto = gifmeta.SetGIFFrameDisposal(frame.Number, anchor_frame, dp)
 		self.Frames = append(self.Frames, &frame)
 	}
 }
