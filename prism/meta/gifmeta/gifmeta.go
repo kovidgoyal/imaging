@@ -54,7 +54,7 @@ func SetGIFFrameDisposal(number, anchor_frame uint, disposal byte) (uint, uint) 
 	if number > 1 {
 		switch disposal {
 		case gif.DisposalNone:
-			compose_onto = number - 1
+			compose_onto = anchor_frame
 			anchor_frame = number
 		case gif.DisposalBackground:
 			// see https://github.com/golang/go/issues/20694
