@@ -31,6 +31,14 @@ func main() {
 	if len(os.Args) == 3 {
 		output_prefix = os.Args[2]
 	}
+	b, err := json.MarshalIndent(img, "", "  ")
+	if err != nil {
+		return
+	}
+	output_file := fmt.Sprintf("%s-metadata.json", output_prefix)
+	if err = os.WriteFile(output_file, b, 0o666); err != nil {
+		return
+	}
 	cimg := img.Clone()
 	cimg.Coalesce()
 	for i, f := range img.Frames {
@@ -58,12 +66,6 @@ func main() {
 			}
 		}()
 	}
-	b, err := json.MarshalIndent(img, "", "  ")
-	if err != nil {
-		return
-	}
-	output_file := fmt.Sprintf("%s-metadata.json", output_prefix)
-	err = os.WriteFile(output_file, b, 0o666)
 	if err == nil {
 		fmt.Printf("Frames decoded to %s-[coalesced]*.[png|json]\n", output_prefix)
 	}

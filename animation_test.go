@@ -27,6 +27,9 @@ func assert_disposal(t *testing.T, img *Image, onto ...uint) {
 }
 
 func TestAnimation(t *testing.T) {
+	lwp, err := OpenAll("testdata/animated-webp-lossy.webp")
+	require.NoError(t, err)
+	require.Equal(t, len(lwp.Frames), 41)
 	gif, err := OpenAll("testdata/animated.gif")
 	require.NoError(t, err)
 	png, err := OpenAll("testdata/animated.apng")

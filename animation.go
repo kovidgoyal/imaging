@@ -60,7 +60,10 @@ func (self *Image) populate_from_apng(p *apng.APNG) {
 func (self *Image) populate_from_webp(p *webp.AnimatedWEBP) {
 	// See https://developers.google.com/speed/webp/docs/riff_container#animation
 	self.LoopCount = uint(p.Header.LoopCount)
-	bg := image.NewUniform(p.Header.BackgroundColor)
+	bgcol := p.Header.BackgroundColor
+	// For some reason web viewers treat bgcol as full transparent. Sigh.
+	bgcol = image.Transparent
+	bg := image.NewUniform(bgcol)
 	_, _, _, a := bg.RGBA()
 	bg_is_fully_transparent := a == 0
 	var prev_dispose bool
@@ -91,15 +94,16 @@ func (self *Image) populate_from_webp(p *webp.AnimatedWEBP) {
 					// directly without needing an extra frame
 					draw.Draw(img, b, frame.Image, image.Point{}, draw.Over)
 					frame.Replace = true
+					frame.Image = img
 				} else {
+					// insert gapless frame to dispose previous frame
 					nf := Frame{
-						Number: frame.Number, Image: img, X: prev_frame.X, Y: prev_frame.Y, Replace: true, Delay: frame.Delay,
+						Number: frame.Number, Image: img, X: prev_frame.X, Y: prev_frame.Y, Replace: true,
 						ComposeOnto: prev_frame.Number,
 					}
 					self.Frames = append(self.Frames, &nf)
 					frame.Number++
 					frame.ComposeOnto = nf.Number
-					frame.Delay = 0
 				}
 			}
 		}
@@ -147,6 +151,7 @@ func (self *Image) Clone() *Image {
 	if ans.DefaultImage != nil {
 		ans.DefaultImage = ClonePreservingType(ans.DefaultImage)
 	}
+	ans.Frames = make([]*Frame, len(self.Frames))
 	for i, f := range self.Frames {
 		nf := *f
 		nf.Image = ClonePreservingType(f.Image)
