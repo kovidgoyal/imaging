@@ -265,6 +265,8 @@ func decode_all(r io.Reader, opts []DecodeOption) (ans *Image, err error) {
 		case WEBP:
 			return nil, nil // animated WEBP not currently supported
 		}
+		ans.Metadata.NumFrames = len(ans.Frames)
+		ans.Metadata.NumPlays = int(ans.LoopCount)
 	} else {
 		img, _, err := image.Decode(r)
 		if err != nil {
