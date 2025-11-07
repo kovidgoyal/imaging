@@ -9,13 +9,21 @@ import (
 
 var _ = fmt.Print
 
+func disposal(img *Image) []uint {
+	actual := make([]uint, len(img.Frames))
+	for i, f := range img.Frames {
+		actual[i] = f.ComposeOnto
+	}
+	return actual
+}
+
 func assert_disposal(t *testing.T, img *Image, onto ...uint) {
 	t.Helper()
 	actual := make([]uint, len(img.Frames))
 	for i, f := range img.Frames {
 		actual[i] = f.ComposeOnto
 	}
-	require.Equal(t, onto, actual)
+	require.Equal(t, onto, disposal(img))
 }
 
 func TestAnimation(t *testing.T) {
@@ -41,4 +49,9 @@ func TestAnimation(t *testing.T) {
 	require.NoError(t, err)
 	// this tests the background == none disposal behavior
 	assert_disposal(t, gif, 0, 1, 2, 3, 4, 5, 6, 7)
+
+	apng := gif.as_apng()
+	r := Image{}
+	r.populate_from_apng(&apng)
+	require.Equal(t, disposal(gif), disposal(&r))
 }
