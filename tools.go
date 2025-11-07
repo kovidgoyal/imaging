@@ -133,68 +133,67 @@ func NormalizeOrigin(src image.Image) image.Image {
 	switch src := src.(type) {
 	case *image.RGBA:
 		dst := *src
-		src.Pix = nil
+		*src = image.RGBA{}
 		dst.Rect = r
 		return &dst
 	case *image.RGBA64:
 		dst := *src
-		src.Pix = nil
+		*src = image.RGBA64{}
 		dst.Rect = r
 		return &dst
 	case *image.NRGBA:
 		dst := *src
-		src.Pix = nil
+		*src = image.NRGBA{}
 		dst.Rect = r
 		return &dst
 	case *NRGB:
 		dst := *src
-		src.Pix = nil
+		*src = NRGB{}
 		dst.Rect = r
 		return &dst
 	case *image.NRGBA64:
 		dst := *src
-		src.Pix = nil
+		*src = image.NRGBA64{}
 		dst.Rect = r
 		return &dst
 	case *image.Gray:
 		dst := *src
-		src.Pix = nil
+		*src = image.Gray{}
 		dst.Rect = r
 		return &dst
 	case *image.Gray16:
 		dst := *src
-		src.Pix = nil
+		*src = image.Gray16{}
 		dst.Rect = r
 		return &dst
 	case *image.Alpha:
 		dst := *src
-		src.Pix = nil
+		*src = image.Alpha{}
 		dst.Rect = r
 		return &dst
 	case *image.Alpha16:
 		dst := *src
-		src.Pix = nil
+		*src = image.Alpha16{}
 		dst.Rect = r
 		return &dst
 	case *image.CMYK:
 		dst := *src
-		src.Pix = nil
+		*src = image.CMYK{}
 		dst.Rect = r
 		return &dst
 	case *image.Paletted:
 		dst := *src
-		src.Pix = nil
-		src.Palette = nil
+		*src = image.Paletted{}
 		dst.Rect = r
 		return &dst
 	case *image.YCbCr:
 		dst := *src
-		src.Y, src.Cb, src.Cr = nil, nil, nil
+		*src = image.YCbCr{}
 		dst.Rect = r
 		return &dst
 	case *image.NYCbCrA:
 		dst := *src
-		src.Y, src.Cb, src.Cr, src.A = nil, nil, nil, nil
+		*src = image.NYCbCrA{}
 		dst.Rect = r
 		return &dst
 	// For any other image type, fall back to a generic copy.

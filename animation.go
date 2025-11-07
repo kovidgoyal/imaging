@@ -3,7 +3,11 @@ package imaging
 import (
 	"fmt"
 	"image"
+	"image/draw"
 	"image/gif"
+	"image/png"
+	"io"
+	"math"
 	"time"
 
 	"github.com/kettek/apng"
@@ -97,4 +101,128 @@ func (self *Image) Clone() *Image {
 		ans.Frames[i] = &nf
 	}
 	return &ans
+}
+
+// Coalesce all animation frames so that each frame is a snapshot of the
+// animation at that instant.
+func (self *Image) Coalesce() {
+	if len(self.Frames) == 1 {
+		return
+	}
+	var canvas *image.RGBA64
+	for _, f := range self.Frames {
+		b := f.Image.Bounds()
+		if f.ComposeOnto == 0 {
+			canvas = image.NewRGBA64(image.Rect(0, 0, int(self.Metadata.PixelWidth), int(self.Metadata.PixelHeight)))
+		} else {
+			canvas = ClonePreservingType(self.Frames[f.ComposeOnto-1].Image).(*image.RGBA64)
+		}
+		op := draw.Over
+		if f.Replace {
+			op = draw.Src
+		}
+		draw.Draw(canvas, image.Rect(f.X, f.Y, f.X+b.Dx(), f.Y+b.Dy()), f.Image, image.Point{}, op)
+		f.Image = canvas
+	}
+}
+
+// converts a time.Duration to a numerator and denominator of type uint16.
+// It finds the best rational approximation of the duration in seconds.
+func as_fraction(d time.Duration) (num, den uint16) {
+	if d <= 0 {
+		return 0, 1
+	}
+
+	// Convert duration to seconds as a float64
+	val := d.Seconds()
+
+	// Use continued fractions to find the best rational approximation.
+	// We look for the convergent that is closest to the original value
+	// while keeping the numerator and denominator within uint16 bounds.
+
+	bestNum, bestDen := uint16(0), uint16(1)
+	bestError := math.Abs(val)
+
+	var h, k [3]int64
+	h[0], k[0] = 0, 1
+	h[1], k[1] = 1, 0
+
+	f := val
+
+	for i := 2; i < 100; i++ { // Limit iterations to prevent infinite loops
+		a := int64(f)
+
+		// Calculate next convergent
+		h[2] = a*h[1] + h[0]
+		k[2] = a*k[1] + k[0]
+
+		if h[2] > math.MaxUint16 || k[2] > math.MaxUint16 {
+			// This convergent is out of bounds, so the previous one was the best we could do.
+			break
+		}
+
+		numConv := uint16(h[2])
+		denConv := uint16(k[2])
+
+		currentVal := float64(numConv) / float64(denConv)
+		currentError := math.Abs(val - currentVal)
+
+		if currentError < bestError {
+			bestError = currentError
+			bestNum = numConv
+			bestDen = denConv
+		}
+
+		// Check if we have a perfect approximation
+		if f-float64(a) == 0.0 {
+			break
+		}
+
+		f = 1.0 / (f - float64(a))
+
+		h[0], h[1] = h[1], h[2]
+		k[0], k[1] = k[1], k[2]
+	}
+
+	return bestNum, bestDen
+}
+
+func (self *Image) as_apng() (ans apng.APNG) {
+	ans.LoopCount = self.LoopCount
+	if self.DefaultImage != nil {
+		ans.Frames = append(ans.Frames, apng.Frame{Image: self.DefaultImage, IsDefault: true})
+	}
+	for i, f := range self.Frames {
+		d := apng.Frame{
+			DisposeOp: apng.DISPOSE_OP_BACKGROUND, BlendOp: apng.BLEND_OP_OVER, XOffset: f.X, YOffset: f.Y, Image: f.Image,
+		}
+		if !f.Replace {
+			d.BlendOp = apng.BLEND_OP_SOURCE
+		}
+		d.DelayNumerator, d.DelayDenominator = as_fraction(f.Delay)
+		if i+1 < len(self.Frames) {
+			nf := self.Frames[i+1]
+			switch nf.ComposeOnto {
+			case f.Number:
+				d.DisposeOp = apng.DISPOSE_OP_NONE
+			case 0:
+				d.DisposeOp = apng.DISPOSE_OP_BACKGROUND
+			case f.ComposeOnto:
+				d.DisposeOp = apng.DISPOSE_OP_PREVIOUS
+			}
+		}
+		ans.Frames = append(ans.Frames, d)
+	}
+	return
+}
+
+func (self *Image) EncodeAsPNG(w io.Writer) error {
+	if len(self.Frames) < 2 {
+		img := self.DefaultImage
+		if img == nil {
+			img = self.Frames[0].Image
+		}
+		return png.Encode(w, img)
+	}
+	return apng.Encode(w, self.as_apng())
 }

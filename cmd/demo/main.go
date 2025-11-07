@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"image/png"
 	"os"
 
 	"github.com/kovidgoyal/imaging"
@@ -22,11 +21,15 @@ func main() {
 		fmt.Fprintln(os.Stderr, "usage: go run ./cmd/demo input-file [output-file]")
 		os.Exit(1)
 	}
-	img, err := imaging.Open(os.Args[1])
+	img, err := imaging.OpenAll(os.Args[1])
 	if err != nil {
 		return
 	}
-	output_file := os.Args[1] + ".png"
+	ext := ".png"
+	if len(img.Frames) > 1 {
+		ext = ".apng"
+	}
+	output_file := os.Args[1] + ext
 	if len(os.Args) == 3 {
 		output_file = os.Args[2]
 	}
@@ -34,7 +37,7 @@ func main() {
 	if err != nil {
 		return
 	}
-	err = png.Encode(out, img)
+	err = img.EncodeAsPNG(out)
 	if err == nil {
 		fmt.Println("PNG saved to:", output_file)
 	}

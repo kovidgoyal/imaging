@@ -31,15 +31,32 @@ func main() {
 	if len(os.Args) == 3 {
 		output_prefix = os.Args[2]
 	}
-	for _, f := range img.Frames {
+	cimg := img.Clone()
+	cimg.Coalesce()
+	for i, f := range img.Frames {
 		output_file := fmt.Sprintf("%s-%05d.png", output_prefix, f.Number)
 		out, err := os.OpenFile(output_file, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o666)
 		if err != nil {
 			return
 		}
-		if err = png.Encode(out, f.Image); err != nil {
+		func() {
+			defer out.Close()
+			if err = png.Encode(out, f.Image); err != nil {
+				return
+			}
+		}()
+		f = cimg.Frames[i]
+		output_file = fmt.Sprintf("%s-coalesced-%05d.png", output_prefix, f.Number)
+		out, err = os.OpenFile(output_file, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o666)
+		if err != nil {
 			return
 		}
+		func() {
+			defer out.Close()
+			if err = png.Encode(out, f.Image); err != nil {
+				return
+			}
+		}()
 	}
 	b, err := json.MarshalIndent(img, "", "  ")
 	if err != nil {
@@ -48,6 +65,6 @@ func main() {
 	output_file := fmt.Sprintf("%s-metadata.json", output_prefix)
 	err = os.WriteFile(output_file, b, 0o666)
 	if err == nil {
-		fmt.Printf("Frames decoded to %s-*.[png|json]\n", output_prefix)
+		fmt.Printf("Frames decoded to %s-[coalesced]*.[png|json]\n", output_prefix)
 	}
 }
