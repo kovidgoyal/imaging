@@ -123,6 +123,10 @@ func (self *Image) Coalesce() {
 		}
 		draw.Draw(canvas, image.Rect(f.X, f.Y, f.X+b.Dx(), f.Y+b.Dy()), f.Image, image.Point{}, op)
 		f.Image = canvas
+		f.X = 0
+		f.Y = 0
+		f.ComposeOnto = 0
+		f.Replace = true
 	}
 }
 
@@ -224,5 +228,9 @@ func (self *Image) EncodeAsPNG(w io.Writer) error {
 		}
 		return png.Encode(w, img)
 	}
-	return apng.Encode(w, self.as_apng())
+	// Unfortunately apng.Encode() is buggy or I am getting my dispose op
+	// mapping wrong, so coalesce first
+	img := self.Clone()
+	img.Coalesce()
+	return apng.Encode(w, img.as_apng())
 }
