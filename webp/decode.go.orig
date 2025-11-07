@@ -19,8 +19,6 @@ import (
 var errInvalidFormat = errors.New("webp: invalid format")
 
 var (
-	fccANIM = riff.FourCC{'A', 'N', 'I', 'M'}
-	fccANMF = riff.FourCC{'A', 'N', 'M', 'F'}
 	fccALPH = riff.FourCC{'A', 'L', 'P', 'H'}
 	fccVP8  = riff.FourCC{'V', 'P', '8', ' '}
 	fccVP8L = riff.FourCC{'V', 'P', '8', 'L'}
@@ -28,21 +26,13 @@ var (
 	fccWEBP = riff.FourCC{'W', 'E', 'B', 'P'}
 )
 
-func webpRiffReader(r io.Reader) (*riff.Reader, error) {
+func decode(r io.Reader, configOnly bool) (image.Image, image.Config, error) {
 	formType, riffReader, err := riff.NewReader(r)
 	if err != nil {
-		return nil, err
+		return nil, image.Config{}, err
 	}
 	if formType != fccWEBP {
-		return nil, errInvalidFormat
-	}
-	return riffReader, nil
-}
-
-func decode(r io.Reader, configOnly bool) (image.Image, image.Config, error) {
-	riffReader, err := webpRiffReader(r)
-	if err != nil {
-		return nil, image.Config{}, err
+		return nil, image.Config{}, errInvalidFormat
 	}
 
 	var (
@@ -131,10 +121,19 @@ func decode(r io.Reader, configOnly bool) (image.Image, image.Config, error) {
 			if chunkLen != 10 {
 				return nil, image.Config{}, errInvalidFormat
 			}
-			h := parseVP8XHeader(chunkData)
-			wantAlpha = h.Alpha
-			widthMinusOne = h.CanvasWidth - 1
-			heightMinusOne = h.CanvasHeight - 1
+			if _, err := io.ReadFull(chunkData, buf[:10]); err != nil {
+				return nil, image.Config{}, err
+			}
+			const (
+				animationBit    = 1 << 1
+				xmpMetadataBit  = 1 << 2
+				exifMetadataBit = 1 << 3
+				alphaBit        = 1 << 4
+				iccProfileBit   = 1 << 5
+			)
+			wantAlpha = (buf[0] & alphaBit) != 0
+			widthMinusOne = uint32(buf[4]) | uint32(buf[5])<<8 | uint32(buf[6])<<16
+			heightMinusOne = uint32(buf[7]) | uint32(buf[8])<<8 | uint32(buf[9])<<16
 			if configOnly {
 				if wantAlpha {
 					return nil, image.Config{
@@ -265,10 +264,6 @@ func Decode(r io.Reader) (image.Image, error) {
 	return m, nil
 }
 
-func DecodeAnimated(r io.Reader) (*AnimatedWEBP, error) {
-	return decodeAnimated(r)
-}
-
 // DecodeConfig returns the color model and dimensions of a WEBP image without
 // decoding the entire image.
 func DecodeConfig(r io.Reader) (image.Config, error) {
@@ -276,27 +271,7 @@ func DecodeConfig(r io.Reader) (image.Config, error) {
 	return c, err
 }
 
-// DecodeVP8XHeader will return the decoded VP8XHeader if this file is in the Extended File Format
-// as defined by the webp specification. The VP8X chunk must be the first chunk of the file.
-// If the first chunk of the file is anything else, it is not in the extended format and this
-// will return a nil VP8XHeader. An error is only returned if the chunk is found, but invalid
-// or a generic io.Reader error occurs.
-func DecodeVP8XHeader(r io.Reader) (*VP8XHeader, error) {
-	riffReader, err := webpRiffReader(r)
-	if err != nil {
-		return nil, err
-	}
-	fourCC, chunkLen, chunkData, err := riffReader.Next()
-	if err != nil {
-		return nil, err
-	}
-	if fourCC != fccVP8X {
-		return nil, nil
-	}
-	if chunkLen != 10 {
-		return nil, errInvalidFormat
-	}
-
-	h := parseVP8XHeader(chunkData)
-	return &h, nil
+func init() {
+	image.RegisterFormat("webp", "RIFF????WEBPVP8", Decode, DecodeConfig)
 }
+
