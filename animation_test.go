@@ -36,6 +36,7 @@ func TestAnimation(t *testing.T) {
 	}
 
 	assert_disposal(t, png, 0x0, 0x1, 0x2, 0x3, 0x4, 0x5, 0x5, 0x7, 0x8, 0x9, 0x9, 0xb)
+	assert_disposal(t, gif, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11)
 	gif, err = OpenAll("testdata/apple.gif")
 	require.NoError(t, err)
 	// this tests the background == none disposal behavior
