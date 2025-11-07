@@ -2,14 +2,32 @@ package imaging
 
 import (
 	"fmt"
+	"image"
 	"image/gif"
 	"time"
 
 	"github.com/kettek/apng"
+	"github.com/kovidgoyal/imaging/prism/meta"
 	"github.com/kovidgoyal/imaging/prism/meta/gifmeta"
 )
 
 var _ = fmt.Print
+
+type Frame struct {
+	Number      uint
+	X, Y        int
+	Image       image.Image `json:"-"`
+	Delay       time.Duration
+	ComposeOnto uint
+	Replace     bool // Do a simple pixel replacement rather than a full alpha blend when compositing this frame
+}
+
+type Image struct {
+	Frames       []*Frame
+	Metadata     *meta.Data
+	LoopCount    uint        // 0 means loop forever, 1 means loop once, ...
+	DefaultImage image.Image `json:"-"` // a "default image" for an animation that is not part of the actual animation
+}
 
 func (self *Image) populate_from_apng(p *apng.APNG) {
 	self.LoopCount = p.LoopCount
