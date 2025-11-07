@@ -141,7 +141,7 @@ func fix_orientation(ans *Image, md *meta.Data, cfg *decodeConfig) error {
 type Frame struct {
 	Number      uint
 	X, Y        int
-	Image       image.Image
+	Image       image.Image `json:"-"`
 	Delay       time.Duration
 	ComposeOnto uint
 	Replace     bool // Do a simple pixel replacement rather than a full alpha blend when compositing this frame
@@ -151,7 +151,7 @@ type Image struct {
 	Frames       []*Frame
 	Metadata     *meta.Data
 	LoopCount    uint        // 0 means loop forever, 1 means loop once, ...
-	DefaultImage image.Image // a "default image" for an animation that is not part of the animation
+	DefaultImage image.Image `json:"-"` // a "default image" for an animation that is not part of the actual animation
 }
 
 func format_from_decode_result(x string) Format {

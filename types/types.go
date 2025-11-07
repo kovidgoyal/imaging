@@ -1,6 +1,7 @@
 package types
 
 import (
+	"encoding/json"
 	"fmt"
 	"image"
 )
@@ -55,6 +56,24 @@ var formatNames = map[Format]string{
 
 func (f Format) String() string {
 	return formatNames[f]
+}
+
+func (s Format) MarshalJSON() ([]byte, error) {
+	return json.Marshal(s.String())
+}
+
+func (s *Format) UnmarshalJSON(data []byte) error {
+	var statusString string
+	if err := json.Unmarshal(data, &statusString); err != nil {
+		return err
+	}
+	for x, ss := range formatNames {
+		if ss == statusString {
+			*s = x
+			return nil
+		}
+	}
+	return fmt.Errorf("unknown image format: %s", statusString)
 }
 
 type Scanner interface {
