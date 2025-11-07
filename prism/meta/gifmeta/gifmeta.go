@@ -48,20 +48,3 @@ func CalculateFrameDelay(delay, min_gap int) time.Duration {
 	delay_ms := max(min_gap, delay)
 	return time.Duration(delay_ms) * 10 * time.Millisecond
 }
-
-func SetGIFFrameDisposal(number, anchor_frame uint, disposal byte) (uint, uint) {
-	compose_onto := uint(0)
-	if number > 1 {
-		switch disposal {
-		case gif.DisposalNone:
-			compose_onto = anchor_frame
-			anchor_frame = number
-		case gif.DisposalBackground:
-			// see https://github.com/golang/go/issues/20694
-			anchor_frame = number
-		case gif.DisposalPrevious:
-			compose_onto = anchor_frame
-		}
-	}
-	return anchor_frame, uint(compose_onto)
-}
