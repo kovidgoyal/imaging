@@ -122,6 +122,93 @@ func ClonePreservingType(src image.Image) image.Image {
 	}
 }
 
+// Ensure image has origin at (0, 0). Note that this destroys the original
+// image and returns a new image with the same data, but origin shifted.
+func NormalizeOrigin(src image.Image) image.Image {
+	r := src.Bounds()
+	if r.Min.X == 0 && r.Min.Y == 0 {
+		return src
+	}
+	r = image.Rect(0, 0, r.Dx(), r.Dy())
+	switch src := src.(type) {
+	case *image.RGBA:
+		dst := *src
+		src.Pix = nil
+		dst.Rect = r
+		return &dst
+	case *image.RGBA64:
+		dst := *src
+		src.Pix = nil
+		dst.Rect = r
+		return &dst
+	case *image.NRGBA:
+		dst := *src
+		src.Pix = nil
+		dst.Rect = r
+		return &dst
+	case *NRGB:
+		dst := *src
+		src.Pix = nil
+		dst.Rect = r
+		return &dst
+	case *image.NRGBA64:
+		dst := *src
+		src.Pix = nil
+		dst.Rect = r
+		return &dst
+	case *image.Gray:
+		dst := *src
+		src.Pix = nil
+		dst.Rect = r
+		return &dst
+	case *image.Gray16:
+		dst := *src
+		src.Pix = nil
+		dst.Rect = r
+		return &dst
+	case *image.Alpha:
+		dst := *src
+		src.Pix = nil
+		dst.Rect = r
+		return &dst
+	case *image.Alpha16:
+		dst := *src
+		src.Pix = nil
+		dst.Rect = r
+		return &dst
+	case *image.CMYK:
+		dst := *src
+		src.Pix = nil
+		dst.Rect = r
+		return &dst
+	case *image.Paletted:
+		dst := *src
+		src.Pix = nil
+		src.Palette = nil
+		dst.Rect = r
+		return &dst
+	case *image.YCbCr:
+		dst := *src
+		src.Y, src.Cb, src.Cr = nil, nil, nil
+		dst.Rect = r
+		return &dst
+	case *image.NYCbCrA:
+		dst := *src
+		src.Y, src.Cb, src.Cr, src.A = nil, nil, nil, nil
+		dst.Rect = r
+		return &dst
+	// For any other image type, fall back to a generic copy.
+	// This creates an NRGBA image, which may not be the original type,
+	// but ensures the image data is preserved.
+	default:
+		b := src.Bounds()
+		dst := image.NewNRGBA64(b)
+		draw.Draw(dst, b, src, b.Min, draw.Src)
+		dst.Rect = r
+		return dst
+	}
+}
+
 // Anchor is the anchor point for image alignment.
 type Anchor int
 

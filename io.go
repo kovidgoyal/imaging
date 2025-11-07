@@ -172,14 +172,9 @@ func (self *Image) populate_from_apng(p *apng.APNG) {
 			self.DefaultImage = f.Image
 			continue
 		}
-		n, d := f.DelayNumerator, f.DelayDenominator
-		if d <= 0 {
-			d = 100
-		}
-		n = max(0, n)
-		frame := Frame{Number: uint(len(self.Frames) + 1), Image: f.Image, X: f.XOffset, Y: f.YOffset,
+		frame := Frame{Number: uint(len(self.Frames) + 1), Image: NormalizeOrigin(f.Image), X: f.XOffset, Y: f.YOffset,
 			Replace: f.BlendOp == apng.BLEND_OP_SOURCE,
-			Delay:   time.Duration(float64(time.Second) * float64(n) / float64(d))}
+			Delay:   time.Duration(float64(time.Second) * f.GetDelay())}
 		dp := uint8(gif.DisposalNone)
 		switch f.DisposeOp {
 		case apng.DISPOSE_OP_BACKGROUND:
@@ -198,7 +193,8 @@ func (self *Image) populate_from_gif(g *gif.GIF) {
 	min_gap := gifmeta.CalcMinimumGap(g.Delay)
 	anchor_frame := uint(1)
 	for i, img := range g.Image {
-		frame := Frame{Number: uint(len(self.Frames) + 1), Image: img, X: img.Bounds().Min.X, Y: img.Bounds().Min.Y,
+		b := img.Bounds()
+		frame := Frame{Number: uint(len(self.Frames) + 1), Image: NormalizeOrigin(img), X: b.Min.X, Y: b.Min.Y,
 			Delay: gifmeta.CalculateFrameDelay(g.Delay[i], min_gap)}
 		anchor_frame, frame.ComposeOnto = gifmeta.SetGIFFrameDisposal(frame.Number, anchor_frame, g.Disposal[i])
 		self.Frames = append(self.Frames, &frame)
