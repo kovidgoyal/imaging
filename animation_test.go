@@ -31,20 +31,29 @@ func TestAnimation(t *testing.T) {
 	require.NoError(t, err)
 	png, err := OpenAll("testdata/animated.apng")
 	require.NoError(t, err)
+	wp, err := OpenAll("testdata/animated.webp")
+	require.NoError(t, err)
 	require.Equal(t, len(gif.Frames), len(png.Frames))
+	require.Equal(t, len(gif.Frames), len(wp.Frames))
 	require.Equal(t, (gif.LoopCount), (png.LoopCount))
+	require.Equal(t, (gif.LoopCount), (wp.LoopCount))
 	for i, gf := range gif.Frames {
 		pf := png.Frames[i]
+		wf := wp.Frames[i]
 		require.Equal(t, gf.Delay, pf.Delay)
 		require.Equal(t, gf.Number, pf.Number)
+		require.Equal(t, gf.Delay, wf.Delay)
+		require.Equal(t, gf.Number, wf.Number)
 		if i > 0 {
 			require.Equal(t, gf.Replace, pf.Replace)
 		}
 		require.Equal(t, gf.Image.Bounds().Min, pf.Image.Bounds().Min, fmt.Sprintf("frame number: %d", gf.Number))
+		require.Equal(t, gf.Image.Bounds().Min, wf.Image.Bounds().Min, fmt.Sprintf("frame number: %d", gf.Number))
 	}
 
 	assert_disposal(t, png, 0x0, 0x1, 0x2, 0x3, 0x4, 0x5, 0x5, 0x7, 0x8, 0x9, 0x9, 0xb)
 	assert_disposal(t, gif, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11)
+	assert_disposal(t, wp, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11)
 	gif, err = OpenAll("testdata/apple.gif")
 	require.NoError(t, err)
 	// this tests the background == none disposal behavior

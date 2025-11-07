@@ -13,6 +13,7 @@ import (
 	"github.com/kettek/apng"
 	"github.com/kovidgoyal/imaging/prism/meta"
 	"github.com/kovidgoyal/imaging/prism/meta/gifmeta"
+	"github.com/kovidgoyal/imaging/webp"
 )
 
 var _ = fmt.Print
@@ -52,6 +53,57 @@ func (self *Image) populate_from_apng(p *apng.APNG) {
 			frame.ComposeOnto = uint(prev_compose_onto)
 		}
 		prev_disposal, prev_compose_onto = int(f.DisposeOp), frame.ComposeOnto
+		self.Frames = append(self.Frames, &frame)
+	}
+}
+
+func (self *Image) populate_from_webp(p *webp.AnimatedWEBP) {
+	// See https://developers.google.com/speed/webp/docs/riff_container#animation
+	self.LoopCount = uint(p.Header.LoopCount)
+	bg := image.NewUniform(p.Header.BackgroundColor)
+	_, _, _, a := bg.RGBA()
+	bg_is_fully_transparent := a == 0
+	var prev_dispose bool
+	for _, f := range p.Frames {
+		frame := Frame{
+			Number: uint(len(self.Frames) + 1), Image: NormalizeOrigin(f.Frame),
+			X: 2 * int(f.Header.FrameX), Y: 2 * int(f.Header.FrameY),
+			Replace: f.Header.BlendBitSet,
+			Delay:   time.Millisecond * time.Duration(f.Header.FrameDuration),
+		}
+		frame.ComposeOnto = frame.Number - 1
+		if prev_dispose {
+			// According to the spec dispose only affects the area of the
+			// frame, filling it with the background color on disposal, so
+			// add an extra frame that clears the prev frame's region and then
+			// draw the current frame as gapless frame.
+			prev_frame := self.Frames[len(self.Frames)-1]
+			b := prev_frame.Image.Bounds()
+			if bg_is_fully_transparent && prev_frame.X == 0 && prev_frame.Y == 0 && b.Dx() >= int(self.Metadata.PixelWidth) && b.Dy() >= int(self.Metadata.PixelHeight) {
+				// prev frame covered entire canvas and background is clear so
+				// just clear canvas
+				frame.ComposeOnto = 0
+			} else {
+				img := image.NewNRGBA(b)
+				draw.Draw(img, b, bg, image.Point{}, draw.Src)
+				if b == frame.Image.Bounds() && prev_frame.X == frame.X && prev_frame.Y == frame.Y {
+					// prev frame and this frame overlap exactly, so just compose
+					// directly without needing an extra frame
+					draw.Draw(img, b, frame.Image, image.Point{}, draw.Over)
+					frame.Replace = true
+				} else {
+					nf := Frame{
+						Number: frame.Number, Image: img, X: prev_frame.X, Y: prev_frame.Y, Replace: true, Delay: frame.Delay,
+						ComposeOnto: prev_frame.Number,
+					}
+					self.Frames = append(self.Frames, &nf)
+					frame.Number++
+					frame.ComposeOnto = nf.Number
+					frame.Delay = 0
+				}
+			}
+		}
+		prev_dispose = f.Header.DisposalBitSet
 		self.Frames = append(self.Frames, &frame)
 	}
 }

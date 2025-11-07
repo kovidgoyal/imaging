@@ -19,6 +19,7 @@ import (
 	"github.com/kovidgoyal/imaging/prism/meta/tiffmeta"
 	"github.com/kovidgoyal/imaging/streams"
 	"github.com/kovidgoyal/imaging/types"
+	"github.com/kovidgoyal/imaging/webp"
 
 	"github.com/kettek/apng"
 	"github.com/rwcarlsen/goexif/exif"
@@ -195,7 +196,11 @@ func decode_all(r io.Reader, opts []DecodeOption) (ans *Image, err error) {
 			}
 			ans.populate_from_apng(&png)
 		case WEBP:
-			return nil, nil // animated WEBP not currently supported
+			wp, err := webp.DecodeAnimated(r)
+			if err != nil {
+				return nil, err
+			}
+			ans.populate_from_webp(wp)
 		}
 		ans.Metadata.NumFrames = len(ans.Frames)
 		ans.Metadata.NumPlays = int(ans.LoopCount)
