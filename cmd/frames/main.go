@@ -39,9 +39,7 @@ func main() {
 	if err = os.WriteFile(output_file, b, 0o666); err != nil {
 		return
 	}
-	cimg := img.Clone()
-	cimg.Coalesce()
-	for i, f := range img.Frames {
+	for _, f := range img.Frames {
 		output_file := fmt.Sprintf("%s-%05d.png", output_prefix, f.Number)
 		out, err := os.OpenFile(output_file, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o666)
 		if err != nil {
@@ -53,9 +51,11 @@ func main() {
 				return
 			}
 		}()
-		f = cimg.Frames[i]
+	}
+	img.Coalesce()
+	for _, f := range img.Frames {
 		output_file = fmt.Sprintf("%s-coalesced-%05d.png", output_prefix, f.Number)
-		out, err = os.OpenFile(output_file, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o666)
+		out, err := os.OpenFile(output_file, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o666)
 		if err != nil {
 			return
 		}

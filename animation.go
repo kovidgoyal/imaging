@@ -3,6 +3,7 @@ package imaging
 import (
 	"fmt"
 	"image"
+	"image/color"
 	"image/draw"
 	"image/gif"
 	"image/png"
@@ -57,6 +58,22 @@ func (self *Image) populate_from_apng(p *apng.APNG) {
 	}
 }
 
+func (f *Frame) Bounds() image.Rectangle {
+	return f.Image.Bounds().Add(image.Point{f.X, f.Y})
+}
+
+func (f *Frame) ColorModel() color.Model {
+	return f.Image.ColorModel()
+}
+
+func (f *Frame) At(x, y int) color.Color {
+	return f.Image.At(x-f.X, y-f.Y)
+}
+
+type canvas_t = image.NRGBA
+
+var new_canvas = image.NewNRGBA
+
 func (self *Image) populate_from_webp(p *webp.AnimatedWEBP) {
 	// See https://developers.google.com/speed/webp/docs/riff_container#animation
 	self.LoopCount = uint(p.Header.LoopCount)
@@ -66,18 +83,19 @@ func (self *Image) populate_from_webp(p *webp.AnimatedWEBP) {
 	bg := image.NewUniform(bgcol)
 	_, _, _, a := bg.RGBA()
 	bg_is_fully_transparent := a == 0
-	var prev_dispose bool
+	w, h := int(self.Metadata.PixelWidth), int(self.Metadata.PixelHeight)
+	var dispose_prev bool
 	for i, f := range p.Frames {
 		frame := Frame{
 			Number: uint(len(self.Frames) + 1), Image: NormalizeOrigin(f.Frame),
 			X: 2 * int(f.Header.FrameX), Y: 2 * int(f.Header.FrameY),
-			Replace: f.Header.BlendBitSet,
+			Replace: !f.Header.AlphaBlend,
 			Delay:   time.Millisecond * time.Duration(f.Header.FrameDuration),
 		}
 		// we want the first frame to have the same size as the canvas, which
 		// is not always true in WebP
-		if i == 0 && (frame.Image.Bounds().Dx() < int(self.Metadata.PixelWidth) || frame.Image.Bounds().Dy() < int(self.Metadata.PixelHeight) || frame.X != 0 || frame.Y != 0) {
-			img := image.NewNRGBA(image.Rect(0, 0, int(self.Metadata.PixelWidth), int(self.Metadata.PixelHeight)))
+		if i == 0 && (frame.Image.Bounds().Dx() < w || frame.Image.Bounds().Dy() < h || frame.X != 0 || frame.Y != 0) {
+			img := new_canvas(image.Rect(0, 0, w, h))
 			dest := image.Rect(frame.X, frame.Y, frame.X+frame.Image.Bounds().Dx(), frame.Y+frame.Image.Bounds().Dy())
 			if !bg_is_fully_transparent {
 				draw.Draw(img, img.Bounds(), bg, image.Point{}, draw.Src)
@@ -90,14 +108,14 @@ func (self *Image) populate_from_webp(p *webp.AnimatedWEBP) {
 		}
 
 		frame.ComposeOnto = frame.Number - 1
-		if prev_dispose {
+		if dispose_prev {
 			// According to the spec dispose only affects the area of the
 			// frame, filling it with the background color on disposal, so
 			// add an extra frame that clears the prev frame's region and then
 			// draw the current frame as gapless frame.
 			prev_frame := self.Frames[len(self.Frames)-1]
 			b := prev_frame.Image.Bounds()
-			if bg_is_fully_transparent && prev_frame.X == 0 && prev_frame.Y == 0 && b.Dx() >= int(self.Metadata.PixelWidth) && b.Dy() >= int(self.Metadata.PixelHeight) {
+			if bg_is_fully_transparent && prev_frame.X == 0 && prev_frame.Y == 0 && b.Dx() >= w && b.Dy() >= h {
 				// prev frame covered entire canvas and background is clear so
 				// just clear canvas
 				frame.ComposeOnto = 0
@@ -123,7 +141,7 @@ func (self *Image) populate_from_webp(p *webp.AnimatedWEBP) {
 			}
 		}
 
-		prev_dispose = f.Header.DisposalBitSet
+		dispose_prev = f.Header.DisposalBitSet
 		self.Frames = append(self.Frames, &frame)
 	}
 }
@@ -167,6 +185,9 @@ func (self *Image) Clone() *Image {
 	if ans.DefaultImage != nil {
 		ans.DefaultImage = ClonePreservingType(ans.DefaultImage)
 	}
+	if ans.Metadata != nil {
+		ans.Metadata = ans.Metadata.Clone()
+	}
 	ans.Frames = make([]*Frame, len(self.Frames))
 	for i, f := range self.Frames {
 		nf := *f
@@ -182,19 +203,19 @@ func (self *Image) Coalesce() {
 	if len(self.Frames) == 1 {
 		return
 	}
-	var canvas *image.RGBA64
-	for _, f := range self.Frames {
-		b := f.Image.Bounds()
-		if f.ComposeOnto == 0 {
-			canvas = image.NewRGBA64(image.Rect(0, 0, int(self.Metadata.PixelWidth), int(self.Metadata.PixelHeight)))
+	canvas_rect := self.Frames[0].Bounds()
+	var canvas *canvas_t
+	for i, f := range self.Frames {
+		if i == 0 || f.ComposeOnto == 0 {
+			canvas = new_canvas(canvas_rect)
 		} else {
-			canvas = ClonePreservingType(self.Frames[f.ComposeOnto-1].Image).(*image.RGBA64)
+			canvas = ClonePreservingType(self.Frames[f.ComposeOnto-1].Image).(*canvas_t)
 		}
 		op := draw.Over
 		if f.Replace {
 			op = draw.Src
 		}
-		draw.Draw(canvas, image.Rect(f.X, f.Y, f.X+b.Dx(), f.Y+b.Dy()), f.Image, image.Point{}, op)
+		draw.Draw(canvas, f.Bounds(), f.Image, image.Point{}, op)
 		f.Image = canvas
 		f.X = 0
 		f.Y = 0

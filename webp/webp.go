@@ -45,7 +45,7 @@ type ANMFHeader struct {
 	FrameWidth     uint32
 	FrameHeight    uint32
 	FrameDuration  uint32
-	BlendBitSet    bool
+	AlphaBlend     bool
 	DisposalBitSet bool
 }
 
@@ -97,8 +97,8 @@ func parseANMFHeader(r io.Reader) ANMFHeader {
 		FrameWidth:     u24(h[6:9]) + 1,
 		FrameHeight:    u24(h[9:12]) + 1,
 		FrameDuration:  u24(h[12:15]),
-		BlendBitSet:    h[15]&blendBit != 0,
-		DisposalBitSet: h[15]&disposeBit != 0,
+		AlphaBlend:     (h[15] & blendBit) == 0,
+		DisposalBitSet: (h[15] & disposeBit) != 0,
 	}
 }
 

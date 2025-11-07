@@ -3,6 +3,7 @@ package meta
 import (
 	"bytes"
 	"fmt"
+	"slices"
 	"sync"
 
 	"github.com/kovidgoyal/imaging/prism/meta/icc"
@@ -29,6 +30,15 @@ type Data struct {
 	iccProfileData []byte
 	iccProfileErr  error
 	iccProfile     *icc.Profile
+}
+
+func (s *Data) Clone() *Data {
+	return &Data{
+		Format: s.Format, PixelWidth: s.PixelWidth, PixelHeight: s.PixelHeight, BitsPerComponent: s.BitsPerComponent,
+		HasFrames: s.HasFrames, NumFrames: s.NumFrames, NumPlays: s.NumPlays, CICP: s.CICP,
+		exifData: slices.Clone(s.exifData), exifErr: s.exifErr, iccProfileData: slices.Clone(s.iccProfileData),
+		iccProfileErr: s.iccProfileErr,
+	}
 }
 
 // Returns an extracted EXIF metadata object from this metadata.
