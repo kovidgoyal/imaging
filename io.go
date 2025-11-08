@@ -128,14 +128,26 @@ func fix_orientation(ans *Image, md *meta.Data, cfg *decodeConfig) error {
 			}
 		}
 	}
-	if oval != orientationUnspecified {
-		for _, img := range ans.Frames {
-			img.Image = fixOrientation(img.Image, ans.Metadata, oval)
-		}
+	switch oval {
+	case orientationNormal, orientationUnspecified:
+	case orientationFlipH:
+		ans.FlipH()
+	case orientationFlipV:
+		ans.FlipV()
+	case orientationRotate90:
+		ans.Rotate90()
+	case orientationRotate180:
+		ans.Rotate180()
+	case orientationRotate270:
+		ans.Rotate270()
+	case orientationTranspose:
+		ans.Transpose()
+	case orientationTransverse:
+		ans.Transverse()
 	}
 	return nil
-
 }
+
 func format_from_decode_result(x string) Format {
 	switch x {
 	case "BMP":
@@ -464,37 +476,3 @@ const (
 	orientationTransverse  = 7
 	orientationRotate90    = 8
 )
-
-// fixOrientation applies a transform to img corresponding to the given orientation flag.
-func fixOrientation(img image.Image, md *meta.Data, o orientation) image.Image {
-	switch o {
-	case orientationNormal:
-	case orientationFlipH:
-		img = FlipH(img)
-	case orientationFlipV:
-		img = FlipV(img)
-	case orientationRotate90:
-		img = Rotate90(img)
-		if md != nil {
-			md.PixelWidth, md.PixelHeight = md.PixelHeight, md.PixelWidth
-		}
-	case orientationRotate180:
-		img = Rotate180(img)
-	case orientationRotate270:
-		img = Rotate270(img)
-		if md != nil {
-			md.PixelWidth, md.PixelHeight = md.PixelHeight, md.PixelWidth
-		}
-	case orientationTranspose:
-		img = Transpose(img)
-		if md != nil {
-			md.PixelWidth, md.PixelHeight = md.PixelHeight, md.PixelWidth
-		}
-	case orientationTransverse:
-		img = Transverse(img)
-		if md != nil {
-			md.PixelWidth, md.PixelHeight = md.PixelHeight, md.PixelWidth
-		}
-	}
-	return img
-}

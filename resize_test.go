@@ -200,9 +200,9 @@ func TestResize(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			got := Resize(tc.src, tc.w, tc.h, tc.f)
+			got := NormalizeOrigin(Resize(tc.src, tc.w, tc.h, tc.f))
 			if !compareNRGBA(got, tc.want, 0) {
-				t.Fatalf("got result %#v want %#v", got, tc.want)
+				t.Fatalf("got\n%#v\nwant\n%#v", got, tc.want)
 			}
 		})
 	}
@@ -229,7 +229,7 @@ func TestResampleFilters(t *testing.T) {
 		t.Run("", func(t *testing.T) {
 			src := image.NewNRGBA(image.Rect(-1, -1, 2, 3))
 			got := Resize(src, 5, 6, filter)
-			want := image.NewNRGBA(image.Rect(0, 0, 5, 6))
+			want := image.NewNRGBA(image.Rect(0, 0, 5, 6).Add(src.Rect.Min))
 			if !compareNRGBA(got, want, 0) {
 				t.Fatalf("got result %#v want %#v", got, want)
 			}
@@ -254,7 +254,7 @@ func TestResizeGolden(t *testing.T) {
 		if err != nil {
 			t.Fatalf("failed to open image: %v", err)
 		}
-		if !compareNRGBAGolden(got, toNRGBA(want)) {
+		if !compareNRGBAGolden(got.(*image.NRGBA), toNRGBA(want)) {
 			t.Fatalf("resulting image differs from golden: %s", name)
 		}
 	}
@@ -367,7 +367,7 @@ func TestFit(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			got := Fit(tc.src, tc.w, tc.h, tc.f)
+			got := NormalizeOrigin(Fit(tc.src, tc.w, tc.h, tc.f))
 			if !compareNRGBA(got, tc.want, 0) {
 				t.Fatalf("got result %#v want %#v", got, tc.want)
 			}
@@ -382,7 +382,7 @@ func TestFitGolden(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to open image: %v", err)
 	}
-	if !compareNRGBAGolden(got, toNRGBA(want)) {
+	if !compareNRGBAGolden(got.(*image.NRGBA), toNRGBA(want)) {
 		t.Fatalf("resulting image differs from golden: %s", name)
 	}
 }
@@ -466,7 +466,7 @@ func TestFill(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			got := Fill(tc.src, tc.w, tc.h, tc.a, tc.f)
+			got := NormalizeOrigin((Fill(tc.src, tc.w, tc.h, tc.a, tc.f)))
 			if !compareNRGBA(got, tc.want, 0) {
 				t.Fatalf("got result %#v want %#v", got, tc.want)
 			}
@@ -487,7 +487,7 @@ func TestFillGolden(t *testing.T) {
 		if err != nil {
 			t.Fatalf("failed to open image: %v", err)
 		}
-		if !compareNRGBAGolden(got, toNRGBA(want)) {
+		if !compareNRGBAGolden(got.(*image.NRGBA), toNRGBA(want)) {
 			t.Fatalf("resulting image differs from golden: %s", name)
 		}
 	}

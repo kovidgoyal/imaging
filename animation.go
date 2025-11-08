@@ -21,7 +21,7 @@ var _ = fmt.Print
 
 type Frame struct {
 	Number      uint
-	X, Y        int
+	TopLeft     image.Point
 	Image       image.Image `json:"-"`
 	Delay       time.Duration
 	ComposeOnto uint
@@ -44,7 +44,8 @@ func (self *Image) populate_from_apng(p *apng.APNG) {
 			self.DefaultImage = f.Image
 			continue
 		}
-		frame := Frame{Number: uint(len(self.Frames) + 1), Image: NormalizeOrigin(f.Image), X: f.XOffset, Y: f.YOffset,
+		frame := Frame{Number: uint(len(self.Frames) + 1), Image: NormalizeOrigin(f.Image),
+			TopLeft: image.Point{X: f.XOffset, Y: f.YOffset},
 			Replace: f.BlendOp == apng.BLEND_OP_SOURCE,
 			Delay:   time.Duration(float64(time.Second) * f.GetDelay())}
 		switch prev_disposal {
@@ -59,7 +60,7 @@ func (self *Image) populate_from_apng(p *apng.APNG) {
 }
 
 func (f *Frame) Bounds() image.Rectangle {
-	return f.Image.Bounds().Add(image.Point{f.X, f.Y})
+	return f.Image.Bounds().Add(f.TopLeft)
 }
 
 func (f *Frame) ColorModel() color.Model {
@@ -67,8 +68,11 @@ func (f *Frame) ColorModel() color.Model {
 }
 
 func (f *Frame) At(x, y int) color.Color {
-	return f.Image.At(x-f.X, y-f.Y)
+	return f.Image.At(x-f.TopLeft.X, y-f.TopLeft.Y)
 }
+
+func (f *Frame) Dx() int { return f.Image.Bounds().Dx() }
+func (f *Frame) Dy() int { return f.Image.Bounds().Dy() }
 
 type canvas_t = image.NRGBA
 
@@ -88,15 +92,15 @@ func (self *Image) populate_from_webp(p *webp.AnimatedWEBP) {
 	for i, f := range p.Frames {
 		frame := Frame{
 			Number: uint(len(self.Frames) + 1), Image: NormalizeOrigin(f.Frame),
-			X: 2 * int(f.Header.FrameX), Y: 2 * int(f.Header.FrameY),
+			TopLeft: image.Point{X: 2 * int(f.Header.FrameX), Y: 2 * int(f.Header.FrameY)},
 			Replace: !f.Header.AlphaBlend,
 			Delay:   time.Millisecond * time.Duration(f.Header.FrameDuration),
 		}
 		// we want the first frame to have the same size as the canvas, which
 		// is not always true in WebP
-		if i == 0 && (frame.Image.Bounds().Dx() < w || frame.Image.Bounds().Dy() < h || frame.X != 0 || frame.Y != 0) {
+		if i == 0 && (frame.Dx() < w || frame.Dy() < h || frame.TopLeft != image.Point{}) {
 			img := new_canvas(image.Rect(0, 0, w, h))
-			dest := image.Rect(frame.X, frame.Y, frame.X+frame.Image.Bounds().Dx(), frame.Y+frame.Image.Bounds().Dy())
+			dest := image.Rectangle{frame.TopLeft, frame.TopLeft.Add(image.Pt(frame.Bounds().Dx(), frame.Bounds().Dy()))}
 			if !bg_is_fully_transparent {
 				draw.Draw(img, img.Bounds(), bg, image.Point{}, draw.Src)
 				draw.Draw(img, dest, frame.Image, image.Point{}, draw.Over)
@@ -104,7 +108,7 @@ func (self *Image) populate_from_webp(p *webp.AnimatedWEBP) {
 				draw.Draw(img, dest, frame.Image, image.Point{}, draw.Src)
 			}
 			frame.Image = img
-			frame.X, frame.Y = 0, 0
+			frame.TopLeft = image.Point{}
 		}
 
 		frame.ComposeOnto = frame.Number - 1
@@ -115,14 +119,14 @@ func (self *Image) populate_from_webp(p *webp.AnimatedWEBP) {
 			// draw the current frame as gapless frame.
 			prev_frame := self.Frames[len(self.Frames)-1]
 			b := prev_frame.Image.Bounds()
-			if bg_is_fully_transparent && prev_frame.X == 0 && prev_frame.Y == 0 && b.Dx() >= w && b.Dy() >= h {
+			if bg_is_fully_transparent && (prev_frame.TopLeft == image.Point{}) && b.Dx() >= w && b.Dy() >= h {
 				// prev frame covered entire canvas and background is clear so
 				// just clear canvas
 				frame.ComposeOnto = 0
 			} else {
 				img := image.NewNRGBA(b)
 				draw.Draw(img, b, bg, image.Point{}, draw.Src)
-				if b == frame.Image.Bounds() && prev_frame.X == frame.X && prev_frame.Y == frame.Y {
+				if b == frame.Image.Bounds() && prev_frame.TopLeft == frame.TopLeft {
 					// prev frame and this frame overlap exactly, so just compose
 					// directly without needing an extra frame
 					draw.Draw(img, b, frame.Image, image.Point{}, draw.Over)
@@ -131,7 +135,7 @@ func (self *Image) populate_from_webp(p *webp.AnimatedWEBP) {
 				} else {
 					// insert gapless frame to dispose previous frame
 					nf := Frame{
-						Number: frame.Number, Image: img, X: prev_frame.X, Y: prev_frame.Y, Replace: true,
+						Number: frame.Number, Image: img, TopLeft: prev_frame.TopLeft, Replace: true,
 						ComposeOnto: prev_frame.Number,
 					}
 					self.Frames = append(self.Frames, &nf)
@@ -153,7 +157,7 @@ func (self *Image) populate_from_gif(g *gif.GIF) {
 	for i, img := range g.Image {
 		b := img.Bounds()
 		frame := Frame{
-			Number: uint(len(self.Frames) + 1), Image: NormalizeOrigin(img), X: b.Min.X, Y: b.Min.Y,
+			Number: uint(len(self.Frames) + 1), Image: NormalizeOrigin(img), TopLeft: b.Min,
 			Delay: gifmeta.CalculateFrameDelay(g.Delay[i], min_gap),
 		}
 		switch prev_disposal {
@@ -217,8 +221,7 @@ func (self *Image) Coalesce() {
 		}
 		draw.Draw(canvas, f.Bounds(), f.Image, image.Point{}, op)
 		f.Image = canvas
-		f.X = 0
-		f.Y = 0
+		f.TopLeft = image.Point{}
 		f.ComposeOnto = 0
 		f.Replace = true
 	}
@@ -292,7 +295,7 @@ func (self *Image) as_apng() (ans apng.APNG) {
 	}
 	for i, f := range self.Frames {
 		d := apng.Frame{
-			DisposeOp: apng.DISPOSE_OP_BACKGROUND, BlendOp: apng.BLEND_OP_OVER, XOffset: f.X, YOffset: f.Y, Image: f.Image,
+			DisposeOp: apng.DISPOSE_OP_BACKGROUND, BlendOp: apng.BLEND_OP_OVER, XOffset: f.TopLeft.X, YOffset: f.TopLeft.Y, Image: f.Image,
 		}
 		if !f.Replace {
 			d.BlendOp = apng.BLEND_OP_SOURCE
@@ -327,4 +330,122 @@ func (self *Image) EncodeAsPNG(w io.Writer) error {
 	img := self.Clone()
 	img.Coalesce()
 	return apng.Encode(w, img.as_apng())
+}
+
+func (self *Image) FlipH() {
+	for _, f := range self.Frames {
+		f.Image = FlipH(f.Image)
+	}
+}
+
+func (self *Image) FlipV() {
+	for _, f := range self.Frames {
+		f.Image = FlipV(f.Image)
+	}
+}
+
+type rotation struct {
+	angle_rads, cos, sin, center_x, center_y float64
+}
+
+func new_rotation(angle_deg float64, canvas_rect image.Rectangle) *rotation {
+	a := angle_deg * (math.Pi / 180.)
+	return &rotation{a, math.Cos(a), math.Sin(a), float64(canvas_rect.Dx()) / 2, float64(canvas_rect.Dy()) / 2}
+}
+
+func (r *rotation) apply(p image.Point) image.Point {
+	if (p == image.Point{}) {
+		return p
+	}
+	x := float64(p.X) - r.center_x
+	y := float64(p.Y) - r.center_y
+	rx := x*r.cos - y*r.sin
+	ry := x*r.sin + y*r.cos
+	return image.Pt(int(rx+r.center_x), int(ry+r.center_y))
+}
+
+func (self *Image) Bounds() image.Rectangle {
+	if self.DefaultImage != nil {
+		return self.DefaultImage.Bounds()
+	}
+	if len(self.Frames) > 0 {
+		return self.Frames[0].Bounds()
+	}
+	return image.Rect(0, 0, int(self.Metadata.PixelWidth), int(self.Metadata.PixelHeight))
+}
+
+func (self *Image) Transpose() {
+	r := new_rotation(90, self.Bounds())
+	for _, f := range self.Frames {
+		f.Image = Transpose(f.Image)
+		f.TopLeft = r.apply(f.TopLeft)
+	}
+	if self.DefaultImage != nil {
+		self.DefaultImage = Transpose(self.DefaultImage)
+	}
+	self.Metadata.PixelWidth, self.Metadata.PixelHeight = self.Metadata.PixelHeight, self.Metadata.PixelWidth
+}
+
+func (self *Image) Transverse() {
+	r := new_rotation(90, self.Bounds())
+	for _, f := range self.Frames {
+		f.Image = Transverse(f.Image)
+		f.TopLeft = r.apply(f.TopLeft)
+	}
+	if self.DefaultImage != nil {
+		self.DefaultImage = Transverse(self.DefaultImage)
+	}
+	self.Metadata.PixelWidth, self.Metadata.PixelHeight = self.Metadata.PixelHeight, self.Metadata.PixelWidth
+}
+
+func (self *Image) Rotate90() {
+	r := new_rotation(90, self.Bounds())
+	for _, f := range self.Frames {
+		f.Image = Rotate90(f.Image)
+		f.TopLeft = r.apply(f.TopLeft)
+	}
+	if self.DefaultImage != nil {
+		self.DefaultImage = Rotate90(self.DefaultImage)
+	}
+	self.Metadata.PixelWidth, self.Metadata.PixelHeight = self.Metadata.PixelHeight, self.Metadata.PixelWidth
+}
+
+func (self *Image) Rotate180() {
+	r := new_rotation(180, self.Bounds())
+	for _, f := range self.Frames {
+		f.Image = Rotate180(f.Image)
+		f.TopLeft = r.apply(f.TopLeft)
+	}
+	if self.DefaultImage != nil {
+		self.DefaultImage = Rotate180(self.DefaultImage)
+	}
+}
+
+func (self *Image) Rotate270() {
+	r := new_rotation(270, self.Bounds())
+	for _, f := range self.Frames {
+		f.Image = Rotate270(f.Image)
+		f.TopLeft = r.apply(f.TopLeft)
+	}
+	self.Metadata.PixelWidth, self.Metadata.PixelHeight = self.Metadata.PixelHeight, self.Metadata.PixelWidth
+	if self.DefaultImage != nil {
+		self.DefaultImage = Rotate270(self.DefaultImage)
+	}
+}
+
+func (self *Image) Resize(width, height int, filter ResampleFilter) {
+	old_width, old_height := self.Bounds().Dx(), self.Bounds().Dy()
+	sx := float64(width) / float64(old_width)
+	sy := float64(height) / float64(old_height)
+	scaledx := func(x int) int { return int(float64(x) * sx) }
+	scaledy := func(x int) int { return int(float64(x) * sy) }
+	for i, f := range self.Frames {
+		if i == 0 {
+			f.Image = Resize(f.Image, width, height, filter)
+		} else {
+			f.Image = Resize(f.Image, scaledx(f.Image.Bounds().Dx()), scaledy(f.Image.Bounds().Dy()), filter)
+			f.TopLeft = image.Pt(scaledx(f.TopLeft.X), scaledy(f.TopLeft.Y))
+		}
+	}
+	self.Metadata.PixelWidth, self.Metadata.PixelHeight = uint32(width), uint32(height)
 }

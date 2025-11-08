@@ -150,11 +150,11 @@ func TestReverse(t *testing.T) {
 	}
 }
 
-func compareNRGBA(img1, img2 *image.NRGBA, delta int) bool {
-	if !img1.Rect.Eq(img2.Rect) {
+func compareNRGBA(img1 image.Image, img2 *image.NRGBA, delta int) bool {
+	if !img1.Bounds().Eq(img2.Bounds()) {
 		return false
 	}
-	return compareBytes(img1.Pix, img2.Pix, delta)
+	return compareBytes(AsNRGBA(img1).Pix, img2.Pix, delta)
 }
 
 func delta16(a, b uint16) int { return absint(int(a) - int(b)) }

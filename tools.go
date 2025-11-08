@@ -43,11 +43,26 @@ func Clone(img image.Image) *image.NRGBA {
 	return dst
 }
 
+func ClonePreservingOrigin(img image.Image) *image.NRGBA {
+	src := newScanner(img)
+	dst := image.NewNRGBA(img.Bounds())
+	size := src.w * 4
+	if err := run_in_parallel_over_range(0, func(start, limit int) {
+		for y := start; y < limit; y++ {
+			i := y * dst.Stride
+			src.Scan(0, y, src.w, y+1, dst.Pix[i:i+size])
+		}
+	}, 0, src.h); err != nil {
+		panic(err)
+	}
+	return dst
+}
+
 func AsNRGBA(src image.Image) *image.NRGBA {
 	if nrgba, ok := src.(*image.NRGBA); ok {
 		return nrgba
 	}
-	return Clone(src)
+	return ClonePreservingOrigin(src)
 }
 
 // Clone an image preserving it's type for all known image types or returning an NRGBA64 image otherwise
