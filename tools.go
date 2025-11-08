@@ -7,6 +7,8 @@ import (
 	"image/draw"
 	"math"
 	"slices"
+
+	"github.com/kovidgoyal/imaging/nrgb"
 )
 
 // New creates a new image with the specified width and height, and fills it with the specified color.
@@ -63,6 +65,23 @@ func AsNRGBA(src image.Image) *image.NRGBA {
 		return nrgba
 	}
 	return ClonePreservingOrigin(src)
+}
+
+func AsNRGB(src image.Image) *NRGB {
+	if nrgb, ok := src.(*NRGB); ok {
+		return nrgb
+	}
+	sc := nrgb.NewNRGBScanner(src, nrgb.Color{})
+	dst := sc.NewImage(src.Bounds()).(*nrgb.Image)
+	w, h := src.Bounds().Dx(), src.Bounds().Dy()
+	if err := run_in_parallel_over_range(0, func(start, limit int) {
+		for y := start; y < limit; y++ {
+			sc.ScanRow(0, y, w, y+1, dst, y)
+		}
+	}, 0, h); err != nil {
+		panic(err)
+	}
+	return dst
 }
 
 // Clone an image preserving it's type for all known image types or returning an NRGBA64 image otherwise
@@ -443,4 +462,27 @@ func OverlayCenter(background, img image.Image, opacity float64) *image.NRGBA {
 	y0 := centerY - img.Bounds().Dy()/2
 
 	return Overlay(background, img, image.Point{x0, y0}, opacity)
+}
+
+// Paste the image onto the specified background color.
+func PasteOntoBackground(img image.Image, bg color.Color) image.Image {
+	if IsOpaque(img) {
+		return img
+	}
+	_, _, _, a := bg.RGBA()
+	bg_is_opaque := a == 0xffff
+	var base draw.Image
+	if bg_is_opaque {
+		// use premult as its faster and will be converted to NRGB anyway
+		base = image.NewRGBA(img.Bounds())
+	} else {
+		base = image.NewNRGBA(img.Bounds())
+	}
+	bgi := image.NewUniform(bg)
+	draw.Draw(base, base.Bounds(), bgi, image.Point{}, draw.Src)
+	draw.Draw(base, base.Bounds(), img, img.Bounds().Min, draw.Over)
+	if bg_is_opaque {
+		return AsNRGB(base)
+	}
+	return base
 }

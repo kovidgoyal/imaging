@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"image"
+	"image/color"
 	"image/draw"
 	"image/gif"
 	"image/jpeg"
@@ -49,14 +50,20 @@ const (
 	SRGB_COLORSPACE
 )
 
+type ResizeCallbackFunction func(w, h int) (nw, nh int)
+
 type decodeConfig struct {
 	autoOrientation  bool
 	outputColorspace ColorSpaceType
+	transform        TransformType
+	resize           ResizeCallbackFunction
+	background       *color.RGBA64
 }
 
 var defaultDecodeConfig = decodeConfig{
 	autoOrientation:  true,
 	outputColorspace: SRGB_COLORSPACE,
+	transform:        NoTransform,
 }
 
 // DecodeOption sets an optional parameter for the Decode and Open functions.
@@ -79,6 +86,57 @@ func ColorSpace(cs ColorSpaceType) DecodeOption {
 		c.outputColorspace = cs
 	}
 }
+
+// Specify a transform to perform on the image when loading it
+func Transform(t TransformType) DecodeOption {
+	return func(c *decodeConfig) {
+		c.transform = t
+	}
+}
+
+// Specify a background color onto which the image should be composed when loading it
+func Background(bg color.Color) DecodeOption {
+	return func(c *decodeConfig) {
+		nbg := color.RGBA64Model.Convert(bg).(color.RGBA64)
+		c.background = &nbg
+	}
+}
+
+// Specify a callback function to decide a new size for the image when loading it
+func ResizeCallback(f ResizeCallbackFunction) DecodeOption {
+	return func(c *decodeConfig) {
+		c.resize = f
+	}
+}
+
+// orientation is an EXIF flag that specifies the transformation
+// that should be applied to image to display it correctly.
+type orientation int
+
+const (
+	orientationUnspecified = 0
+	orientationNormal      = 1
+	orientationFlipH       = 2
+	orientationRotate180   = 3
+	orientationFlipV       = 4
+	orientationTranspose   = 5
+	orientationRotate270   = 6
+	orientationTransverse  = 7
+	orientationRotate90    = 8
+)
+
+type TransformType int
+
+const (
+	NoTransform TransformType = iota
+	FlipHTransform
+	FlipVTranform
+	Rotate90Transform
+	Rotate180Transform
+	Rotate270Transform
+	TransverseTransform
+	TransposeTransform
+)
 
 func fix_colors(images []*Frame, md *meta.Data, cfg *decodeConfig) error {
 	var err error
@@ -148,6 +206,25 @@ func fix_orientation(ans *Image, md *meta.Data, cfg *decodeConfig) error {
 	return nil
 }
 
+func (img *Image) Transform(t TransformType) {
+	switch t {
+	case TransverseTransform:
+		img.Transverse()
+	case TransposeTransform:
+		img.Transpose()
+	case FlipHTransform:
+		img.FlipH()
+	case FlipVTranform:
+		img.FlipV()
+	case Rotate90Transform:
+		img.Rotate90()
+	case Rotate180Transform:
+		img.Rotate180()
+	case Rotate270Transform:
+		img.Rotate270()
+	}
+}
+
 func format_from_decode_result(x string) Format {
 	switch x {
 	case "BMP":
@@ -158,6 +235,15 @@ func format_from_decode_result(x string) Format {
 	return UNKNOWN
 }
 
+func (img *Image) PasteOntoBackground(bg color.Color) {
+	if img.DefaultImage != nil {
+		img.DefaultImage = PasteOntoBackground(img.DefaultImage, bg)
+	}
+	for _, f := range img.Frames {
+		f.Image = PasteOntoBackground(f.Image, bg)
+	}
+}
+
 func decode_all(r io.Reader, opts []DecodeOption) (ans *Image, err error) {
 	cfg := defaultDecodeConfig
 	for _, option := range opts {
@@ -165,12 +251,30 @@ func decode_all(r io.Reader, opts []DecodeOption) (ans *Image, err error) {
 	}
 
 	defer func() {
-		if ans != nil && err == nil && ans.Metadata != nil && (cfg.autoOrientation || cfg.outputColorspace != NO_CHANGE_OF_COLORSPACE) {
+		if ans == nil || err != nil || ans.Metadata == nil {
+			return
+		}
+		if cfg.outputColorspace != NO_CHANGE_OF_COLORSPACE {
 			if err = fix_colors(ans.Frames, ans.Metadata, &cfg); err != nil {
 				return
 			}
+		}
+		if cfg.autoOrientation {
 			if err = fix_orientation(ans, ans.Metadata, &cfg); err != nil {
 				return
+			}
+		}
+		if cfg.background != nil {
+			ans.PasteOntoBackground(*cfg.background)
+		}
+		if cfg.transform != NoTransform {
+			ans.Transform(cfg.transform)
+		}
+		if cfg.resize != nil {
+			w, h := ans.Bounds().Dx(), ans.Bounds().Dy()
+			nw, nh := cfg.resize(w, h)
+			if nw != w || nh != h {
+				ans.Resize(nw, nh, Lanczos)
 			}
 		}
 	}()
@@ -460,19 +564,3 @@ func Save(img image.Image, filename string, opts ...EncodeOption) (err error) {
 	}
 	return err
 }
-
-// orientation is an EXIF flag that specifies the transformation
-// that should be applied to image to display it correctly.
-type orientation int
-
-const (
-	orientationUnspecified = 0
-	orientationNormal      = 1
-	orientationFlipH       = 2
-	orientationRotate180   = 3
-	orientationFlipV       = 4
-	orientationTranspose   = 5
-	orientationRotate270   = 6
-	orientationTransverse  = 7
-	orientationRotate90    = 8
-)
