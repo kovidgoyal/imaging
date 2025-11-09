@@ -15,8 +15,27 @@ jobs:
       with:
         go-version-file: go.mod
 
-    - name: Install lcms2
-      run: sudo apt-get update && sudo apt-get install -y liblcms2-dev
+    - name: Install dependencies
+      run: sudo apt-get update && sudo apt-get install -y liblcms2-dev imagemagick
+
+    - name: Build
+      run: go build -tags lcms2cgo -v ./...
+
+    - name: Test
+      run: go test -tags lcms2cgo -v -race -cover ./...
+
+  macos:
+    runs-on: macos-latest
+    steps:
+    - uses: actions/checkout@v5
+
+    - name: Set up Go
+      uses: actions/setup-go@v6
+      with:
+        go-version-file: go.mod
+
+    - name: Install dependencies
+      run: brew install little-cms2 imagemagick
 
     - name: Build
       run: go build -tags lcms2cgo -v ./...

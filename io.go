@@ -13,6 +13,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/kovidgoyal/imaging/magick"
 	_ "github.com/kovidgoyal/imaging/netpbm"
@@ -50,6 +51,16 @@ const (
 	GO_IMAGE Backend = iota
 	MAGICK_IMAGE
 )
+
+func (b Backend) String() string {
+	switch b {
+	case GO_IMAGE:
+		return "GO_IMAGE"
+	case MAGICK_IMAGE:
+		return "MAGICK_IMAGE"
+	}
+	return fmt.Sprintf("UNKNOWN_IMAGE_TYPE_%d", b)
+}
 
 type ColorSpaceType int
 
@@ -112,7 +123,8 @@ func ResizeCallback(f ResizeCallbackFunction) DecodeOption {
 	}
 }
 
-// Specify which backends to use to try to load the image, successively
+// Specify which backends to use to try to load the image, successively. If no backends are specified, the default
+// set are used.
 func Backends(backends ...Backend) DecodeOption {
 	return func(c *decodeConfig) {
 		c.backends = backends
@@ -124,13 +136,14 @@ func NewDecodeConfig(opts ...DecodeOption) *decodeConfig {
 		autoOrientation:  true,
 		outputColorspace: SRGB_COLORSPACE,
 		transform:        types.NoTransform,
-		backends:         []Backend{GO_IMAGE},
+		backends:         []Backend{GO_IMAGE, MAGICK_IMAGE},
 	}
+	default_backends := cfg.backends
 	for _, option := range opts {
 		option(&cfg)
 	}
 	if len(cfg.backends) == 0 {
-		cfg.backends = []Backend{GO_IMAGE}
+		cfg.backends = default_backends
 	}
 	return &cfg
 }
@@ -298,6 +311,8 @@ func decode_all_go(r io.Reader, md *meta.Data, cfg *decodeConfig) (ans *Image, e
 				ans.Resize(nw, nh, Lanczos)
 			}
 		}
+		ans.Metadata.PixelWidth = uint32(ans.Bounds().Dx())
+		ans.Metadata.PixelHeight = uint32(ans.Bounds().Dy())
 	}()
 	if md == nil {
 		img, imgf, err := image.Decode(r)
@@ -349,6 +364,28 @@ func decode_all_go(r io.Reader, md *meta.Data, cfg *decodeConfig) (ans *Image, e
 	return
 }
 
+func decode_all_magick(inp *types.Input, md *meta.Data, cfg *decodeConfig) (ans *Image, err error) {
+	mi, err := magick.OpenAll(inp, md, cfg.magick_callback)
+	if err != nil {
+		return nil, err
+	}
+	ans = &Image{Metadata: md}
+	for _, f := range mi.Frames {
+		fr := &Frame{
+			Number: uint(f.Number), TopLeft: image.Pt(f.Left, f.Top), Image: f.Img,
+			Delay: time.Millisecond * time.Duration(f.Delay_ms), ComposeOnto: uint(f.Compose_onto),
+			Replace: f.Replace,
+		}
+		ans.Frames = append(ans.Frames, fr)
+	}
+	if md != nil {
+		// in case of transforms/auto-orient
+		b := ans.Bounds()
+		md.PixelWidth, md.PixelHeight = uint32(b.Dx()), uint32(b.Dy())
+	}
+	return
+}
+
 func decode_all(inp *types.Input, opts []DecodeOption) (ans *Image, err error) {
 	if inp.Reader == nil {
 		var f *os.File
@@ -374,7 +411,12 @@ func decode_all(inp *types.Input, opts []DecodeOption) (ans *Image, err error) {
 				return
 			})
 		case MAGICK_IMAGE:
-			panic("TODO: Implement me")
+			inp.Reader, backend_err = streams.CallbackWithSeekable(inp.Reader, func(r io.Reader) (err error) {
+				i := *inp
+				i.Reader = r
+				ans, err = decode_all_magick(&i, md, cfg)
+				return
+			})
 		}
 		if backend_err == nil && ans != nil {
 			return

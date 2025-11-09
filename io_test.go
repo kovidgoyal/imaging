@@ -3,6 +3,7 @@ package imaging
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"image"
 	"image/color"
 	"image/color/palette"
@@ -14,6 +15,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/kovidgoyal/imaging/magick"
 	"github.com/stretchr/testify/require"
 )
 
@@ -258,6 +260,23 @@ func TestAutoOrientation(t *testing.T) {
 	}
 	origBW := toBW(orig)
 
+	test_path := func(t *testing.T, path string, backend DecodeOption) {
+		img, err := OpenAll(path, backend)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if img.Frames[0].Image.Bounds() != orig.Bounds() {
+			t.Fatalf("%s: got bounds %v want %v", path, img.Frames[0].Image.Bounds(), orig.Bounds())
+		}
+		imgBW := toBW(img.Frames[0].Image)
+		if !bytes.Equal(imgBW, origBW) {
+			t.Fatalf("%s: got bw data %v want %v", path, imgBW, origBW)
+		}
+		require.Equal(t, orig.Bounds(), img.Bounds())
+		require.Equal(t, orig.Bounds().Dx(), int(img.Metadata.PixelWidth))
+		require.Equal(t, orig.Bounds().Dy(), int(img.Metadata.PixelHeight))
+	}
+
 	testCases := []struct {
 		path string
 	}{
@@ -271,20 +290,15 @@ func TestAutoOrientation(t *testing.T) {
 		{"testdata/orientation_7.jpg"},
 		{"testdata/orientation_8.jpg"},
 	}
+	backends := []Backend{GO_IMAGE}
+	if magick.HasMagick() {
+		backends = append(backends, MAGICK_IMAGE)
+	}
 	for _, tc := range testCases {
-		img, err := OpenAll(tc.path)
-		if err != nil {
-			t.Fatal(err)
+		for _, b := range backends {
+			t.Run(fmt.Sprintf("%s_%s", b, tc.path), func(t *testing.T) { test_path(t, tc.path, Backends(b)) })
 		}
-		if img.Frames[0].Image.Bounds() != orig.Bounds() {
-			t.Fatalf("%s: got bounds %v want %v", tc.path, img.Frames[0].Image.Bounds(), orig.Bounds())
-		}
-		imgBW := toBW(img.Frames[0].Image)
-		if !bytes.Equal(imgBW, origBW) {
-			t.Fatalf("%s: got bw data %v want %v", tc.path, imgBW, origBW)
-		}
-		require.Equal(t, orig.Bounds().Dx(), int(img.Metadata.PixelWidth))
-		require.Equal(t, orig.Bounds().Dy(), int(img.Metadata.PixelHeight))
+
 	}
 
 	if _, err := Decode(strings.NewReader("invalid data"), AutoOrientation(true)); err == nil {
