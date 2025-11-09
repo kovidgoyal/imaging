@@ -8,7 +8,9 @@ import (
 	"image/gif"
 	"image/png"
 	"io"
+	"io/fs"
 	"math"
+	"os"
 	"time"
 
 	"github.com/kettek/apng"
@@ -330,6 +332,15 @@ func (self *Image) EncodeAsPNG(w io.Writer) error {
 	img := self.Clone()
 	img.Coalesce()
 	return apng.Encode(w, img.as_apng())
+}
+
+func (self *Image) SaveAsPNG(path string, mode fs.FileMode) error {
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, mode)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	return self.EncodeAsPNG(f)
 }
 
 func (self *Image) FlipH() {
