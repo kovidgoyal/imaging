@@ -21,7 +21,7 @@ func main() {
 		fmt.Fprintln(os.Stderr, "usage: go run ./cmd/demo input-file [output-file]")
 		os.Exit(1)
 	}
-	img, err := imaging.OpenAll(os.Args[1])
+	img, err := imaging.OpenAll(os.Args[1], imaging.Backends(imaging.GO_IMAGE))
 	if err != nil {
 		return
 	}
