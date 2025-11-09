@@ -5,6 +5,9 @@ package prism
 import (
 	"bytes"
 	"fmt"
+	"image"
+	"image/color"
+	"image/jpeg"
 	"math"
 	"os"
 	"path/filepath"
@@ -12,6 +15,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/kovidgoyal/imaging/prism/meta/autometa"
 	"github.com/kovidgoyal/imaging/prism/meta/icc"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -48,6 +52,7 @@ var profiles = map[string]opt{
 	"lcms-stress.icc": {skip_inv: true, pcs_tolerance: 2 * THRESHOLD16, srgb_tolerance: 4 * THRESHOLD16},
 	// CMYK profile using LAB space
 	"cmyk.icc": {pcs_tolerance: 2 * THRESHOLD16, inv_tolerance: 0.05 * THRESHOLD8, srgb_tolerance: 0.2 * THRESHOLD8},
+	"cmyk.jpg": {pcs_tolerance: 2 * THRESHOLD16, inv_tolerance: 0.05 * THRESHOLD8, srgb_tolerance: 0.05 * THRESHOLD8},
 	// Adobe RGB matrix/TRC PCS=XYZ profile
 	"adobergb.icc": {inv_tolerance: 0.2 * THRESHOLD8, srgb_tolerance: 0.5 * THRESHOLD8},
 	// Apple Display P3 matrix/TRC PCS=XYZ
@@ -90,10 +95,33 @@ func profile_data(t *testing.T, name string) []byte {
 	return ans
 }
 
+func image_data(t *testing.T, name string) []byte {
+	ans, err := os.ReadFile(filepath.Join(testDir(t), "test-images", name))
+	require.NoError(t, err)
+	return ans
+}
+
 func profile(t *testing.T, name string) *icc.Profile {
 	ans, err := icc.DecodeProfile(bytes.NewReader(profile_data(t, name)))
 	require.NoError(t, err)
 	return ans
+}
+
+func image_and_profile(t *testing.T, name string) (image.Image, *icc.Profile, *CMSProfile) {
+	data := image_data(t, name)
+	md, r, err := autometa.Load(bytes.NewReader(data))
+	require.NoError(t, err)
+	require.NotNil(t, md)
+	img, err := jpeg.Decode(r)
+	require.NoError(t, err)
+	p, err := md.ICCProfile()
+	require.NoError(t, err)
+	require.NotNil(t, p)
+	pd, err := md.ICCProfileData()
+	require.NoError(t, err)
+	lcms, err := CreateCMSProfile(pd)
+	require.NoError(t, err)
+	return img, p, lcms
 }
 
 func lcms_profile(t *testing.T, name string) *CMSProfile {
@@ -214,18 +242,74 @@ func run_general(p *icc.Pipeline, inp, outp []float64, ni, no, np int) {
 	}
 }
 
+func img_to_floats(img image.Image) []float64 {
+	bounds := img.Bounds()
+	width, height := bounds.Dx(), bounds.Dy()
+	numChannels := 4 // Assuming 4 channels for both CMYK and RGBA
+
+	normalized := make([]float64, width*height*numChannels)
+	i := 0
+
+	// Use a type switch to handle CMYK images differently.
+	switch img := img.(type) {
+	case *image.CMYK:
+		for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
+			for x := bounds.Min.X; x < bounds.Max.X; x++ {
+				// The At() method for image.CMYK returns a color.CMYK.
+				cmykColor := img.At(x, y).(color.CMYK)
+
+				// The C, M, Y, K values are uint8s in the range [0, 255].
+				// Normalize them to [0.0, 1.0].
+				normalized[i] = float64(cmykColor.C) / 255.0
+				normalized[i+1] = float64(cmykColor.M) / 255.0
+				normalized[i+2] = float64(cmykColor.Y) / 255.0
+				normalized[i+3] = float64(cmykColor.K) / 255.0
+				i += numChannels
+			}
+		}
+	default:
+		// Fallback for all other image types (RGBA, Gray, etc.).
+		// This logic converts them to RGBA.
+		for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
+			for x := bounds.Min.X; x < bounds.Max.X; x++ {
+				// The RGBA() method returns color values as uint32s in the range [0, 65535].
+				r, g, b, a := img.At(x, y).RGBA()
+
+				// Normalize the values to the [0.0, 1.0] range.
+				normalized[i] = float64(r) / 65535.0
+				normalized[i+1] = float64(g) / 65535.0
+				normalized[i+2] = float64(b) / 65535.0
+				normalized[i+3] = float64(a) / 65535.0
+				i += numChannels
+			}
+		}
+	}
+	return normalized
+}
+
 func test_profile(t *testing.T, name string) {
 	opt := options_for_profile(name)
 	t.Run(name, func(t *testing.T) {
 		t.Parallel()
-		p := profile(t, name)
+		ext := filepath.Ext(name)
+		is_image := ext != ".icc" && ext != ".icm"
+		var p *icc.Profile
+		var pts []float64
+		var lcms *CMSProfile
+		if is_image {
+			var img image.Image
+			img, p, lcms = image_and_profile(t, name)
+			pts = img_to_floats(img)
+		} else {
+			p = profile(t, name)
+			lcms = lcms_profile(t, name)
+		}
 		inv, err := p.CreateDefaultTransformerToDevice()
 		dev_channels := 3
 		if !opt.skip_inv {
 			require.NoError(t, err)
 			_, dev_channels = inv.IOSig()
 		}
-		lcms := lcms_profile(t, name)
 		actual_bp := p.BlackPoint(p.Header.RenderingIntent, nil)
 		expected_bp, ok := lcms.DetectBlackPoint(p.Header.RenderingIntent)
 		require.True(t, ok)
@@ -234,11 +318,12 @@ func test_profile(t *testing.T, name string) {
 		require.NoError(t, err)
 		srgb, err := p.CreateTransformerToSRGB(p.Header.RenderingIntent, dev_channels, false, false, true)
 		require.NoError(t, err)
-		var pts []float64
-		if dev_channels == 3 {
-			pts = icc.Points_for_transformer_comparison3()
-		} else {
-			pts = icc.Points_for_transformer_comparison4()
+		if !is_image {
+			if dev_channels == 3 {
+				pts = icc.Points_for_transformer_comparison3()
+			} else {
+				pts = icc.Points_for_transformer_comparison4()
+			}
 		}
 		var actual, expected struct{ pcs, inv, srgb []float64 }
 		num_pixels := len(pts) / dev_channels
