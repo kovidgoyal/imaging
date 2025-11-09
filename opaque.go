@@ -34,14 +34,15 @@ func is_opaque1(pix []uint8, w, h, stride int) bool {
 }
 
 func is_opaque8(pix []uint8, w, h, stride int) bool {
-	is_opaque := true
+	is_opaque := atomic.Bool{}
+	is_opaque.Store(true)
 	parallel.Run_in_parallel_to_first_result(0, func(start, limit int, keep_going *atomic.Bool) bool {
 		pix := pix[stride*start:]
 		for range limit - start {
 			p := pix[0 : 4*w : 4*w]
 			for range w {
 				if p[3] != 0xff {
-					is_opaque = false
+					is_opaque.Store(false)
 					return true
 				}
 				p = p[4:]
@@ -53,18 +54,19 @@ func is_opaque8(pix []uint8, w, h, stride int) bool {
 		}
 		return false
 	}, 0, h)
-	return is_opaque
+	return is_opaque.Load()
 }
 
 func is_opaque16(pix []uint8, w, h, stride int) bool {
-	is_opaque := true
+	is_opaque := atomic.Bool{}
+	is_opaque.Store(true)
 	parallel.Run_in_parallel_to_first_result(0, func(start, limit int, keep_going *atomic.Bool) bool {
 		pix := pix[stride*start:]
 		for range limit - start {
 			p := pix[0 : 8*w : 8*w]
 			for range w {
 				if p[6] != 0xff || p[7] != 0xff {
-					is_opaque = false
+					is_opaque.Store(false)
 					return true
 				}
 				p = p[8:]
@@ -76,7 +78,7 @@ func is_opaque16(pix []uint8, w, h, stride int) bool {
 		}
 		return false
 	}, 0, h)
-	return is_opaque
+	return is_opaque.Load()
 }
 
 func IsOpaque(img image.Image) (ans bool) {
