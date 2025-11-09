@@ -3,7 +3,7 @@
 package prism
 
 /*
-#cgo LDFLAGS: -llcms2
+#cgo pkg-config: lcms2
 #include <lcms2.h>
 #include <stdlib.h>
 
