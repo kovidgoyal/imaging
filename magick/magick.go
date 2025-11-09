@@ -278,7 +278,7 @@ func is_not_srgb(name string) bool {
 	return name != "" && strings.ToUpper(name) != "SRGB"
 }
 
-func render(path *input, ro *RenderOptions, frames []IdentifyRecord) (ans []*ImageFrame, err error) {
+func render(path *input, ro *RenderOptions, is_srgb bool, frames []IdentifyRecord) (ans []*ImageFrame, err error) {
 	cmd := []string{}
 	if ro.Background == nil {
 		cmd = append(cmd, "-background", "none")
@@ -322,7 +322,7 @@ func render(path *input, ro *RenderOptions, frames []IdentifyRecord) (ans []*Ima
 		return
 	}
 	defer os.RemoveAll(tdir)
-	if ro.ToSRGB && is_not_srgb(frames[0].ColorSpace) {
+	if ro.ToSRGB && !is_srgb {
 		profile_path := filepath.Join(tdir, "sRGB.icc")
 		if err = os.WriteFile(profile_path, icc.Srgb_xyz_profile_data, 0o666); err != nil {
 			return nil, fmt.Errorf("failed to create temporary file with profile for ImageMagick with error: %w", err)
@@ -524,7 +524,7 @@ func OpenAll(input *types.Input, md *meta.Data, callback func(w, h int) RenderOp
 		is_srgb = md.IsSRGB()
 	}
 	ro := callback(identify_records[0].Canvas.Width, identify_records[0].Canvas.Height)
-	frames, err := render(i, &ro, identify_records)
+	frames, err := render(i, &ro, is_srgb, identify_records)
 	if err != nil {
 		return nil, err
 	}
