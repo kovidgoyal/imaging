@@ -449,3 +449,12 @@ func (self *Image) Resize(width, height int, filter ResampleFilter) {
 	}
 	self.Metadata.PixelWidth, self.Metadata.PixelHeight = uint32(width), uint32(height)
 }
+
+func (img *Image) PasteOntoBackground(bg color.Color) {
+	if img.DefaultImage != nil {
+		img.DefaultImage = PasteOntoBackground(img.DefaultImage, bg)
+	}
+	for _, f := range img.Frames {
+		f.Image = PasteOntoBackground(f.Image, bg)
+	}
+}

@@ -32,7 +32,7 @@ func (badFS) Create(name string) (io.WriteCloser, error) {
 	return nil, errCreate
 }
 
-func (badFS) Open(name string) (io.ReadCloser, error) {
+func (badFS) Open(name string) (*os.File, error) {
 	return nil, errOpen
 }
 
@@ -151,9 +151,9 @@ func TestOpenSave(t *testing.T) {
 		t.Fatalf("got %v want ErrUnsupportedFormat", err)
 	}
 
-	prevFS := fs
-	fs = badFS{}
-	defer func() { fs = prevFS }()
+	prevFS := mockable_fs
+	mockable_fs = badFS{}
+	defer func() { mockable_fs = prevFS }()
 
 	err = Save(imgWithAlpha, "test.jpg")
 	if err != errCreate {

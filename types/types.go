@@ -4,12 +4,26 @@ import (
 	"encoding/json"
 	"fmt"
 	"image"
+	"io"
 )
 
 var _ = fmt.Print
 
 // Format is an image file format.
 type Format int
+
+type TransformType int
+
+const (
+	NoTransform TransformType = iota
+	FlipHTransform
+	FlipVTranform
+	Rotate90Transform
+	Rotate180Transform
+	Rotate270Transform
+	TransverseTransform
+	TransposeTransform
+)
 
 // Image file formats.
 const (
@@ -84,4 +98,9 @@ type Scanner interface {
 	Bounds() image.Rectangle
 	ReverseRow(image.Image, int)
 	NewImage(r image.Rectangle) image.Image
+}
+
+type Input struct {
+	Reader io.Reader
+	Path   string
 }

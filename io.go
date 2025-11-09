@@ -14,6 +14,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/kovidgoyal/imaging/magick"
 	_ "github.com/kovidgoyal/imaging/netpbm"
 	"github.com/kovidgoyal/imaging/prism/meta"
 	"github.com/kovidgoyal/imaging/prism/meta/autometa"
@@ -33,15 +34,22 @@ import (
 
 type fileSystem interface {
 	Create(string) (io.WriteCloser, error)
-	Open(string) (io.ReadCloser, error)
+	Open(string) (*os.File, error)
 }
 
 type localFS struct{}
 
 func (localFS) Create(name string) (io.WriteCloser, error) { return os.Create(name) }
-func (localFS) Open(name string) (io.ReadCloser, error)    { return os.Open(name) }
+func (localFS) Open(name string) (*os.File, error)         { return os.Open(name) }
 
-var fs fileSystem = localFS{}
+var mockable_fs fileSystem = localFS{}
+
+type Backend int
+
+const (
+	GO_IMAGE Backend = iota
+	MAGICK_IMAGE
+)
 
 type ColorSpaceType int
 
@@ -55,15 +63,10 @@ type ResizeCallbackFunction func(w, h int) (nw, nh int)
 type decodeConfig struct {
 	autoOrientation  bool
 	outputColorspace ColorSpaceType
-	transform        TransformType
+	transform        types.TransformType
 	resize           ResizeCallbackFunction
 	background       *color.RGBA64
-}
-
-var defaultDecodeConfig = decodeConfig{
-	autoOrientation:  true,
-	outputColorspace: SRGB_COLORSPACE,
-	transform:        NoTransform,
+	backends         []Backend
 }
 
 // DecodeOption sets an optional parameter for the Decode and Open functions.
@@ -88,7 +91,7 @@ func ColorSpace(cs ColorSpaceType) DecodeOption {
 }
 
 // Specify a transform to perform on the image when loading it
-func Transform(t TransformType) DecodeOption {
+func Transform(t types.TransformType) DecodeOption {
 	return func(c *decodeConfig) {
 		c.transform = t
 	}
@@ -109,6 +112,40 @@ func ResizeCallback(f ResizeCallbackFunction) DecodeOption {
 	}
 }
 
+// Specify which backends to use to try to load the image, successively
+func Backends(backends ...Backend) DecodeOption {
+	return func(c *decodeConfig) {
+		c.backends = backends
+	}
+}
+
+func NewDecodeConfig(opts ...DecodeOption) *decodeConfig {
+	cfg := decodeConfig{
+		autoOrientation:  true,
+		outputColorspace: SRGB_COLORSPACE,
+		transform:        types.NoTransform,
+		backends:         []Backend{GO_IMAGE},
+	}
+	for _, option := range opts {
+		option(&cfg)
+	}
+	if len(cfg.backends) == 0 {
+		cfg.backends = []Backend{GO_IMAGE}
+	}
+	return &cfg
+}
+
+func (cfg *decodeConfig) magick_callback(w, h int) (ro magick.RenderOptions) {
+	ro.AutoOrient = cfg.autoOrientation
+	if cfg.resize != nil {
+		ro.ResizeTo.X, ro.ResizeTo.Y = cfg.resize(w, h)
+	}
+	ro.Background = cfg.background
+	ro.ToSRGB = cfg.outputColorspace == SRGB_COLORSPACE
+	ro.Transform = cfg.transform
+	return
+}
+
 // orientation is an EXIF flag that specifies the transformation
 // that should be applied to image to display it correctly.
 type orientation int
@@ -123,19 +160,6 @@ const (
 	orientationRotate270   = 6
 	orientationTransverse  = 7
 	orientationRotate90    = 8
-)
-
-type TransformType int
-
-const (
-	NoTransform TransformType = iota
-	FlipHTransform
-	FlipVTranform
-	Rotate90Transform
-	Rotate180Transform
-	Rotate270Transform
-	TransverseTransform
-	TransposeTransform
 )
 
 func fix_colors(images []*Frame, md *meta.Data, cfg *decodeConfig) error {
@@ -206,24 +230,35 @@ func fix_orientation(ans *Image, md *meta.Data, cfg *decodeConfig) error {
 	return nil
 }
 
-func (img *Image) Transform(t TransformType) {
+func (img *Image) Transform(t types.TransformType) {
 	switch t {
-	case TransverseTransform:
+	case types.TransverseTransform:
 		img.Transverse()
-	case TransposeTransform:
+	case types.TransposeTransform:
 		img.Transpose()
-	case FlipHTransform:
+	case types.FlipHTransform:
 		img.FlipH()
-	case FlipVTranform:
+	case types.FlipVTranform:
 		img.FlipV()
-	case Rotate90Transform:
+	case types.Rotate90Transform:
 		img.Rotate90()
-	case Rotate180Transform:
+	case types.Rotate180Transform:
 		img.Rotate180()
-	case Rotate270Transform:
+	case types.Rotate270Transform:
 		img.Rotate270()
 	}
 }
+
+const (
+	NoTransform         = types.NoTransform
+	FlipHTransform      = types.FlipHTransform
+	FlipVTranform       = types.FlipVTranform
+	Rotate90Transform   = types.Rotate90Transform
+	Rotate180Transform  = types.Rotate180Transform
+	Rotate270Transform  = types.Rotate270Transform
+	TransverseTransform = types.TransverseTransform
+	TransposeTransform  = types.TransposeTransform
+)
 
 func format_from_decode_result(x string) Format {
 	switch x {
@@ -235,39 +270,25 @@ func format_from_decode_result(x string) Format {
 	return UNKNOWN
 }
 
-func (img *Image) PasteOntoBackground(bg color.Color) {
-	if img.DefaultImage != nil {
-		img.DefaultImage = PasteOntoBackground(img.DefaultImage, bg)
-	}
-	for _, f := range img.Frames {
-		f.Image = PasteOntoBackground(f.Image, bg)
-	}
-}
-
-func decode_all(r io.Reader, opts []DecodeOption) (ans *Image, err error) {
-	cfg := defaultDecodeConfig
-	for _, option := range opts {
-		option(&cfg)
-	}
-
+func decode_all_go(r io.Reader, md *meta.Data, cfg *decodeConfig) (ans *Image, err error) {
 	defer func() {
 		if ans == nil || err != nil || ans.Metadata == nil {
 			return
 		}
 		if cfg.outputColorspace != NO_CHANGE_OF_COLORSPACE {
-			if err = fix_colors(ans.Frames, ans.Metadata, &cfg); err != nil {
+			if err = fix_colors(ans.Frames, ans.Metadata, cfg); err != nil {
 				return
 			}
 		}
 		if cfg.autoOrientation {
-			if err = fix_orientation(ans, ans.Metadata, &cfg); err != nil {
+			if err = fix_orientation(ans, ans.Metadata, cfg); err != nil {
 				return
 			}
 		}
 		if cfg.background != nil {
 			ans.PasteOntoBackground(*cfg.background)
 		}
-		if cfg.transform != NoTransform {
+		if cfg.transform != types.NoTransform {
 			ans.Transform(cfg.transform)
 		}
 		if cfg.resize != nil {
@@ -278,11 +299,7 @@ func decode_all(r io.Reader, opts []DecodeOption) (ans *Image, err error) {
 			}
 		}
 	}()
-	md, r, err := autometa.Load(r)
 	if md == nil {
-		if err != nil {
-			return nil, err
-		}
 		img, imgf, err := image.Decode(r)
 		if err != nil {
 			return nil, err
@@ -332,41 +349,69 @@ func decode_all(r io.Reader, opts []DecodeOption) (ans *Image, err error) {
 	return
 }
 
+func decode_all(inp *types.Input, opts []DecodeOption) (ans *Image, err error) {
+	if inp.Reader == nil {
+		var f *os.File
+		f, err = mockable_fs.Open(inp.Path)
+		if err != nil {
+			return
+		}
+		defer f.Close()
+		inp.Reader = f
+	}
+	cfg := NewDecodeConfig(opts...)
+	var md *meta.Data
+	md, inp.Reader, err = autometa.Load(inp.Reader)
+	if err != nil {
+		return
+	}
+	var backend_err error
+	for _, backend := range cfg.backends {
+		switch backend {
+		case GO_IMAGE:
+			inp.Reader, backend_err = streams.CallbackWithSeekable(inp.Reader, func(r io.Reader) (err error) {
+				ans, err = decode_all_go(r, md, cfg)
+				return
+			})
+		case MAGICK_IMAGE:
+			panic("TODO: Implement me")
+		}
+		if backend_err == nil && ans != nil {
+			return
+		}
+	}
+	if ans == nil && backend_err == nil {
+		backend_err = fmt.Errorf("unrecognised image format")
+	}
+	return ans, backend_err
+}
+
 // Decode image from r including all animation frames if its an animated image.
 // Returns nil with no error when no supported image is found in r.
 // Also returns a reader that will yield all bytes from r so that this API does
 // not exhaust r.
 func DecodeAll(r io.Reader, opts ...DecodeOption) (ans *Image, s io.Reader, err error) {
-	s, err = streams.CallbackWithSeekable(r, func(r io.Reader) (err error) {
-		ans, err = decode_all(r, opts)
-		return
-	})
+	inp := &types.Input{Reader: r}
+	ans, err = decode_all(inp, opts)
+	s = inp.Reader
 	return
+}
+
+func (ans *Image) SingleFrame() image.Image {
+	if ans.DefaultImage != nil {
+		return ans.DefaultImage
+	}
+	return ans.Frames[0].Image
+
 }
 
 // Decode reads an image from r.
 func Decode(r io.Reader, opts ...DecodeOption) (image.Image, error) {
-	cfg := defaultDecodeConfig
-
-	for _, option := range opts {
-		option(&cfg)
-	}
-
-	if !cfg.autoOrientation && cfg.outputColorspace == NO_CHANGE_OF_COLORSPACE {
-		img, _, err := image.Decode(r)
-		return img, err
-	}
-	ans, err := decode_all(r, opts)
+	ans, _, err := DecodeAll(r, opts...)
 	if err != nil {
 		return nil, err
 	}
-	if ans == nil {
-		return nil, fmt.Errorf("unrecognised image format")
-	}
-	if ans.DefaultImage != nil {
-		return ans.DefaultImage, nil
-	}
-	return ans.Frames[0].Image, nil
+	return ans.SingleFrame(), nil
 }
 
 // Open loads an image from file.
@@ -376,26 +421,19 @@ func Decode(r io.Reader, opts ...DecodeOption) (image.Image, error) {
 //	// Load an image from file.
 //	img, err := imaging.Open("test.jpg")
 func Open(filename string, opts ...DecodeOption) (image.Image, error) {
-	file, err := fs.Open(filename)
+	ans, err := OpenAll(filename, opts...)
 	if err != nil {
 		return nil, err
 	}
-	defer file.Close()
-	return Decode(file, opts...)
+	return ans.SingleFrame(), nil
 }
 
 func OpenAll(filename string, opts ...DecodeOption) (*Image, error) {
-	file, err := fs.Open(filename)
-	if err != nil {
-		return nil, err
-	}
-	defer file.Close()
-	ans, _, err := DecodeAll(file, opts...)
-	return ans, err
+	return decode_all(&types.Input{Path: filename}, opts)
 }
 
 func OpenConfig(filename string) (ans image.Config, format_name string, err error) {
-	file, err := fs.Open(filename)
+	file, err := mockable_fs.Open(filename)
 	if err != nil {
 		return ans, "", err
 	}
@@ -553,7 +591,7 @@ func Save(img image.Image, filename string, opts ...EncodeOption) (err error) {
 	if err != nil {
 		return err
 	}
-	file, err := fs.Create(filename)
+	file, err := mockable_fs.Create(filename)
 	if err != nil {
 		return err
 	}
