@@ -13,7 +13,7 @@ var _ = fmt.Println
 
 type WellKnownProfile int
 
-//go:embed test-profiles/sRGB.icc
+//go:embed test-profiles/sRGB-v4.icc
 var Srgb_xyz_profile_data []byte
 
 const (

@@ -27,6 +27,10 @@ const THRESHOLD8 = 1. / math.MaxUint8
 var profiles = map[string]opt{
 	// simplest case: matrix/trc profile
 	srgb_xyz_profile_name: {srgb_tolerance: 0.4 * THRESHOLD8, inv_tolerance: 6 * THRESHOLD16},
+	// sRGB XYZ v4 profile matrix/TRC based distributed in Linux
+	"sRGB.icc": {srgb_tolerance: 0.4 * THRESHOLD8},
+	// sRGB XYZ v4 profile matrix/TRC based, small size
+	"sRGB-v4.icc": {srgb_tolerance: 0.35 * THRESHOLD8},
 	// LutAtoBType profile with PCS=XYZ (need higher tolerance for
 	// because of lcms does interpolation and matrix calculation using 16bit
 	// numbers, we use 64bit numbers)
