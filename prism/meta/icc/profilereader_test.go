@@ -24,6 +24,7 @@ func TestSRGBProfileDetection(t *testing.T) {
 		"sRGB-v2-nano.icc":  true,
 		"sRGBz.icc":         true,
 		"sRGB.icm":          true,
+		"sRGB.icc":          true,
 		"tinyrgb.icc":       true,
 
 		"ClayRGB1998.icm":                false,
