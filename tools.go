@@ -2,6 +2,7 @@ package imaging
 
 import (
 	"bytes"
+	"fmt"
 	"image"
 	"image/color"
 	"image/draw"
@@ -10,6 +11,8 @@ import (
 
 	"github.com/kovidgoyal/imaging/nrgb"
 )
+
+var _ = fmt.Println
 
 // New creates a new image with the specified width and height, and fills it with the specified color.
 func New(width, height int, fillColor color.Color) *image.NRGBA {

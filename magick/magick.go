@@ -263,10 +263,8 @@ type RenderOptions struct {
 	BlackpointCompensation bool
 }
 
-func rgba64ToImageMagick(c color.RGBA64) string {
-	// ImageMagick's rgba() format can take percentages for color channels (0% to 100%)
-	// and a float for alpha (0.0 to 1.0).
-	// We calculate the percentage for each 16-bit channel (value / 65535.0).
+func rgba64ToImageMagick(c_ color.RGBA64) string {
+	c := color.NRGBA64Model.Convert(c_).(color.NRGBA64)
 	rPercent := float64(c.R) / 65535.0 * 100.0
 	gPercent := float64(c.G) / 65535.0 * 100.0
 	bPercent := float64(c.B) / 65535.0 * 100.0
@@ -280,12 +278,14 @@ func is_not_srgb(name string) bool {
 
 func render(path *input, ro *RenderOptions, is_srgb bool, frames []IdentifyRecord) (ans []*ImageFrame, err error) {
 	cmd := []string{}
+	add_alpha_remove := false
 	if ro.Background == nil {
 		cmd = append(cmd, "-background", "none")
 	} else {
 		if ro.Background.A == 0xffff {
 			n := nrgb.Model.Convert(*ro.Background).(nrgb.Color)
-			cmd = append(cmd, "-background", n.AsSharp(), "-alpha", "remove")
+			add_alpha_remove = true
+			cmd = append(cmd, "-background", n.AsSharp())
 		} else {
 			cmd = append(cmd, "-background", rgba64ToImageMagick(*ro.Background))
 		}
@@ -299,6 +299,11 @@ func render(path *input, ro *RenderOptions, is_srgb bool, frames []IdentifyRecor
 	cmd = append(cmd, "--", cpath)
 	if ro.AutoOrient {
 		cmd = append(cmd, "-auto-orient")
+	}
+	if add_alpha_remove {
+		cmd = append(cmd, "-alpha", "remove")
+	} else if ro.Background != nil {
+		cmd = append(cmd, "-flatten")
 	}
 	switch ro.Transform {
 	case types.FlipHTransform:
