@@ -41,6 +41,16 @@ func (s *Data) Clone() *Data {
 	}
 }
 
+func (s *Data) IsSRGB() bool {
+	if s.CICP.IsSet {
+		return s.CICP.IsSRGB()
+	}
+	if p, err := s.ICCProfile(); p != nil && err == nil {
+		return p.IsSRGB()
+	}
+	return true
+}
+
 // Returns an extracted EXIF metadata object from this metadata.
 //
 // An error is returned if the EXIF profile could not be correctly parsed.

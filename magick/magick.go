@@ -510,6 +510,11 @@ func OpenAll(input *types.Input, md *meta.Data, callback func(w, h int) RenderOp
 	if err != nil {
 		return nil, err
 	}
+	is_srgb := !is_not_srgb(identify_records[0].ColorSpace)
+	if is_srgb && md != nil {
+		// ImageMagick is a PoS that cant identify profiles
+		is_srgb = md.IsSRGB()
+	}
 	ro := callback(identify_records[0].Canvas.Width, identify_records[0].Canvas.Height)
 	frames, err := render(i, &ro, identify_records)
 	if err != nil {
