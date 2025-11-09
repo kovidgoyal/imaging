@@ -242,7 +242,7 @@ func (p *Pipeline) IsXYZSRGB() bool {
 					var expected_matrix = Matrix3{{0.218036, 0.192576, 0.0715343}, {0.111246, 0.358442, 0.0303044}, {0.00695811, 0.0485389, 0.357053}}
 					// unfortunately there exist profiles in the wild that
 					// deviate from the expected matrix by more than FLOAT_EQUALITY_THRESHOLD
-					if q.Equals(&expected_matrix, 7*FLOAT_EQUALITY_THRESHOLD) {
+					if q.Equals(&expected_matrix, 8.5*FLOAT_EQUALITY_THRESHOLD) {
 						return true
 					}
 				}
