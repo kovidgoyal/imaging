@@ -22,17 +22,17 @@ import (
 var _ = fmt.Print
 
 type Frame struct {
-	Number      uint
-	TopLeft     image.Point
-	Image       image.Image `json:"-"`
-	Delay       time.Duration
-	ComposeOnto uint
-	Replace     bool // Do a simple pixel replacement rather than a full alpha blend when compositing this frame
+	Number      uint          // a 1-based frame number
+	TopLeft     image.Point   // location of top-left of this frame w.r.t top left of first frame
+	Image       image.Image   `json:"-"` // the actual pixel data
+	Delay       time.Duration // the time for which this frame should be visible
+	ComposeOnto uint          // the frame number of the frame this frame should be composed onto. 0 means compose onto blank
+	Replace     bool          // Do a simple pixel replacement rather than a full alpha blend when compositing this frame
 }
 
 type Image struct {
-	Frames       []*Frame
-	Metadata     *meta.Data
+	Frames       []*Frame    // the actual frames of image data. The first frame is guaranteed to be the size of the image.
+	Metadata     *meta.Data  // image metadata
 	LoopCount    uint        // 0 means loop forever, 1 means loop once, ...
 	DefaultImage image.Image `json:"-"` // a "default image" for an animation that is not part of the actual animation
 }
@@ -186,6 +186,7 @@ func (self *Image) populate_from_gif(g *gif.GIF) {
 	}
 }
 
+// Create a clone of this image, all data is copied
 func (self *Image) Clone() *Image {
 	ans := *self
 	if ans.DefaultImage != nil {
@@ -319,6 +320,7 @@ func (self *Image) as_apng() (ans apng.APNG) {
 	return
 }
 
+// Encode this image into a PNG
 func (self *Image) EncodeAsPNG(w io.Writer) error {
 	if len(self.Frames) < 2 {
 		img := self.DefaultImage
@@ -334,6 +336,7 @@ func (self *Image) EncodeAsPNG(w io.Writer) error {
 	return apng.Encode(w, img.as_apng())
 }
 
+// Save this image as PNG
 func (self *Image) SaveAsPNG(path string, mode fs.FileMode) error {
 	f, err := os.OpenFile(path, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, mode)
 	if err != nil {
@@ -343,12 +346,14 @@ func (self *Image) SaveAsPNG(path string, mode fs.FileMode) error {
 	return self.EncodeAsPNG(f)
 }
 
+// Flip all frames horizontally
 func (self *Image) FlipH() {
 	for _, f := range self.Frames {
 		f.Image = FlipH(f.Image)
 	}
 }
 
+// Flip all frames vertically
 func (self *Image) FlipV() {
 	for _, f := range self.Frames {
 		f.Image = FlipV(f.Image)
@@ -385,6 +390,7 @@ func (self *Image) Bounds() image.Rectangle {
 	return image.Rect(0, 0, int(self.Metadata.PixelWidth), int(self.Metadata.PixelHeight))
 }
 
+// Transpose all frames (flip and rotate 90)
 func (self *Image) Transpose() {
 	r := new_rotation(90, self.Bounds())
 	for _, f := range self.Frames {
@@ -397,6 +403,7 @@ func (self *Image) Transpose() {
 	self.Metadata.PixelWidth, self.Metadata.PixelHeight = self.Metadata.PixelHeight, self.Metadata.PixelWidth
 }
 
+// Transverse all frames (flip and rotate 90)
 func (self *Image) Transverse() {
 	r := new_rotation(90, self.Bounds())
 	for _, f := range self.Frames {
@@ -409,6 +416,7 @@ func (self *Image) Transverse() {
 	self.Metadata.PixelWidth, self.Metadata.PixelHeight = self.Metadata.PixelHeight, self.Metadata.PixelWidth
 }
 
+// Rotate all frames by 90 counter clockwise
 func (self *Image) Rotate90() {
 	r := new_rotation(90, self.Bounds())
 	for _, f := range self.Frames {
@@ -421,6 +429,7 @@ func (self *Image) Rotate90() {
 	self.Metadata.PixelWidth, self.Metadata.PixelHeight = self.Metadata.PixelHeight, self.Metadata.PixelWidth
 }
 
+// Rotate all frames by 180 counter clockwise
 func (self *Image) Rotate180() {
 	r := new_rotation(180, self.Bounds())
 	for _, f := range self.Frames {
@@ -432,6 +441,7 @@ func (self *Image) Rotate180() {
 	}
 }
 
+// Rotate all frames by 270 counter clockwise
 func (self *Image) Rotate270() {
 	r := new_rotation(270, self.Bounds())
 	for _, f := range self.Frames {
@@ -444,6 +454,7 @@ func (self *Image) Rotate270() {
 	}
 }
 
+// Resize all frames to the specified size
 func (self *Image) Resize(width, height int, filter ResampleFilter) {
 	old_width, old_height := self.Bounds().Dx(), self.Bounds().Dy()
 	sx := float64(width) / float64(old_width)
@@ -461,6 +472,7 @@ func (self *Image) Resize(width, height int, filter ResampleFilter) {
 	self.Metadata.PixelWidth, self.Metadata.PixelHeight = uint32(width), uint32(height)
 }
 
+// Paste all frames onto the specified background color (OVER alpha blend)
 func (img *Image) PasteOntoBackground(bg color.Color) {
 	if img.DefaultImage != nil {
 		img.DefaultImage = PasteOntoBackground(img.DefaultImage, bg)
