@@ -308,11 +308,11 @@ func render(path *input, ro *RenderOptions, frames []IdentifyRecord) (ans []*Ima
 	case types.TransverseTransform:
 		cmd = append(cmd, "-transverse")
 	case types.Rotate90Transform:
-		cmd = append(cmd, "-rotate", "90")
+		cmd = append(cmd, "-rotate", "270")
 	case types.Rotate180Transform:
 		cmd = append(cmd, "-rotate", "180")
 	case types.Rotate270Transform:
-		cmd = append(cmd, "-rotate", "270")
+		cmd = append(cmd, "-rotate", "90")
 	}
 	tdir, err := os.MkdirTemp(TempDirInRAMIfPossible(), "")
 	if err != nil {

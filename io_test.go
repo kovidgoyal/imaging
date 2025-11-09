@@ -16,6 +16,7 @@ import (
 	"testing"
 
 	"github.com/kovidgoyal/imaging/magick"
+	"github.com/kovidgoyal/imaging/types"
 	"github.com/stretchr/testify/require"
 )
 
@@ -260,35 +261,40 @@ func TestAutoOrientation(t *testing.T) {
 	}
 	origBW := toBW(orig)
 
-	test_path := func(t *testing.T, path string, backend DecodeOption) {
+	test_path := func(t *testing.T, path string, transform types.TransformType, backend DecodeOption) {
+		var err error
+		check_img := func(img *Image) {
+			require.NoError(t, err)
+			if img.Frames[0].Image.Bounds() != orig.Bounds() {
+				t.Fatalf("%s: got bounds %v want %v", path, img.Frames[0].Image.Bounds(), orig.Bounds())
+			}
+			imgBW := toBW(img.Frames[0].Image)
+			if !bytes.Equal(imgBW, origBW) {
+				t.Fatalf("%s: got bw data %v want %v", path, imgBW, origBW)
+			}
+			require.Equal(t, orig.Bounds(), img.Bounds())
+			require.Equal(t, orig.Bounds().Dx(), int(img.Metadata.PixelWidth))
+			require.Equal(t, orig.Bounds().Dy(), int(img.Metadata.PixelHeight))
+		}
 		img, err := OpenAll(path, backend)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if img.Frames[0].Image.Bounds() != orig.Bounds() {
-			t.Fatalf("%s: got bounds %v want %v", path, img.Frames[0].Image.Bounds(), orig.Bounds())
-		}
-		imgBW := toBW(img.Frames[0].Image)
-		if !bytes.Equal(imgBW, origBW) {
-			t.Fatalf("%s: got bw data %v want %v", path, imgBW, origBW)
-		}
-		require.Equal(t, orig.Bounds(), img.Bounds())
-		require.Equal(t, orig.Bounds().Dx(), int(img.Metadata.PixelWidth))
-		require.Equal(t, orig.Bounds().Dy(), int(img.Metadata.PixelHeight))
+		check_img(img)
+		img, err = OpenAll(path, backend, AutoOrientation(false), Transform(transform))
+		check_img(img)
 	}
 
 	testCases := []struct {
-		path string
+		path      string
+		transform types.TransformType
 	}{
-		{"testdata/orientation_0.jpg"},
-		{"testdata/orientation_1.jpg"},
-		{"testdata/orientation_2.jpg"},
-		{"testdata/orientation_3.jpg"},
-		{"testdata/orientation_4.jpg"},
-		{"testdata/orientation_5.jpg"},
-		{"testdata/orientation_6.jpg"},
-		{"testdata/orientation_7.jpg"},
-		{"testdata/orientation_8.jpg"},
+		{"testdata/orientation_0.jpg", NoTransform},
+		{"testdata/orientation_1.jpg", NoTransform},
+		{"testdata/orientation_2.jpg", FlipHTransform},
+		{"testdata/orientation_3.jpg", Rotate180Transform},
+		{"testdata/orientation_4.jpg", FlipVTranform},
+		{"testdata/orientation_5.jpg", TransposeTransform},
+		{"testdata/orientation_6.jpg", Rotate270Transform},
+		{"testdata/orientation_7.jpg", TransverseTransform},
+		{"testdata/orientation_8.jpg", Rotate90Transform},
 	}
 	backends := []Backend{GO_IMAGE}
 	if magick.HasMagick() {
@@ -296,7 +302,7 @@ func TestAutoOrientation(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		for _, b := range backends {
-			t.Run(fmt.Sprintf("%s_%s", b, tc.path), func(t *testing.T) { test_path(t, tc.path, Backends(b)) })
+			t.Run(fmt.Sprintf("%s_%s", b, tc.path), func(t *testing.T) { test_path(t, tc.path, tc.transform, Backends(b)) })
 		}
 
 	}
