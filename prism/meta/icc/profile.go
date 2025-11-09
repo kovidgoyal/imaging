@@ -168,12 +168,18 @@ func (p *Profile) find_conversion_tag(forward bool, rendering_intent RenderingIn
 	return ans, nil
 }
 
-func (p *Profile) should_apply_blackpoint(intent RenderingIntent) bool {
+func (p *Profile) effective_bpc(intent RenderingIntent, user_requested_bpc bool) bool {
 	// See _cmsLinkProfiles() in cmscnvrt.c
-	return (intent == PerceptualRenderingIntent || intent == SaturationRenderingIntent) && p.Header.Version.Major >= 4
+	if intent == AbsoluteColorimetricRenderingIntent {
+		return false
+	}
+	if (intent == PerceptualRenderingIntent || intent == SaturationRenderingIntent) && p.Header.Version.Major >= 4 {
+		return true
+	}
+	return user_requested_bpc
 }
 
-func (p *Profile) CreateTransformerToDevice(rendering_intent RenderingIntent, optimize bool) (ans *Pipeline, err error) {
+func (p *Profile) CreateTransformerToDevice(rendering_intent RenderingIntent, use_blackpoint_compensation, optimize bool) (ans *Pipeline, err error) {
 	num_output_channels := len(p.Header.DataColorSpace.BlackPoint())
 	if num_output_channels == 0 {
 		return nil, fmt.Errorf("unsupported device color space: %s", p.Header.DataColorSpace)
@@ -188,7 +194,7 @@ func (p *Profile) CreateTransformerToDevice(rendering_intent RenderingIntent, op
 	}()
 	ans = &Pipeline{}
 
-	if p.should_apply_blackpoint(rendering_intent) {
+	if p.effective_bpc(rendering_intent, use_blackpoint_compensation) {
 		var PCS_blackpoint XYZType // 0, 0, 0
 		output_blackpoint := p.BlackPoint(rendering_intent, nil)
 		if PCS_blackpoint != output_blackpoint {
@@ -297,7 +303,7 @@ func (p *Profile) CreateTransformerToPCS(rendering_intent RenderingIntent, input
 	return
 }
 
-func (p *Profile) CreateTransformerToSRGB(rendering_intent RenderingIntent, input_channels int, clamp, map_gamut, optimize bool) (ans *Pipeline, err error) {
+func (p *Profile) CreateTransformerToSRGB(rendering_intent RenderingIntent, use_blackpoint_compensation bool, input_channels int, clamp, map_gamut, optimize bool) (ans *Pipeline, err error) {
 	if ans, err = p.createTransformerToPCS(rendering_intent); err != nil {
 		return
 	}
@@ -305,7 +311,7 @@ func (p *Profile) CreateTransformerToSRGB(rendering_intent RenderingIntent, inpu
 		return nil, fmt.Errorf("transformer to PCS %s not suitable for %d input channels", ans.String(), input_channels)
 	}
 	input_colorspace := p.Header.ProfileConnectionSpace
-	if p.should_apply_blackpoint(rendering_intent) {
+	if p.effective_bpc(rendering_intent, use_blackpoint_compensation) {
 		var sRGB_blackpoint XYZType // 0, 0, 0
 		input_blackpoint := p.BlackPoint(rendering_intent, nil)
 		if input_blackpoint != sRGB_blackpoint {
@@ -333,7 +339,7 @@ func (p *Profile) CreateTransformerToSRGB(rendering_intent RenderingIntent, inpu
 }
 
 func (p *Profile) CreateDefaultTransformerToDevice() (*Pipeline, error) {
-	return p.CreateTransformerToDevice(p.Header.RenderingIntent, true)
+	return p.CreateTransformerToDevice(p.Header.RenderingIntent, false, true)
 }
 
 func (p *Profile) CreateDefaultTransformerToPCS(input_channels int) (*Pipeline, error) {

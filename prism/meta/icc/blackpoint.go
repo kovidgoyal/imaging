@@ -78,7 +78,7 @@ func (p *Profile) black_point_as_darker_colorant(intent RenderingIntent, debug G
 }
 
 func (p *Profile) black_point_using_perceptual_black(debug General_debug_callback) XYZType {
-	dev, err := p.CreateTransformerToDevice(PerceptualRenderingIntent, debug == nil)
+	dev, err := p.CreateTransformerToDevice(PerceptualRenderingIntent, false, debug == nil)
 	if err != nil {
 		return XYZType{}
 	}

@@ -316,7 +316,7 @@ func test_profile(t *testing.T, name string) {
 		require.InDeltaSlice(t, []float64{expected_bp.X, expected_bp.Y, expected_bp.Z}, []float64{actual_bp.X, actual_bp.Y, actual_bp.Z}, THRESHOLD16, fmt.Sprintf("blackpoint is not equal: %.6v != %.6v", expected_bp, actual_bp))
 		pcs, err := p.CreateDefaultTransformerToPCS(dev_channels)
 		require.NoError(t, err)
-		srgb, err := p.CreateTransformerToSRGB(p.Header.RenderingIntent, dev_channels, false, false, true)
+		srgb, err := p.CreateTransformerToSRGB(p.Header.RenderingIntent, false, dev_channels, false, false, true)
 		require.NoError(t, err)
 		if !is_image {
 			if dev_channels == 3 {
@@ -400,7 +400,7 @@ var _ = transform_debug
 func develop_to_srgb(p *icc.Profile, lcms *CMSProfile, t *testing.T, name string, tolerance float64) {
 	const r, g, b float64 = 1, 0.0666667, 0.2
 	l, err := lcms.TransformFloatToSRGB([]float64{r, g, b}, p.Header.RenderingIntent)
-	tr, err := p.CreateTransformerToSRGB(p.Header.RenderingIntent, 3, false, false, false)
+	tr, err := p.CreateTransformerToSRGB(p.Header.RenderingIntent, false, 3, false, false, false)
 	require.NoError(t, err)
 	x, y, z := tr.TransformDebug(r, g, b, transform_debug)
 	fmt.Println()
@@ -414,7 +414,7 @@ func develop_inverse(p *icc.Profile, lcms *CMSProfile, t *testing.T, name string
 	var r, g, b float64 = 78.2471, -57.496, 10.4908
 	l, err := lcms.TransformFloatToDevice([]float64{r, g, b}, p.Header.RenderingIntent)
 	fmt.Println()
-	tr, err := p.CreateTransformerToDevice(p.Header.RenderingIntent, false)
+	tr, err := p.CreateTransformerToDevice(p.Header.RenderingIntent, false, false)
 	require.NoError(t, err)
 	x, y, z := tr.TransformDebug(r, g, b, transform_debug)
 	fmt.Println()
@@ -455,7 +455,7 @@ func develop_inverse4(p *icc.Profile, lcms *CMSProfile, t *testing.T, name strin
 		l[i] /= 100.
 	}
 	fmt.Println()
-	tr, err := p.CreateTransformerToDevice(p.Header.RenderingIntent, false)
+	tr, err := p.CreateTransformerToDevice(p.Header.RenderingIntent, false, false)
 	require.NoError(t, err)
 	cmyk := []float64{0, 0, 0, 0}
 	tr.TransformGeneralDebug(cmyk, []float64{r, g, b, 0}, transform_general_debug)
@@ -467,7 +467,7 @@ func develop_to_srgb4(p *icc.Profile, lcms *CMSProfile, t *testing.T, name strin
 	const c, m, y, k = 1, 0, 0, 0
 	l, err := lcms.TransformFloatToSRGB([]float64{c * 100, m * 100, y * 100, k * 100}, p.Header.RenderingIntent)
 	fmt.Println()
-	tr, err := p.CreateTransformerToSRGB(p.Header.RenderingIntent, 4, false, false, false)
+	tr, err := p.CreateTransformerToSRGB(p.Header.RenderingIntent, false, 4, false, false, false)
 	require.NoError(t, err)
 	out := []float64{0, 0, 0, 0}
 	tr.TransformGeneralDebug(out, []float64{c, m, y, k}, transform_general_debug)

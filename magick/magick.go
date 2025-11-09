@@ -253,12 +253,14 @@ func identify(path *input) (ans []IdentifyRecord, err error) {
 }
 
 type RenderOptions struct {
-	Background     *color.RGBA64
-	ResizeTo       image.Point
-	OnlyFirstFrame bool
-	AutoOrient     bool
-	ToSRGB         bool
-	Transform      types.TransformType
+	Background             *color.RGBA64
+	ResizeTo               image.Point
+	OnlyFirstFrame         bool
+	AutoOrient             bool
+	ToSRGB                 bool
+	Transform              types.TransformType
+	RenderingIntent        icc.RenderingIntent
+	BlackpointCompensation bool
 }
 
 func rgba64ToImageMagick(c color.RGBA64) string {
@@ -325,6 +327,9 @@ func render(path *input, ro *RenderOptions, frames []IdentifyRecord) (ans []*Ima
 		if err = os.WriteFile(profile_path, icc.Srgb_xyz_profile_data, 0o666); err != nil {
 			return nil, fmt.Errorf("failed to create temporary file with profile for ImageMagick with error: %w", err)
 		}
+
+		cmd = append(cmd, icc.IfElse(ro.BlackpointCompensation, "-", "+")+"black-point-compensation")
+		cmd = append(cmd, "-intent", ro.RenderingIntent.String())
 		cmd = append(cmd, "-profile", profile_path)
 	}
 	if ro.ResizeTo.X > 0 {
@@ -491,6 +496,9 @@ func magick_input_path(i *types.Input) (inp *input, err error) {
 }
 
 func OpenAll(input *types.Input, md *meta.Data, callback func(w, h int) RenderOptions) (ans *Image, err error) {
+	if !HasMagick() {
+		return nil, fmt.Errorf("the magick command as not found in PATH")
+	}
 	// ImageMagick needs to be told explicitly to use APNG otherwise it only returns the first frame
 	i, err := magick_input_path(input)
 	if i.os_file != nil && i.needs_close {

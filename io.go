@@ -12,6 +12,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -19,6 +20,7 @@ import (
 	_ "github.com/kovidgoyal/imaging/netpbm"
 	"github.com/kovidgoyal/imaging/prism/meta"
 	"github.com/kovidgoyal/imaging/prism/meta/autometa"
+	"github.com/kovidgoyal/imaging/prism/meta/icc"
 	"github.com/kovidgoyal/imaging/prism/meta/tiffmeta"
 	"github.com/kovidgoyal/imaging/streams"
 	"github.com/kovidgoyal/imaging/types"
@@ -68,16 +70,24 @@ const (
 	NO_CHANGE_OF_COLORSPACE ColorSpaceType = iota
 	SRGB_COLORSPACE
 )
+const (
+	Relative   icc.RenderingIntent = icc.RelativeColorimetricRenderingIntent
+	Perceptual                     = icc.PerceptualRenderingIntent
+	Saturation                     = icc.SaturationRenderingIntent
+	Absolute                       = icc.AbsoluteColorimetricRenderingIntent
+)
 
 type ResizeCallbackFunction func(w, h int) (nw, nh int)
 
 type decodeConfig struct {
-	autoOrientation  bool
-	outputColorspace ColorSpaceType
-	transform        types.TransformType
-	resize           ResizeCallbackFunction
-	background       *color.RGBA64
-	backends         []Backend
+	autoOrientation             bool
+	outputColorspace            ColorSpaceType
+	transform                   types.TransformType
+	resize                      ResizeCallbackFunction
+	background                  *color.RGBA64
+	backends                    []Backend
+	rendering_intent            icc.RenderingIntent
+	use_blackpoint_compensation bool
 }
 
 // DecodeOption sets an optional parameter for the Decode and Open functions.
@@ -131,21 +141,38 @@ func Backends(backends ...Backend) DecodeOption {
 	}
 }
 
-func NewDecodeConfig(opts ...DecodeOption) *decodeConfig {
-	cfg := decodeConfig{
+// Set the rendering intent to use for ICC profile based color conversions
+func RenderingIntent(intent icc.RenderingIntent) DecodeOption {
+	return func(c *decodeConfig) {
+		c.rendering_intent = intent
+	}
+}
+
+// Set whether to use blackpoint compensation during ICC profile color conversions
+func BlackpointCompensation(enable bool) DecodeOption {
+	return func(c *decodeConfig) {
+		c.use_blackpoint_compensation = enable
+	}
+}
+
+func NewDecodeConfig(opts ...DecodeOption) (cfg *decodeConfig) {
+	cfg = &decodeConfig{
 		autoOrientation:  true,
 		outputColorspace: SRGB_COLORSPACE,
 		transform:        types.NoTransform,
 		backends:         []Backend{GO_IMAGE, MAGICK_IMAGE},
+		// These settings match ImageMagick defaults as of v6
+		rendering_intent:            Relative,
+		use_blackpoint_compensation: true,
 	}
 	default_backends := cfg.backends
 	for _, option := range opts {
-		option(&cfg)
+		option(cfg)
 	}
 	if len(cfg.backends) == 0 {
 		cfg.backends = default_backends
 	}
-	return &cfg
+	return
 }
 
 func (cfg *decodeConfig) magick_callback(w, h int) (ro magick.RenderOptions) {
@@ -156,6 +183,8 @@ func (cfg *decodeConfig) magick_callback(w, h int) (ro magick.RenderOptions) {
 	ro.Background = cfg.background
 	ro.ToSRGB = cfg.outputColorspace == SRGB_COLORSPACE
 	ro.Transform = cfg.transform
+	ro.RenderingIntent = cfg.rendering_intent
+	ro.BlackpointCompensation = cfg.use_blackpoint_compensation
 	return
 }
 
@@ -198,7 +227,7 @@ func fix_colors(images []*Frame, md *meta.Data, cfg *decodeConfig) error {
 	}
 	if profile != nil {
 		for _, f := range images {
-			if f.Image, err = ConvertToSRGB(profile, f.Image); err != nil {
+			if f.Image, err = ConvertToSRGB(profile, cfg.rendering_intent, cfg.use_blackpoint_compensation, f.Image); err != nil {
 				return err
 			}
 		}
@@ -387,6 +416,14 @@ func decode_all_magick(inp *types.Input, md *meta.Data, cfg *decodeConfig) (ans 
 }
 
 func decode_all(inp *types.Input, opts []DecodeOption) (ans *Image, err error) {
+	cfg := NewDecodeConfig(opts...)
+	if !magick.HasMagick() {
+		cfg.backends = slices.DeleteFunc(cfg.backends, func(b Backend) bool { return b == MAGICK_IMAGE })
+	}
+	if len(cfg.backends) == 0 {
+		return nil, fmt.Errorf("the magick command was not found in PATH")
+	}
+
 	if inp.Reader == nil {
 		var f *os.File
 		f, err = mockable_fs.Open(inp.Path)
@@ -396,7 +433,6 @@ func decode_all(inp *types.Input, opts []DecodeOption) (ans *Image, err error) {
 		defer f.Close()
 		inp.Reader = f
 	}
-	cfg := NewDecodeConfig(opts...)
 	var md *meta.Data
 	md, inp.Reader, err = autometa.Load(inp.Reader)
 	if err != nil {

@@ -13,7 +13,7 @@ var _ = fmt.Print
 // may be either the original image unmodified if no color
 // conversion was needed, the original image modified, or a new image (when the original image
 // is not in a supported format).
-func ConvertToSRGB(p *icc.Profile, image_any image.Image) (ans image.Image, err error) {
+func ConvertToSRGB(p *icc.Profile, intent icc.RenderingIntent, use_blackpoint_compensation bool, image_any image.Image) (ans image.Image, err error) {
 	if p.IsSRGB() {
 		return image_any, nil
 	}
@@ -21,7 +21,7 @@ func ConvertToSRGB(p *icc.Profile, image_any image.Image) (ans image.Image, err 
 	if _, is_cmyk := image_any.(*image.CMYK); is_cmyk {
 		num_channels = 4
 	}
-	tr, err := p.CreateTransformerToSRGB(p.Header.RenderingIntent, num_channels, true, true, true)
+	tr, err := p.CreateTransformerToSRGB(intent, use_blackpoint_compensation, num_channels, true, true, true)
 	if err != nil {
 		return nil, err
 	}
