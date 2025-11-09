@@ -37,6 +37,15 @@ img.Resize(128, 128, imaging.Lanczos)
 img.SaveAsPNG(path, mode)
 ```
 
+There are also convenience scripts that demonstrate this library in action,
+note that these are mainly for development and as such they only use the pure
+Go code and do not fallback to ImageMagick:
+
+```sh
+./to-png some-image.whatever some-image.png
+./to-frames some-animated-image.whatever some-animated-image.apng
+```
+
 Imaging supports image resizing using various resampling filters. The most notable ones:
 - `Lanczos` - A high-quality resampling filter for photographic images yielding sharp results.
 - `CatmullRom` - A sharp cubic filter that is faster than Lanczos filter while providing similar results.
