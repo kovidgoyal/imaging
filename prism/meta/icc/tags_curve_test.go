@@ -13,9 +13,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-//go:embed test-profiles/sRGB2014.icc
-var Srgb_xyz_profile_data []byte
-
 var Srgb_xyz_profile = sync.OnceValue(func() *Profile {
 	p, _ := DecodeProfile(bytes.NewReader(Srgb_xyz_profile_data))
 	return p

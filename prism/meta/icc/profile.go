@@ -2,6 +2,7 @@ package icc
 
 import (
 	"bytes"
+	_ "embed"
 	"fmt"
 	"io"
 	"os"
@@ -11,6 +12,9 @@ import (
 var _ = fmt.Println
 
 type WellKnownProfile int
+
+//go:embed test-profiles/sRGB.icc
+var Srgb_xyz_profile_data []byte
 
 const (
 	UnknownProfile WellKnownProfile = iota
