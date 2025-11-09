@@ -63,17 +63,21 @@ func TestMagick(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, len(img2.Frames), 1)
 
-	test_image := func(path string, threshold float64) {
+	test_image := func(path string, threshold float64, opts ...DecodeOption) {
 		t.Run(path, func(t *testing.T) {
 			t.Parallel()
-			cmyk, err := OpenAll(path, Backends(MAGICK_IMAGE))
+			opts = append(opts, Backends(MAGICK_IMAGE))
+			m, err := OpenAll(path, opts...)
 			require.NoError(t, err)
-			cmyk_go, err := OpenAll(path, Backends(GO_IMAGE))
+			opts = opts[:len(opts)-1]
+			opts = append(opts, Backends(GO_IMAGE))
+			g, err := OpenAll(path, opts...)
 			require.NoError(t, err)
-			compare_images(t, cmyk_go, cmyk, threshold)
+			compare_images(t, g, m, threshold)
 		})
 	}
-	test_image("prism/test-images/cmyk.jpg", 0.6)
-	test_image("prism/test-images/pizza-rgb8-adobergb.jpg", 0.5)
-	test_image("prism/test-images/pizza-rgb8-srgb.jpg", 0.4)
+	halve := ResizeCallback(func(w, h int) (int, int) { return w / 2, h / 2 })
+	test_image("prism/test-images/cmyk.jpg", 0.6, halve)
+	test_image("prism/test-images/pizza-rgb8-adobergb.jpg", 0.5, halve)
+	test_image("prism/test-images/pizza-rgb8-srgb.jpg", 0.4, halve)
 }
