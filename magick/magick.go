@@ -308,7 +308,7 @@ func render(path *input, ro *RenderOptions, is_srgb bool, frames []IdentifyRecor
 	switch ro.Transform {
 	case types.FlipHTransform:
 		cmd = append(cmd, "-flop")
-	case types.FlipVTranform:
+	case types.FlipVTransform:
 		cmd = append(cmd, "-flip")
 	case types.TransposeTransform:
 		cmd = append(cmd, "-transpose")

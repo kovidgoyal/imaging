@@ -280,7 +280,7 @@ func (img *Image) Transform(t types.TransformType) {
 		img.Transpose()
 	case types.FlipHTransform:
 		img.FlipH()
-	case types.FlipVTranform:
+	case types.FlipVTransform:
 		img.FlipV()
 	case types.Rotate90Transform:
 		img.Rotate90()
@@ -294,7 +294,7 @@ func (img *Image) Transform(t types.TransformType) {
 const (
 	NoTransform         = types.NoTransform
 	FlipHTransform      = types.FlipHTransform
-	FlipVTranform       = types.FlipVTranform
+	FlipVTransform      = types.FlipVTransform
 	Rotate90Transform   = types.Rotate90Transform
 	Rotate180Transform  = types.Rotate180Transform
 	Rotate270Transform  = types.Rotate270Transform

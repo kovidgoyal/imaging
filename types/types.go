@@ -17,7 +17,7 @@ type TransformType int
 const (
 	NoTransform TransformType = iota
 	FlipHTransform
-	FlipVTranform
+	FlipVTransform
 	Rotate90Transform
 	Rotate180Transform
 	Rotate270Transform

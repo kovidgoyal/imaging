@@ -290,7 +290,7 @@ func TestAutoOrientation(t *testing.T) {
 		{"testdata/orientation_1.jpg", NoTransform},
 		{"testdata/orientation_2.jpg", FlipHTransform},
 		{"testdata/orientation_3.jpg", Rotate180Transform},
-		{"testdata/orientation_4.jpg", FlipVTranform},
+		{"testdata/orientation_4.jpg", FlipVTransform},
 		{"testdata/orientation_5.jpg", TransposeTransform},
 		{"testdata/orientation_6.jpg", Rotate270Transform},
 		{"testdata/orientation_7.jpg", TransverseTransform},
