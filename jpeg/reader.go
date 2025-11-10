@@ -8,12 +8,12 @@
 package jpeg
 
 import (
-	"fmt"
 	"image"
 	"image/color"
 	"io"
 
 	"github.com/kovidgoyal/go-parallel"
+	"github.com/kovidgoyal/imaging/nrgb"
 	"github.com/kovidgoyal/imaging/nrgba"
 )
 
@@ -383,12 +383,10 @@ func (d *decoder) processSOF(n int) error {
 					return errUnsupportedSubsamplingRatio
 				}
 			case 1: // Cb.
-				fmt.Println(2222222, d.comp[0].h, d.comp[0].v)
 				if d.comp[0].h%h != 0 || d.comp[0].v%v != 0 {
 					return errUnsupportedSubsamplingRatio
 				}
 			case 2: // Cr.
-				fmt.Println(33333333, d.comp[1].h, d.comp[1].v)
 				if d.comp[1].h != h || d.comp[1].v != v {
 					return errUnsupportedSubsamplingRatio
 				}
@@ -768,18 +766,19 @@ func (d *decoder) isRGB() bool {
 func (d *decoder) convertToRGB() (image.Image, error) {
 	cScale := d.comp[0].h / d.comp[1].h
 	bounds := d.img3.Bounds()
-	img := image.NewRGBA(bounds)
-	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
-		po := img.PixOffset(bounds.Min.X, y)
-		yo := d.img3.YOffset(bounds.Min.X, y)
-		co := d.img3.COffset(bounds.Min.X, y)
-		for i, iMax := 0, bounds.Max.X-bounds.Min.X; i < iMax; i++ {
-			img.Pix[po+4*i+0] = d.img3.Y[yo+i]
-			img.Pix[po+4*i+1] = d.img3.Cb[co+i/cScale]
-			img.Pix[po+4*i+2] = d.img3.Cr[co+i/cScale]
-			img.Pix[po+4*i+3] = 255
+	img := nrgb.NewNRGB(bounds)
+	parallel.Run_in_parallel_over_range(0, func(start, limit int) {
+		for y := start; y < limit; y++ {
+			po := img.PixOffset(bounds.Min.X, y)
+			yo := d.img3.YOffset(bounds.Min.X, y)
+			co := d.img3.COffset(bounds.Min.X, y)
+			for i, iMax := 0, bounds.Max.X-bounds.Min.X; i < iMax; i++ {
+				img.Pix[po+3*i+0] = d.img3.Y[yo+i]
+				img.Pix[po+3*i+1] = d.img3.Cb[co+i/cScale]
+				img.Pix[po+3*i+2] = d.img3.Cr[co+i/cScale]
+			}
 		}
-	}
+	}, bounds.Min.Y, bounds.Max.Y)
 	return img, nil
 }
 
@@ -806,7 +805,7 @@ func DecodeConfig(r io.Reader) (image.Config, error) {
 	case 3:
 		cm := color.YCbCrModel
 		if d.isRGB() {
-			cm = color.RGBAModel
+			cm = nrgb.Model
 		}
 		return image.Config{
 			ColorModel: cm,
