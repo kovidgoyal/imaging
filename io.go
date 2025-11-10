@@ -16,6 +16,7 @@ import (
 	"strings"
 	"time"
 
+	myjpeg "github.com/kovidgoyal/imaging/jpeg"
 	"github.com/kovidgoyal/imaging/magick"
 	_ "github.com/kovidgoyal/imaging/netpbm"
 	"github.com/kovidgoyal/imaging/prism/meta"
@@ -385,7 +386,12 @@ func decode_all_go(r io.Reader, md *meta.Data, cfg *decodeConfig) (ans *Image, e
 		ans.Metadata.NumFrames = len(ans.Frames)
 		ans.Metadata.NumPlays = int(ans.LoopCount)
 	} else {
-		img, _, err := image.Decode(r)
+		var img image.Image
+		if md.Format == JPEG {
+			img, err = myjpeg.Decode(r)
+		} else {
+			img, _, err = image.Decode(r)
+		}
 		if err != nil {
 			return nil, err
 		}
