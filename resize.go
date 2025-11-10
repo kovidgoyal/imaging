@@ -3,6 +3,8 @@ package imaging
 import (
 	"image"
 	"math"
+
+	"github.com/kovidgoyal/imaging/nrgba"
 )
 
 type indexWeight struct {
@@ -97,13 +99,14 @@ func Resize(img image.Image, width, height int, filter ResampleFilter) image.Ima
 }
 
 func resizeHorizontal(img image.Image, width int, filter ResampleFilter) *image.NRGBA {
-	src := newScanner(img)
-	dst := image.NewNRGBA(image.Rect(0, 0, width, src.h).Add(img.Bounds().Min))
-	weights := precomputeWeights(width, src.w, filter)
+	w, h := img.Bounds().Dx(), img.Bounds().Dy()
+	src := nrgba.NewNRGBAScanner(img)
+	dst := image.NewNRGBA(image.Rect(0, 0, width, h).Add(img.Bounds().Min))
+	weights := precomputeWeights(width, w, filter)
 	if err := run_in_parallel_over_range(0, func(start, limit int) {
-		scanLine := make([]uint8, src.w*4)
+		scanLine := make([]uint8, w*4)
 		for y := start; y < limit; y++ {
-			src.Scan(0, y, src.w, y+1, scanLine)
+			src.Scan(0, y, w, y+1, scanLine)
 			j0 := y * dst.Stride
 			for x := range weights {
 				var r, g, b, a float64
@@ -127,20 +130,21 @@ func resizeHorizontal(img image.Image, width int, filter ResampleFilter) *image.
 				}
 			}
 		}
-	}, 0, src.h); err != nil {
+	}, 0, h); err != nil {
 		panic(err)
 	}
 	return dst
 }
 
 func resizeVertical(img image.Image, height int, filter ResampleFilter) *image.NRGBA {
-	src := newScanner(img)
-	dst := image.NewNRGBA(image.Rect(0, 0, src.w, height).Add(img.Bounds().Min))
-	weights := precomputeWeights(height, src.h, filter)
+	w, h := img.Bounds().Dx(), img.Bounds().Dy()
+	src := nrgba.NewNRGBAScanner(img)
+	dst := image.NewNRGBA(image.Rect(0, 0, w, height).Add(img.Bounds().Min))
+	weights := precomputeWeights(height, h, filter)
 	if err := run_in_parallel_over_range(0, func(start, limit int) {
-		scanLine := make([]uint8, src.h*4)
+		scanLine := make([]uint8, h*4)
 		for x := start; x < limit; x++ {
-			src.Scan(x, 0, x+1, src.h, scanLine)
+			src.Scan(x, 0, x+1, h, scanLine)
 			for y := range weights {
 				var r, g, b, a float64
 				for _, w := range weights[y] {
@@ -163,7 +167,7 @@ func resizeVertical(img image.Image, height int, filter ResampleFilter) *image.N
 				}
 			}
 		}
-	}, 0, src.w); err != nil {
+	}, 0, w); err != nil {
 		panic(err)
 	}
 	return dst
@@ -176,7 +180,7 @@ func resizeNearest(img image.Image, width, height int) *image.NRGBA {
 	dy := float64(img.Bounds().Dy()) / float64(height)
 
 	if dx > 1 && dy > 1 {
-		src := newScanner(img)
+		src := nrgba.NewNRGBAScanner(img)
 		if err := run_in_parallel_over_range(0, func(start, limit int) {
 			for y := start; y < limit; y++ {
 				srcY := int((float64(y) + 0.5) * dy)

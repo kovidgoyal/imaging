@@ -117,39 +117,6 @@ func TestClamp(t *testing.T) {
 	}
 }
 
-func TestReverse(t *testing.T) {
-	testCases := []struct {
-		pix  []uint8
-		want []uint8
-	}{
-		{
-			pix:  []uint8{},
-			want: []uint8{},
-		},
-		{
-			pix:  []uint8{1, 2, 3, 4},
-			want: []uint8{1, 2, 3, 4},
-		},
-		{
-			pix:  []uint8{1, 2, 3, 4, 5, 6, 7, 8},
-			want: []uint8{5, 6, 7, 8, 1, 2, 3, 4},
-		},
-		{
-			pix:  []uint8{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12},
-			want: []uint8{9, 10, 11, 12, 5, 6, 7, 8, 1, 2, 3, 4},
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run("", func(t *testing.T) {
-			reverse4(tc.pix)
-			if !compareBytes(tc.pix, tc.want, 0) {
-				t.Fatalf("got pix %v want %v", tc.pix, tc.want)
-			}
-		})
-	}
-}
-
 func compareNRGBA(img1 image.Image, img2 *image.NRGBA, delta int) bool {
 	if !img1.Bounds().Eq(img2.Bounds()) {
 		return false

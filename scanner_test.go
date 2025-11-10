@@ -10,6 +10,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/kovidgoyal/imaging/nrgb"
+	"github.com/kovidgoyal/imaging/nrgba"
 )
 
 var opaque_base = NRGBColor{}
@@ -108,7 +109,7 @@ func TestScanner(t *testing.T) {
 		}
 		t.Run(tc.name, func(t *testing.T) {
 			r := tc.img.Bounds()
-			s := newScanner(tc.img)
+			s := nrgba.NewNRGBAScanner(tc.img)
 			for y := r.Min.Y; y < r.Max.Y; y++ {
 				buf := make([]byte, r.Dx()*4)
 				s.Scan(0, y-r.Min.Y, r.Dx(), y+1-r.Min.Y, buf)
