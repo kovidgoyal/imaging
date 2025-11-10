@@ -178,7 +178,10 @@ func NewDecodeConfig(opts ...DecodeOption) (cfg *decodeConfig) {
 func (cfg *decodeConfig) magick_callback(w, h int) (ro magick.RenderOptions) {
 	ro.AutoOrient = cfg.autoOrientation
 	if cfg.resize != nil {
-		ro.ResizeTo.X, ro.ResizeTo.Y = cfg.resize(w, h)
+		nw, nh := cfg.resize(w, h)
+		if nw != w || nh != h {
+			ro.ResizeTo.X, ro.ResizeTo.Y = nw, nh
+		}
 	}
 	ro.Background = cfg.background
 	ro.ToSRGB = cfg.outputColorspace == SRGB_COLORSPACE
