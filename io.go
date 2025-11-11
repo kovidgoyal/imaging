@@ -631,7 +631,7 @@ func Encode(w io.Writer, img image.Image, format Format, opts ...EncodeOption) e
 
 	switch format {
 	case JPEG:
-		if nrgba, ok := img.(*image.NRGBA); ok && nrgba.Opaque() {
+		if nrgba, ok := img.(*image.NRGBA); ok && IsOpaque(nrgba) {
 			rgba := &image.RGBA{
 				Pix:    nrgba.Pix,
 				Stride: nrgba.Stride,
