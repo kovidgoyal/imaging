@@ -5,7 +5,7 @@ import os
 import subprocess
 
 
-VERSION = "1.8.8"
+VERSION = "1.8.9"
 
 
 def run(*args: str):
