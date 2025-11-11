@@ -298,9 +298,7 @@ func (d *decoder) processSOS(n int) error {
 						// SOS markers are processed.
 						continue
 					}
-					if err := d.reconstructBlock(&b, bx, by, int(compIndex)); err != nil {
-						return err
-					}
+					d.reconstructBlock(&b, bx, by, int(compIndex))
 				} // for j
 			} // for i
 			mcu++
@@ -452,9 +450,7 @@ func (d *decoder) reconstructProgressiveImage() error {
 		stride := mxx * d.comp[i].h
 		for by := 0; by*v < d.height; by++ {
 			for bx := 0; bx*h < d.width; bx++ {
-				if err := d.reconstructBlock(&d.progCoeffs[i][by*stride+bx], bx, by, i); err != nil {
-					return err
-				}
+				d.reconstructBlock(&d.progCoeffs[i][by*stride+bx], bx, by, i)
 			}
 		}
 	}
@@ -463,7 +459,7 @@ func (d *decoder) reconstructProgressiveImage() error {
 
 // reconstructBlock dequantizes, performs the inverse DCT and stores the block
 // to the image.
-func (d *decoder) reconstructBlock(b *block, bx, by, compIndex int) error {
+func (d *decoder) reconstructBlock(b *block, bx, by, compIndex int) {
 	qt := &d.quant[d.comp[compIndex].tq]
 	for zig := range blockSize {
 		b[unzig[zig]] *= qt[zig]
@@ -482,8 +478,6 @@ func (d *decoder) reconstructBlock(b *block, bx, by, compIndex int) error {
 			dst, stride = d.img3.Cr[8*(by*d.img3.CStride+bx):], d.img3.CStride
 		case 3:
 			dst, stride = d.blackPix[8*(by*d.blackStride+bx):], d.blackStride
-		default:
-			return UnsupportedError("too many components")
 		}
 	}
 	// Level shift by +128, clip to [0, 255], and write to dst.
@@ -502,7 +496,6 @@ func (d *decoder) reconstructBlock(b *block, bx, by, compIndex int) error {
 			dst[yStride+x] = uint8(c)
 		}
 	}
-	return nil
 }
 
 // findRST advances past the next RST restart marker that matches expectedRST.
