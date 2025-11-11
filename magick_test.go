@@ -83,4 +83,5 @@ func TestMagick(t *testing.T) {
 	test_image("testdata/kitty-128.png", 0.0)
 	test_image("testdata/kitty-128.png", 0.06, Background(color.NRGBA{13, 255, 67, 255}))
 	test_image("testdata/kitty-128.png", 0.06, Background(color.NRGBA{255, 0, 0, 125}))
+	test_image("testdata/non-standard-subsample.jpeg", 1.3)
 }

@@ -18,6 +18,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/require"
 )
 
 // TestDecodeProgressive tests that decoding the baseline and progressive
@@ -570,6 +572,46 @@ func TestBadRestartMarker(t *testing.T) {
 			t.Errorf("%q: got %v, want %v", tc, got, want)
 		}
 	}
+}
+
+func require_images_equal(t *testing.T, a, b *image.YCbCr) {
+	require.Equal(t, a.Bounds(), b.Bounds())
+	for y := a.Bounds().Min.Y; y < a.Bounds().Max.Y; y++ {
+		for x := a.Bounds().Min.X; x < a.Bounds().Max.X; x++ {
+			ac := a.YCbCrAt(x, y)
+			bc := b.YCbCrAt(x, y)
+			require.Equal(t, ac, bc, fmt.Sprintf("pixel at: (%d, %d)", x-a.Bounds().Min.X, y-a.Bounds().Min.Y))
+		}
+	}
+}
+
+func test_flex(t *testing.T, path string) {
+	t.Run(path, func(t *testing.T) {
+		t.Parallel()
+		data, err := os.ReadFile(path)
+		require.NoError(t, err)
+		expected, err := stdlibjpeg.Decode(bytes.NewReader(data))
+		require.NoError(t, err)
+		d := decoder{force_flex: true}
+		actual, err := d.decode(bytes.NewReader(data), false)
+		require.NoError(t, err)
+		require.True(t, d.flex)
+		require_images_equal(t, expected.(*image.YCbCr), actual.(*image.YCbCr))
+	})
+}
+
+func TestNonStandardSubSampling(t *testing.T) {
+	for _, path := range []string{
+		"../testdata/video-001",
+		"../testdata/video-001.q50.410",
+		"../testdata/video-001.q50.411",
+		"../testdata/video-001.q50.420",
+		"../testdata/video-001.q50.422",
+		"../testdata/video-001.q50.440",
+		"../testdata/video-001.q50.444"} {
+		test_flex(t, path+".jpeg")
+	}
+
 }
 
 func benchmarkDecode(b *testing.B, filename string) {

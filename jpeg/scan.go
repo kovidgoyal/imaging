@@ -15,29 +15,34 @@ func (d *decoder) makeImg(mxx, myy int) {
 		d.img1 = m.SubImage(image.Rect(0, 0, d.width, d.height)).(*image.Gray)
 		return
 	}
-
-	h0 := d.comp[0].h
-	v0 := d.comp[0].v
-	hRatio := h0 / d.comp[1].h
-	vRatio := v0 / d.comp[1].v
-	var subsampleRatio image.YCbCrSubsampleRatio
-	switch hRatio<<4 | vRatio {
-	case 0x11:
-		subsampleRatio = image.YCbCrSubsampleRatio444
-	case 0x12:
-		subsampleRatio = image.YCbCrSubsampleRatio440
-	case 0x21:
-		subsampleRatio = image.YCbCrSubsampleRatio422
-	case 0x22:
-		subsampleRatio = image.YCbCrSubsampleRatio420
-	case 0x41:
-		subsampleRatio = image.YCbCrSubsampleRatio411
-	case 0x42:
-		subsampleRatio = image.YCbCrSubsampleRatio410
-	default:
-		panic("unreachable")
+	subsampleRatio := image.YCbCrSubsampleRatio444
+	if d.comp[1].h != d.comp[2].h || d.comp[1].v != d.comp[2].v || d.maxH != d.comp[0].h || d.maxV != d.comp[0].v {
+		d.flex = true
+	} else {
+		if d.force_flex {
+			d.flex = true
+		} else {
+			hRatio := d.maxH / d.comp[1].h
+			vRatio := d.maxV / d.comp[1].v
+			switch hRatio<<4 | vRatio {
+			case 0x11:
+				subsampleRatio = image.YCbCrSubsampleRatio444
+			case 0x12:
+				subsampleRatio = image.YCbCrSubsampleRatio440
+			case 0x21:
+				subsampleRatio = image.YCbCrSubsampleRatio422
+			case 0x22:
+				subsampleRatio = image.YCbCrSubsampleRatio420
+			case 0x41:
+				subsampleRatio = image.YCbCrSubsampleRatio411
+			case 0x42:
+				subsampleRatio = image.YCbCrSubsampleRatio410
+			default:
+				d.flex = true
+			}
+		}
 	}
-	m := image.NewYCbCr(image.Rect(0, 0, 8*h0*mxx, 8*v0*myy), subsampleRatio)
+	m := image.NewYCbCr(image.Rect(0, 0, 8*d.maxH*mxx, 8*d.maxV*myy), subsampleRatio)
 	d.img3 = m.SubImage(image.Rect(0, 0, d.width, d.height)).(*image.YCbCr)
 
 	if d.nComp == 4 {
@@ -457,6 +462,45 @@ func (d *decoder) reconstructProgressiveImage() error {
 	return nil
 }
 
+func level_shift(c int32) uint8 {
+	if c < -128 {
+		return 0
+	}
+	if c > 127 {
+		return 255
+	}
+	return uint8(c + 128)
+}
+
+func (d *decoder) storeFlexBlock(b *block, bx, by, compIndex int) {
+	h, v := d.comp[compIndex].expand.h, d.comp[compIndex].expand.v
+	dst, stride := []byte(nil), 0
+	bx, by = bx*h, by*v
+	switch compIndex {
+	case 0:
+		dst, stride = d.img3.Y[8*(by*d.img3.YStride+bx):], d.img3.YStride
+	case 1:
+		dst, stride = d.img3.Cb[8*(by*d.img3.CStride+bx):], d.img3.CStride
+	case 2:
+		dst, stride = d.img3.Cr[8*(by*d.img3.CStride+bx):], d.img3.CStride
+	case 3:
+		dst, stride = d.blackPix[8*(by*d.blackStride+bx):], d.blackStride
+	}
+	for y := range 8 {
+		y8 := y * 8
+		yv := y * v
+		for x := range 8 {
+			val := level_shift(b[y8+x])
+			xh := x * h
+			for yy := range v {
+				for xx := range h {
+					dst[(yv+yy)*stride+xh+xx] = val
+				}
+			}
+		}
+	}
+}
+
 // reconstructBlock dequantizes, performs the inverse DCT and stores the block
 // to the image.
 func (d *decoder) reconstructBlock(b *block, bx, by, compIndex int) {
@@ -469,6 +513,10 @@ func (d *decoder) reconstructBlock(b *block, bx, by, compIndex int) {
 	if d.nComp == 1 {
 		dst, stride = d.img1.Pix[8*(by*d.img1.Stride+bx):], d.img1.Stride
 	} else {
+		if d.flex {
+			d.storeFlexBlock(b, bx, by, compIndex)
+			return
+		}
 		switch compIndex {
 		case 0:
 			dst, stride = d.img3.Y[8*(by*d.img3.YStride+bx):], d.img3.YStride
@@ -485,15 +533,7 @@ func (d *decoder) reconstructBlock(b *block, bx, by, compIndex int) {
 		y8 := y * 8
 		yStride := y * stride
 		for x := range 8 {
-			c := b[y8+x]
-			if c < -128 {
-				c = 0
-			} else if c > 127 {
-				c = 255
-			} else {
-				c += 128
-			}
-			dst[yStride+x] = uint8(c)
+			dst[yStride+x] = level_shift(b[y8+x])
 		}
 	}
 }

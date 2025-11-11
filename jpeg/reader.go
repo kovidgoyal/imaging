@@ -31,10 +31,11 @@ var errUnsupportedSubsamplingRatio = UnsupportedError("luma/chroma subsampling r
 
 // Component specification, specified in section B.2.2.
 type component struct {
-	h  int   // Horizontal sampling factor.
-	v  int   // Vertical sampling factor.
-	c  uint8 // Component identifier.
-	tq uint8 // Quantization table destination selector.
+	h      int                // Horizontal sampling factor.
+	v      int                // Vertical sampling factor.
+	c      uint8              // Component identifier.
+	tq     uint8              // Quantization table destination selector.
+	expand struct{ h, v int } // subsampleRatio for this component
 }
 
 const (
@@ -125,6 +126,9 @@ type decoder struct {
 	img1        *image.Gray
 	img3        *image.YCbCr
 	blackPix    []byte
+	flex        bool // uses a non-standard subsampleRatio
+	force_flex  bool // used for testing
+	maxH, maxV  int
 	blackStride int
 
 	ri    int // Restart Interval.
@@ -348,6 +352,7 @@ func (d *decoder) processSOF(n int) error {
 		if h == 3 || v == 3 {
 			return errUnsupportedSubsamplingRatio
 		}
+		d.maxH, d.maxV = max(d.maxH, h), max(d.maxV, v)
 		switch d.nComp {
 		case 1:
 			// If a JPEG image has only one component, section A.2 says "this data
@@ -364,31 +369,9 @@ func (d *decoder) processSOF(n int) error {
 			h, v = 1, 1
 
 		case 3:
-			// For YCbCr images, we only support 4:4:4, 4:4:0, 4:2:2, 4:2:0,
-			// 4:1:1 or 4:1:0 chroma subsampling ratios. This implies that the
-			// (h, v) values for the Y component are either (1, 1), (1, 2),
-			// (2, 1), (2, 2), (4, 1) or (4, 2), and the Y component's values
-			// must be a multiple of the Cb and Cr component's values. We also
-			// assume that the two chroma components have the same subsampling
-			// ratio.
-			switch i {
-			case 0: // Y.
-				// We have already verified, above, that h and v are both
-				// either 1, 2 or 4, so invalid (h, v) combinations are those
-				// with v == 4.
-				if v == 4 {
-					return errUnsupportedSubsamplingRatio
-				}
-			case 1: // Cb.
-				if d.comp[0].h%h != 0 || d.comp[0].v%v != 0 {
-					return errUnsupportedSubsamplingRatio
-				}
-			case 2: // Cr.
-				if d.comp[1].h != h || d.comp[1].v != v {
-					return errUnsupportedSubsamplingRatio
-				}
+			if i == 0 && v == 4 {
+				return errUnsupportedSubsamplingRatio
 			}
-
 		case 4:
 			// For 4-component images (either CMYK or YCbCrK), we only support two
 			// hv vectors: [0x11 0x11 0x11 0x11] and [0x22 0x11 0x11 0x22].
@@ -417,6 +400,17 @@ func (d *decoder) processSOF(n int) error {
 
 		d.comp[i].h = h
 		d.comp[i].v = v
+	}
+	if d.nComp == 3 {
+		for i := range 3 {
+			if d.maxH%d.comp[i].h != 0 || d.maxV%d.comp[i].v != 0 {
+				return errUnsupportedSubsamplingRatio
+			}
+		}
+	}
+	for i := range d.nComp {
+		d.comp[i].expand.h = d.maxH / d.comp[i].h
+		d.comp[i].expand.v = d.maxV / d.comp[i].v
 	}
 	return nil
 }
