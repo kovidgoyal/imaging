@@ -29,7 +29,7 @@ func Histogram(img image.Image) [256]float64 {
 		for y := start; y < limit; y++ {
 			src.Scan(0, y, w, y+1, scanLine)
 			i := 0
-			for x := 0; x < w; x++ {
+			for range w {
 				s := scanLine[i : i+3 : i+3]
 				r := s[0]
 				g := s[1]

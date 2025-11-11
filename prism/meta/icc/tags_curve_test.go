@@ -173,7 +173,7 @@ func TestParametricCurveDecoder(t *testing.T) {
 		buf.WriteString("para")
 		buf.Write([]byte{0, 0, 0, 0})
 		_ = binary.Write(&buf, binary.BigEndian, uint16(5))
-		for i := 0; i < 7; i++ {
+		for range 7 {
 			_ = binary.Write(&buf, binary.BigEndian, uint32(0x00010000)) // 1.0
 		}
 		_, err := parametricCurveDecoder(buf.Bytes())

@@ -71,7 +71,7 @@ const (
 // ASSP, Vol. ASSP- 32, pp. 803-816, Aug. 1984.
 func idct(src *block) {
 	// Horizontal 1-D IDCT.
-	for y := 0; y < 8; y++ {
+	for y := range 8 {
 		y8 := y * 8
 		s := src[y8 : y8+8 : y8+8] // Small cap improves performance, see https://golang.org/issue/27857
 		// If all the AC components are zero, then the IDCT is trivial.
@@ -138,7 +138,7 @@ func idct(src *block) {
 	}
 
 	// Vertical 1-D IDCT.
-	for x := 0; x < 8; x++ {
+	for x := range 8 {
 		// Similar to the horizontal 1-D IDCT case, if all the AC components are zero, then the IDCT is trivial.
 		// However, after performing the horizontal 1-D IDCT, there are typically non-zero AC components, so
 		// we do not bother to check for the all-zero case.

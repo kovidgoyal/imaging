@@ -46,7 +46,7 @@ func TestGrayscale(t *testing.T) {
 
 func BenchmarkGrayscale(b *testing.B) {
 	b.ReportAllocs()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		Grayscale(testdataBranchesJPG)
 	}
 }
@@ -91,7 +91,7 @@ func TestInvert(t *testing.T) {
 
 func BenchmarkInvert(b *testing.B) {
 	b.ReportAllocs()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		Invert(testdataBranchesJPG)
 	}
 }
@@ -242,7 +242,7 @@ func TestAdjustSaturationGolden(t *testing.T) {
 
 func BenchmarkAdjustSaturation(b *testing.B) {
 	b.ReportAllocs()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		AdjustSaturation(testdataBranchesJPG, 10)
 	}
 }
@@ -529,7 +529,7 @@ func TestAdjustHueGolden(t *testing.T) {
 
 func BenchmarkAdjustHue(b *testing.B) {
 	b.ReportAllocs()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		AdjustHue(testdataBranchesJPG, 10)
 	}
 }
@@ -680,7 +680,7 @@ func TestAdjustContrastGolden(t *testing.T) {
 
 func BenchmarkAdjustContrast(b *testing.B) {
 	b.ReportAllocs()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		AdjustContrast(testdataBranchesJPG, 10)
 	}
 }
@@ -831,7 +831,7 @@ func TestAdjustBrightnessGolden(t *testing.T) {
 
 func BenchmarkAdjustBrightness(b *testing.B) {
 	b.ReportAllocs()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		AdjustBrightness(testdataBranchesJPG, 10)
 	}
 }
@@ -938,7 +938,7 @@ func TestAdjustGammaGolden(t *testing.T) {
 
 func BenchmarkAdjustGamma(b *testing.B) {
 	b.ReportAllocs()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		AdjustGamma(testdataBranchesJPG, 1.5)
 	}
 }
@@ -1033,7 +1033,7 @@ func TestAdjustSigmoid(t *testing.T) {
 
 func BenchmarkAdjustSigmoid(b *testing.B) {
 	b.ReportAllocs()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		AdjustSigmoid(testdataBranchesJPG, 0.5, 3.0)
 	}
 }
@@ -1110,7 +1110,7 @@ func TestAdjustFunc(t *testing.T) {
 
 func BenchmarkAdjustFunc(b *testing.B) {
 	b.ReportAllocs()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		AdjustFunc(testdataBranchesJPG, func(c color.NRGBA) color.NRGBA {
 			return color.NRGBA{c.B, c.G, c.R, c.A}
 		})

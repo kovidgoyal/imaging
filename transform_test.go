@@ -67,7 +67,7 @@ func TestFlipH(t *testing.T) {
 
 func BenchmarkFlipH(b *testing.B) {
 	b.ReportAllocs()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		FlipH(testdataBranchesJPG)
 	}
 }
@@ -112,7 +112,7 @@ func TestFlipV(t *testing.T) {
 
 func BenchmarkFlipV(b *testing.B) {
 	b.ReportAllocs()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		FlipV(testdataBranchesJPG)
 	}
 }
@@ -156,7 +156,7 @@ func TestTranspose(t *testing.T) {
 
 func BenchmarkTranspose(b *testing.B) {
 	b.ReportAllocs()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		Transpose(testdataBranchesJPG)
 	}
 }
@@ -200,7 +200,7 @@ func TestTransverse(t *testing.T) {
 
 func BenchmarkTransverse(b *testing.B) {
 	b.ReportAllocs()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		Transverse(testdataBranchesJPG)
 	}
 }
@@ -244,7 +244,7 @@ func TestRotate90(t *testing.T) {
 
 func BenchmarkRotate90(b *testing.B) {
 	b.ReportAllocs()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		Rotate90(testdataBranchesJPG)
 	}
 }
@@ -289,7 +289,7 @@ func TestRotate180(t *testing.T) {
 
 func BenchmarkRotate180(b *testing.B) {
 	b.ReportAllocs()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		Rotate180(testdataBranchesJPG)
 	}
 }
@@ -333,7 +333,7 @@ func TestRotate270(t *testing.T) {
 
 func BenchmarkRotate270(b *testing.B) {
 	b.ReportAllocs()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		Rotate270(testdataBranchesJPG)
 	}
 }
@@ -660,7 +660,7 @@ func TestRotate(t *testing.T) {
 
 func BenchmarkRotate(b *testing.B) {
 	b.ReportAllocs()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		Rotate(testdataBranchesJPG, 30, color.Transparent)
 	}
 }

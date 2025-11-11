@@ -160,8 +160,8 @@ func check(bounds image.Rectangle, pix0, pix1 []byte, stride0, stride1 int) erro
 				continue
 			}
 
-			for j := 0; j < 8; j++ {
-				for i := 0; i < 8; i++ {
+			for j := range 8 {
+				for i := range 8 {
 					index0 := (y+j)*stride0 + (x + i)
 					index1 := (y+j)*stride1 + (x + i)
 					if pix0[index0] != pix1[index1] {
@@ -179,9 +179,9 @@ func check(bounds image.Rectangle, pix0, pix1 []byte, stride0, stride1 int) erro
 
 func pixString(pix []byte, stride, x, y int) string {
 	s := &strings.Builder{}
-	for j := 0; j < 8; j++ {
+	for j := range 8 {
 		fmt.Fprintf(s, "\t")
-		for i := 0; i < 8; i++ {
+		for i := range 8 {
 			fmt.Fprintf(s, "%02x ", pix[(y+j)*stride+(x+i)])
 		}
 		fmt.Fprintf(s, "\n")
@@ -200,10 +200,7 @@ func TestTruncatedSOSDataDoesntPanic(t *testing.T) {
 		t.Fatal("SOS marker not found")
 	}
 	i += len(sosMarker)
-	j := i + 10
-	if j > len(b) {
-		j = len(b)
-	}
+	j := min(i+10, len(b))
 	for ; i < j; i++ {
 		Decode(bytes.NewReader(b[:i]))
 	}
@@ -586,8 +583,8 @@ func benchmarkDecode(b *testing.B, filename string) {
 	}
 	b.SetBytes(int64(cfg.Width * cfg.Height * 4))
 	b.ReportAllocs()
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+
+	for b.Loop() {
 		Decode(bytes.NewReader(data))
 	}
 }

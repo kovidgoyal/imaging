@@ -133,7 +133,7 @@ func (d *decoder) processDHT(n int) error {
 		// Derive the look-up table.
 		clear(h.lut[:])
 		var x, code uint32
-		for i := uint32(0); i < lutSize; i++ {
+		for i := range uint32(lutSize) {
 			code <<= 1
 			for j := int32(0); j < nCodes[i]; j++ {
 				// The codeLength is 1+i, so shift code by 8-(1+i) to

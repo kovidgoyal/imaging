@@ -19,7 +19,7 @@ func TestSubChunkReader(t *testing.T) {
 	for _, numSubChunks := range []int{1, 5, 10, 20} {
 		chunk := make([]byte, 0, 2048)
 		wantLength := uint32(128)
-		for i := 0; i < numSubChunks; i++ {
+		for range numSubChunks {
 			chunk = append(chunk, genSubChunk(wantLength)...)
 		}
 

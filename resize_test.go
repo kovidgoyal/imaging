@@ -908,7 +908,7 @@ func BenchmarkResize(b *testing.B) {
 
 				b.Run(fmt.Sprintf("%s %s %s", dir, filter, format), func(b *testing.B) {
 					b.ReportAllocs()
-					for i := 0; i < b.N; i++ {
+					for b.Loop() {
 						Resize(img, size, size, f)
 					}
 				})
@@ -953,7 +953,7 @@ func BenchmarkFill(b *testing.B) {
 
 				b.Run(fmt.Sprintf("%s %s %s", dir, filter, format), func(b *testing.B) {
 					b.ReportAllocs()
-					for i := 0; i < b.N; i++ {
+					for b.Loop() {
 						Fill(img, width, height, Center, f)
 					}
 				})

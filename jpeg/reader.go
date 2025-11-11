@@ -284,10 +284,7 @@ func (d *decoder) ignore(n int) error {
 	}
 
 	for {
-		m := d.bytes.j - d.bytes.i
-		if m > n {
-			m = n
-		}
+		m := min(d.bytes.j-d.bytes.i, n)
 		d.bytes.i += m
 		n -= m
 		if n == 0 {

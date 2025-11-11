@@ -307,7 +307,7 @@ func TestNormalizeKernel(t *testing.T) {
 
 func BenchmarkConvolve3x3(b *testing.B) {
 	b.ReportAllocs()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		Convolve3x3(
 			testdataBranchesJPG,
 			[9]float64{
@@ -322,7 +322,7 @@ func BenchmarkConvolve3x3(b *testing.B) {
 
 func BenchmarkConvolve5x5(b *testing.B) {
 	b.ReportAllocs()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		Convolve5x5(
 			testdataBranchesJPG,
 			[25]float64{

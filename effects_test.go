@@ -107,7 +107,7 @@ func TestBlurGolden(t *testing.T) {
 
 func BenchmarkBlur(b *testing.B) {
 	b.ReportAllocs()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		Blur(testdataBranchesJPG, 3)
 	}
 }
@@ -232,7 +232,7 @@ func TestSharpenGolden(t *testing.T) {
 
 func BenchmarkSharpen(b *testing.B) {
 	b.ReportAllocs()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		Sharpen(testdataBranchesJPG, 3)
 	}
 }

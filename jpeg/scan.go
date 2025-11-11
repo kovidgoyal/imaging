@@ -68,7 +68,7 @@ func (d *decoder) processSOS(n int) error {
 		ta        uint8 // AC table selector.
 	}
 	totalHV := 0
-	for i := 0; i < nComp; i++ {
+	for i := range nComp {
 		cs := d.tmp[1+2*i] // Component selector.
 		compIndex := -1
 		for j, comp := range d.comp[:d.nComp] {
@@ -85,7 +85,7 @@ func (d *decoder) processSOS(n int) error {
 		// verified that a frame's component identifiers (C_i values in section
 		// B.2.2) are unique, it suffices to check that the implicit indexes
 		// into d.comp are unique.
-		for j := 0; j < i; j++ {
+		for j := range i {
 			if scan[i].compIndex == scan[j].compIndex {
 				return FormatError("repeated component selector")
 			}
@@ -150,7 +150,7 @@ func (d *decoder) processSOS(n int) error {
 		d.makeImg(mxx, myy)
 	}
 	if d.progressive {
-		for i := 0; i < nComp; i++ {
+		for i := range nComp {
 			compIndex := scan[i].compIndex
 			if d.progCoeffs[compIndex] == nil {
 				d.progCoeffs[compIndex] = make([]block, mxx*myy*d.comp[compIndex].h*d.comp[compIndex].v)
@@ -169,9 +169,9 @@ func (d *decoder) processSOS(n int) error {
 		bx, by     int
 		blockCount int
 	)
-	for my := 0; my < myy; my++ {
-		for mx := 0; mx < mxx; mx++ {
-			for i := 0; i < nComp; i++ {
+	for my := range myy {
+		for mx := range mxx {
+			for i := range nComp {
 				compIndex := scan[i].compIndex
 				hi := d.comp[compIndex].h
 				vi := d.comp[compIndex].v
@@ -465,7 +465,7 @@ func (d *decoder) reconstructProgressiveImage() error {
 // to the image.
 func (d *decoder) reconstructBlock(b *block, bx, by, compIndex int) error {
 	qt := &d.quant[d.comp[compIndex].tq]
-	for zig := 0; zig < blockSize; zig++ {
+	for zig := range blockSize {
 		b[unzig[zig]] *= qt[zig]
 	}
 	idct(b)
@@ -487,10 +487,10 @@ func (d *decoder) reconstructBlock(b *block, bx, by, compIndex int) error {
 		}
 	}
 	// Level shift by +128, clip to [0, 255], and write to dst.
-	for y := 0; y < 8; y++ {
+	for y := range 8 {
 		y8 := y * 8
 		yStride := y * stride
-		for x := 0; x < 8; x++ {
+		for x := range 8 {
 			c := b[y8+x]
 			if c < -128 {
 				c = 0
