@@ -227,6 +227,7 @@ func newScannerRGB(img image.Image, opaque_base Color) *scanner_rgb {
 
 // scan scans the given rectangular region of the image into dst.
 func (s *scanner_rgb) Scan(x1, y1, x2, y2 int, dst []uint8) {
+	_ = dst[3*(x2-x1)*(y2-y1)-1]
 	switch img := s.image.(type) {
 	case *image.NRGBA:
 		j := 0

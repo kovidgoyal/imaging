@@ -70,6 +70,7 @@ func (s *scanner) ScanRow(x1, y1, x2, y2 int, img image.Image, row int) {
 
 // scan scans the given rectangular region of the image into dst.
 func (s *scanner) Scan(x1, y1, x2, y2 int, dst []uint8) {
+	_ = dst[4*(x2-x1)*(y2-y1)-1]
 	switch img := s.image.(type) {
 	case *nrgb.Image:
 		if x2 == x1+1 {
