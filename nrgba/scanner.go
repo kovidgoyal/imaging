@@ -234,42 +234,58 @@ func (s *scanner) Scan(x1, y1, x2, y2 int, dst []uint8) {
 		}
 
 	case *image.YCbCr:
-		j := 0
-		x1 += img.Rect.Min.X
-		x2 += img.Rect.Min.X
-		y1 += img.Rect.Min.Y
-		y2 += img.Rect.Min.Y
-
-		hy := img.Rect.Min.Y / 2
-		hx := img.Rect.Min.X / 2
-		for y := y1; y < y2; y++ {
-			iy := (y-img.Rect.Min.Y)*img.YStride + (x1 - img.Rect.Min.X)
-
-			var yBase int
-			switch img.SubsampleRatio {
-			case image.YCbCrSubsampleRatio444, image.YCbCrSubsampleRatio422:
-				yBase = (y - img.Rect.Min.Y) * img.CStride
-			case image.YCbCrSubsampleRatio420, image.YCbCrSubsampleRatio440:
-				yBase = (y/2 - hy) * img.CStride
+		if img.SubsampleRatio == image.YCbCrSubsampleRatio444 {
+			Y := img.Y[y1*img.YStride:]
+			Cb := img.Cb[y1*img.CStride:]
+			Cr := img.Cr[y1*img.CStride:]
+			for range y2 - y1 {
+				for x := x1; x < x2; x++ {
+					d := dst[0:4:4]
+					d[0], d[1], d[2] = color.YCbCrToRGB(Y[x], Cb[x], Cr[x])
+					d[3] = 255
+					dst = dst[4:]
+				}
+				Y, Cb, Cr = Y[img.YStride:], Cb[img.CStride:], Cr[img.CStride:]
 			}
+		} else {
 
-			for x := x1; x < x2; x++ {
-				var ic int
+			j := 0
+			x1 += img.Rect.Min.X
+			x2 += img.Rect.Min.X
+			y1 += img.Rect.Min.Y
+			y2 += img.Rect.Min.Y
+
+			hy := img.Rect.Min.Y / 2
+			hx := img.Rect.Min.X / 2
+			for y := y1; y < y2; y++ {
+				iy := (y-img.Rect.Min.Y)*img.YStride + (x1 - img.Rect.Min.X)
+
+				var yBase int
 				switch img.SubsampleRatio {
-				case image.YCbCrSubsampleRatio444, image.YCbCrSubsampleRatio440:
-					ic = yBase + (x - img.Rect.Min.X)
-				case image.YCbCrSubsampleRatio422, image.YCbCrSubsampleRatio420:
-					ic = yBase + (x/2 - hx)
-				default:
-					ic = img.COffset(x, y)
+				case image.YCbCrSubsampleRatio422:
+					yBase = (y - img.Rect.Min.Y) * img.CStride
+				case image.YCbCrSubsampleRatio420, image.YCbCrSubsampleRatio440:
+					yBase = (y/2 - hy) * img.CStride
 				}
 
-				d := dst[j : j+4 : j+4]
-				d[0], d[1], d[2] = color.YCbCrToRGB(img.Y[iy], img.Cb[ic], img.Cr[ic])
-				d[3] = 0xff
+				for x := x1; x < x2; x++ {
+					var ic int
+					switch img.SubsampleRatio {
+					case image.YCbCrSubsampleRatio440:
+						ic = yBase + (x - img.Rect.Min.X)
+					case image.YCbCrSubsampleRatio422, image.YCbCrSubsampleRatio420:
+						ic = yBase + (x/2 - hx)
+					default:
+						ic = img.COffset(x, y)
+					}
 
-				iy++
-				j += 4
+					d := dst[j : j+4 : j+4]
+					d[0], d[1], d[2] = color.YCbCrToRGB(img.Y[iy], img.Cb[ic], img.Cr[ic])
+					d[3] = 0xff
+
+					iy++
+					j += 4
+				}
 			}
 		}
 
