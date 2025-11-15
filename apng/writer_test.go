@@ -100,8 +100,8 @@ func TestWriterPaletted(t *testing.T) {
 			m0 := image.NewPaletted(image.Rect(0, 0, width, height), palette)
 
 			i := 0
-			for y := 0; y < height; y++ {
-				for x := 0; x < width; x++ {
+			for y := range height {
+				for x := range width {
 					m0.SetColorIndex(x, y, uint8(i%tc.plen))
 					i++
 				}
@@ -175,8 +175,8 @@ func TestWriterLevels(t *testing.T) {
 
 func TestSubImage(t *testing.T) {
 	m0 := image.NewRGBA(image.Rect(0, 0, 256, 256))
-	for y := 0; y < 256; y++ {
-		for x := 0; x < 256; x++ {
+	for y := range 256 {
+		for x := range 256 {
 			m0.Set(x, y, color.RGBA{uint8(x), uint8(y), 0, 255})
 		}
 	}
@@ -197,8 +197,8 @@ func BenchmarkEncodeGray(b *testing.B) {
 	img := image.NewGray(image.Rect(0, 0, 640, 480))
 	b.SetBytes(640 * 480 * 1)
 	b.ReportAllocs()
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+
+	for b.Loop() {
 		Encode(io.Discard, APNG{Frames: []Frame{{Image: img}}})
 	}
 }
@@ -222,8 +222,8 @@ func BenchmarkEncodeGrayWithBufferPool(b *testing.B) {
 	}
 	b.SetBytes(640 * 480 * 1)
 	b.ReportAllocs()
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+
+	for b.Loop() {
 		e.Encode(io.Discard, APNG{Frames: []Frame{{Image: img}}})
 	}
 }
@@ -242,8 +242,8 @@ func BenchmarkEncodeNRGBOpaque(b *testing.B) {
 	}
 	b.SetBytes(640 * 480 * 4)
 	b.ReportAllocs()
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+
+	for b.Loop() {
 		Encode(io.Discard, APNG{Frames: []Frame{{Image: img}}})
 	}
 }
@@ -255,8 +255,8 @@ func BenchmarkEncodeNRGBA(b *testing.B) {
 	}
 	b.SetBytes(640 * 480 * 4)
 	b.ReportAllocs()
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+
+	for b.Loop() {
 		Encode(io.Discard, APNG{Frames: []Frame{{Image: img}}})
 	}
 }
@@ -268,8 +268,8 @@ func BenchmarkEncodePaletted(b *testing.B) {
 	})
 	b.SetBytes(640 * 480 * 1)
 	b.ReportAllocs()
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+
+	for b.Loop() {
 		Encode(io.Discard, APNG{Frames: []Frame{{Image: img}}})
 	}
 }
@@ -288,8 +288,8 @@ func BenchmarkEncodeRGBOpaque(b *testing.B) {
 	}
 	b.SetBytes(640 * 480 * 4)
 	b.ReportAllocs()
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+
+	for b.Loop() {
 		Encode(io.Discard, APNG{Frames: []Frame{{Image: img}}})
 	}
 }
@@ -301,8 +301,8 @@ func BenchmarkEncodeRGBA(b *testing.B) {
 	}
 	b.SetBytes(640 * 480 * 4)
 	b.ReportAllocs()
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+
+	for b.Loop() {
 		Encode(io.Discard, APNG{Frames: []Frame{{Image: img}}})
 	}
 }

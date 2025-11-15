@@ -103,8 +103,8 @@ func ExampleEncode() {
 			circles[c].Y = int(float64(h) * (0.5 - 0.15*math.Cos(theta0) - 0.1*math.Cos(theta0+theta)))
 		}
 
-		for y := 0; y < h; y++ {
-			for x := 0; x < w; x++ {
+		for y := range h {
+			for x := range w {
 				var rgb [3]uint8
 				for c := range circles {
 					dx, dy := x-circles[c].X, y-circles[c].Y

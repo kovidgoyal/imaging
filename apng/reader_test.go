@@ -74,7 +74,7 @@ func TestMultipletRNSChunks(t *testing.T) {
 		idat = "\x00\x00\x00\x0eIDAT\x78\x9c\x62\x62\x00\x04\x00\x00\xff\xff\x00\x06\x00\x03\xfa\xd0\x59\xae"
 		iend = "\x00\x00\x00\x00IEND\xae\x42\x60\x82"
 	)
-	for i := 0; i < 4; i++ {
+	for i := range 4 {
 		var b []byte
 		b = append(b, pngHeader...)
 		b = append(b, ihdr...)

@@ -34,7 +34,7 @@ func slowPaeth(a, b, c uint8) uint8 {
 
 // slowFilterPaeth is a slow but simple implementation of func filterPaeth.
 func slowFilterPaeth(cdat, pdat []byte, bytesPerPixel int) {
-	for i := 0; i < bytesPerPixel; i++ {
+	for i := range bytesPerPixel {
 		cdat[i] += paeth(0, pdat[i], 0)
 	}
 	for i := bytesPerPixel; i < len(cdat); i++ {
@@ -57,7 +57,7 @@ func TestPaeth(t *testing.T) {
 }
 
 func BenchmarkPaeth(b *testing.B) {
-	for i := 0; i < b.N; i++ {
+	for i := 0; b.Loop(); i++ {
 		paeth(uint8(i>>16), uint8(i>>8), uint8(i))
 	}
 }
@@ -71,7 +71,7 @@ func TestPaethDecode(t *testing.T) {
 	cdat2 := make([]byte, 32)
 	r := rand.New(rand.NewSource(1))
 	for bytesPerPixel := 1; bytesPerPixel <= 8; bytesPerPixel++ {
-		for i := 0; i < 100; i++ {
+		for range 100 {
 			for j := range pdat0 {
 				pdat0[j] = uint8(r.Uint32())
 				cdat0[j] = uint8(r.Uint32())
