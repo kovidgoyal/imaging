@@ -1,4 +1,4 @@
-package apng_test
+package apng
 
 import (
 	"encoding/base64"
@@ -9,8 +9,6 @@ import (
 	"os"
 	"strings"
 	"time"
-
-	"github.com/kettek/apng"
 )
 
 const gopher = `iVBORw0KGgoAAAANSUhEUgAAADIAAAAZCAAAAABWPyKYAAAAAnRSTlMAAHaTzTgAAAAIYWNUTAAAAAgAAAAAuT2L0QAAABpmY1RMAAAAAAAAADIAAAAZAAAAAAAAAAAACgBkAABynX+UAAAA
@@ -34,7 +32,7 @@ MqhTy+VWV7eh4XBDXm5q20BuC1rjDO4/aoflZlo3bdY9Hf4TMIz7kLhAvnT6Z0dcIF+oys+sUiQzbbRU
 func gopherPNG() io.Reader { return base64.NewDecoder(base64.StdEncoding, strings.NewReader(gopher)) }
 
 func ExampleDecodeAll() {
-	am, err := apng.DecodeAll(gopherPNG())
+	am, err := DecodeAll(gopherPNG())
 	if err != nil {
 		panic(err)
 	}
@@ -62,7 +60,7 @@ func ExampleDecodeAll() {
 					c := fr.Image.At(x, y)
 					if _, _, _, a := c.RGBA(); a > 0 {
 						buf[y+fr.YOffset][x+fr.XOffset] = levels[(color.GrayModel.Convert(c).(color.Gray).Y / 52)]
-					} else if fr.BlendOp == apng.BLEND_OP_SOURCE {
+					} else if fr.BlendOp == BLEND_OP_SOURCE {
 						buf[y+fr.YOffset][x+fr.XOffset] = ' '
 					}
 				}
@@ -73,7 +71,7 @@ func ExampleDecodeAll() {
 			}
 			time.Sleep(time.Duration(float64(time.Second)*float64(fr.DelayNumerator)/float64(fr.DelayDenominator)) - time.Now().Sub(n))
 			n = time.Now()
-			if fr.DisposeOp == apng.DISPOSE_OP_BACKGROUND || i == len(am.Frames)-1 {
+			if fr.DisposeOp == DISPOSE_OP_BACKGROUND || i == len(am.Frames)-1 {
 				for y := 0; y < fr.Image.Bounds().Dy(); y++ {
 					for x := 0; x < fr.Image.Bounds().Dx(); x++ {
 						buf[y+fr.YOffset][x+fr.XOffset] = ' '
@@ -89,7 +87,7 @@ func ExampleDecodeAll() {
 
 func ExampleEncode() {
 	w, h := 200, 200
-	am := apng.APNG{Frames: make([]apng.Frame, 20)}
+	am := APNG{Frames: make([]Frame, 20)}
 	var circles [3]image.Point
 
 	for i := range am.Frames {
@@ -122,7 +120,7 @@ func ExampleEncode() {
 		panic(err)
 	}
 	defer f.Close()
-	if err := apng.Encode(f, am); err != nil {
+	if err := Encode(f, am); err != nil {
 		panic(err)
 	}
 }

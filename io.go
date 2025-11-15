@@ -16,6 +16,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/kovidgoyal/imaging/apng"
 	myjpeg "github.com/kovidgoyal/imaging/jpeg"
 	"github.com/kovidgoyal/imaging/magick"
 	_ "github.com/kovidgoyal/imaging/netpbm"
@@ -27,7 +28,6 @@ import (
 	"github.com/kovidgoyal/imaging/types"
 	"github.com/kovidgoyal/imaging/webp"
 
-	"github.com/kettek/apng"
 	"github.com/rwcarlsen/goexif/exif"
 	exif_tiff "github.com/rwcarlsen/goexif/tiff"
 

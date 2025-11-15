@@ -13,7 +13,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/kettek/apng"
+	"github.com/kovidgoyal/imaging/apng"
 	"github.com/kovidgoyal/imaging/prism/meta"
 	"github.com/kovidgoyal/imaging/prism/meta/gifmeta"
 	"github.com/kovidgoyal/imaging/webp"
