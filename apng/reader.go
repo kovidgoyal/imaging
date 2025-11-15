@@ -1149,7 +1149,3 @@ func DecodeConfig(r io.Reader) (image.Config, error) {
 		Height:     d.a.Frames[0].height,
 	}, nil
 }
-
-func init() {
-	image.RegisterFormat("apng", pngHeader, Decode, DecodeConfig)
-}

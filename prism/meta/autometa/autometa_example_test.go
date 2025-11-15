@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"image"
 	"image/jpeg"
-	"image/png"
 	"os"
 
+	"github.com/kovidgoyal/imaging/apng"
 	"github.com/kovidgoyal/imaging/prism/meta"
 	"github.com/kovidgoyal/imaging/prism/meta/autometa"
 	"golang.org/x/image/webp"
@@ -62,7 +62,7 @@ func ExampleLoad_basicPNGMetadata() {
 		panic(err)
 	}
 
-	img, err := png.Decode(imgStream)
+	img, err := apng.Decode(imgStream)
 	if err != nil {
 		panic(err)
 	}

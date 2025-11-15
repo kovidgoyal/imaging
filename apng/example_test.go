@@ -69,7 +69,7 @@ func ExampleDecodeAll() {
 			for y := range buf {
 				println(string(buf[y]))
 			}
-			time.Sleep(time.Duration(float64(time.Second)*float64(fr.DelayNumerator)/float64(fr.DelayDenominator)) - time.Now().Sub(n))
+			time.Sleep(time.Duration(float64(time.Second)*float64(fr.DelayNumerator)/float64(fr.DelayDenominator)) - time.Since(n))
 			n = time.Now()
 			if fr.DisposeOp == DISPOSE_OP_BACKGROUND || i == len(am.Frames)-1 {
 				for y := 0; y < fr.Image.Bounds().Dy(); y++ {

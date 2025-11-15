@@ -387,9 +387,12 @@ func decode_all_go(r io.Reader, md *meta.Data, cfg *decodeConfig) (ans *Image, e
 		ans.Metadata.NumPlays = int(ans.LoopCount)
 	} else {
 		var img image.Image
-		if md.Format == JPEG {
+		switch md.Format {
+		case JPEG:
 			img, err = myjpeg.Decode(r)
-		} else {
+		case PNG:
+			img, err = apng.Decode(r)
+		default:
 			img, _, err = image.Decode(r)
 		}
 		if err != nil {
