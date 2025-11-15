@@ -463,9 +463,9 @@ func (self *Image) Resize(width, height int, filter ResampleFilter) {
 	scaledy := func(x int) int { return int(float64(x) * sy) }
 	for i, f := range self.Frames {
 		if i == 0 {
-			f.Image = Resize(f.Image, width, height, filter)
+			f.Image = ResizeWithOpacity(f.Image, width, height, filter, IsOpaque(f.Image))
 		} else {
-			f.Image = Resize(f.Image, scaledx(f.Image.Bounds().Dx()), scaledy(f.Image.Bounds().Dy()), filter)
+			f.Image = ResizeWithOpacity(f.Image, scaledx(f.Image.Bounds().Dx()), scaledy(f.Image.Bounds().Dy()), filter, IsOpaque(f.Image))
 			f.TopLeft = image.Pt(scaledx(f.TopLeft.X), scaledy(f.TopLeft.Y))
 		}
 	}

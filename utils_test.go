@@ -6,6 +6,8 @@ import (
 	"math"
 	"runtime"
 	"testing"
+
+	"github.com/kovidgoyal/imaging/nrgb"
 )
 
 var (
@@ -124,6 +126,13 @@ func compareNRGBA(img1 image.Image, img2 *image.NRGBA, delta int) bool {
 	return compareBytes(AsNRGBA(img1).Pix, img2.Pix, delta)
 }
 
+func compareNRGB(img1 image.Image, img2 *nrgb.Image, delta int) bool {
+	if !img1.Bounds().Eq(img2.Bounds()) {
+		return false
+	}
+	return compareBytes(AsNRGB(img1).Pix, img2.Pix, delta)
+}
+
 func delta16(a, b uint16) int { return absint(int(a) - int(b)) }
 
 func compare_colors(ac, bc color.Color, delta int) bool {
@@ -171,6 +180,14 @@ func compareNRGBAGolden(img1, img2 *image.NRGBA) bool {
 		delta = 1
 	}
 	return compareNRGBA(img1, img2, delta)
+}
+
+func compareNRGBGolden(img1, img2 *nrgb.Image) bool {
+	delta := 0
+	if runtime.GOARCH != "amd64" {
+		delta = 1
+	}
+	return compareNRGB(img1, img2, delta)
 }
 
 func compareFloat64(a, b, delta float64) bool {

@@ -89,6 +89,16 @@ func is_opaque16(pix []uint8, w, h, stride int) bool {
 	return is_opaque.Load()
 }
 
+func IsOpaqueType(img image.Image) (ans bool) {
+	switch img.(type) {
+	case *nrgb.Image, *image.CMYK, *image.YCbCr, *image.Gray, *image.Gray16:
+		return true
+
+	default:
+		return false
+	}
+}
+
 func IsOpaque(img image.Image) (ans bool) {
 	type is_opaque interface{ Opaque() bool }
 	if img.Bounds().Empty() {
