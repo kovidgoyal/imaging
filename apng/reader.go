@@ -20,6 +20,8 @@ import (
 	"image"
 	"image/color"
 	"io"
+
+	"github.com/kovidgoyal/imaging/nrgb"
 )
 
 // Color type, as per the PNG spec.
@@ -437,7 +439,7 @@ func (d *decoder) readImagePass(r io.Reader, pass int, allocateOnly bool) (image
 	pixOffset := 0
 	var (
 		gray     *image.Gray
-		rgba     *image.RGBA
+		rgb      *nrgb.Image
 		paletted *image.Paletted
 		nrgba    *image.NRGBA
 		gray16   *image.Gray16
@@ -481,8 +483,8 @@ func (d *decoder) readImagePass(r io.Reader, pass int, allocateOnly bool) (image
 			nrgba = image.NewNRGBA(image.Rect(0, 0, width, height))
 			img = nrgba
 		} else {
-			rgba = image.NewRGBA(image.Rect(0, 0, width, height))
-			img = rgba
+			rgb = nrgb.NewNRGB(image.Rect(0, 0, width, height))
+			img = rgb
 		}
 	case cbP1, cbP2, cbP4, cbP8:
 		bitsPerPixel = d.depth
@@ -688,16 +690,15 @@ func (d *decoder) readImagePass(r io.Reader, pass int, allocateOnly bool) (image
 				}
 				pixOffset += nrgba.Stride
 			} else {
-				pix, i, j := rgba.Pix, pixOffset, 0
+				pix, i, j := rgb.Pix, pixOffset, 0
 				for x := 0; x < width; x++ {
 					pix[i+0] = cdat[j+0]
 					pix[i+1] = cdat[j+1]
 					pix[i+2] = cdat[j+2]
-					pix[i+3] = 0xff
-					i += 4
+					i += 3
 					j += 3
 				}
-				pixOffset += rgba.Stride
+				pixOffset += rgb.Stride
 			}
 		case cbP1:
 			for x := 0; x < width; x += 8 {
