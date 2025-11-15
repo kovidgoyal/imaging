@@ -493,27 +493,30 @@ func PasteOntoBackground(img image.Image, bg color.Color) image.Image {
 	return base
 }
 
-// Return contiguous non-premultiplied RGB/RGBA pixel data for this image with 8 bits per channel
-func AsRGBData8(img image.Image) (num_channels int, pix []uint8) {
+// Return contiguous non-premultiplied RGB pixel data for this image with 8 bits per channel
+func AsRGBData8(img image.Image) (pix []uint8) {
 	b := img.Bounds()
-	if IsOpaque(img) {
-		n := AsNRGB(img)
-		if n.Stride == b.Dx()*3 {
-			return 3, n.Pix
-		}
-		pix = make([]uint8, 0, b.Dx()*b.Dy()*3)
-		for y := range b.Dy() {
-			pix = append(pix, n.Pix[y*n.Stride:y*(n.Stride+1)]...)
-		}
-		return 3, pix
+	n := AsNRGB(img)
+	if n.Stride == b.Dx()*3 {
+		return n.Pix
 	}
+	pix = make([]uint8, 0, b.Dx()*b.Dy()*3)
+	for y := range b.Dy() {
+		pix = append(pix, n.Pix[y*n.Stride:y*(n.Stride+1)]...)
+	}
+	return pix
+}
+
+// Return contiguous non-premultiplied RGBA pixel data for this image with 8 bits per channel
+func AsRGBAData8(img image.Image) (pix []uint8) {
+	b := img.Bounds()
 	n := AsNRGBA(img)
 	if n.Stride == b.Dx()*4 {
-		return 4, n.Pix
+		return n.Pix
 	}
 	pix = make([]uint8, 0, b.Dx()*b.Dy()*4)
 	for y := range b.Dy() {
 		pix = append(pix, n.Pix[y*n.Stride:y*(n.Stride+1)]...)
 	}
-	return 4, pix
+	return pix
 }
