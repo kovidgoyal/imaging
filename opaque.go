@@ -94,7 +94,6 @@ func IsOpaque(img image.Image) (ans bool) {
 	if img.Bounds().Empty() {
 		return true
 	}
-	fmt.Printf("%T\n", img)
 	switch img := img.(type) {
 	case *nrgb.Image, *image.CMYK, *image.YCbCr, *image.Gray, *image.Gray16:
 		return true
