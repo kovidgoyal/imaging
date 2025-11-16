@@ -163,7 +163,7 @@ func (self *Image) populate_from_gif(g *gif.GIF) {
 			Delay: gifmeta.CalculateFrameDelay(g.Delay[i], min_gap),
 		}
 		switch prev_disposal {
-		case gif.DisposalNone:
+		case gif.DisposalNone, 0:
 			frame.ComposeOnto = frame.Number - 1
 		case gif.DisposalPrevious:
 			frame.ComposeOnto = prev_compose_onto
