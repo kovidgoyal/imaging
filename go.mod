@@ -8,7 +8,7 @@ require (
 	github.com/kovidgoyal/go-shm v1.0.0
 	github.com/rwcarlsen/goexif v0.0.0-20190401172101-9e8deecbddbd
 	github.com/stretchr/testify v1.11.1
-	golang.org/x/image v0.32.0
+	golang.org/x/image v0.33.0
 	golang.org/x/sys v0.38.0
 )
 
