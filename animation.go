@@ -460,7 +460,7 @@ func (self *Image) Resize(width, height int, filter ResampleFilter) {
 	sx := float64(width) / float64(old_width)
 	sy := float64(height) / float64(old_height)
 	scaledx := func(x int) int { return int(float64(x) * sx) }
-	scaledy := func(x int) int { return int(float64(x) * sy) }
+	scaledy := func(y int) int { return int(float64(y) * sy) }
 	for i, f := range self.Frames {
 		if i == 0 {
 			f.Image = ResizeWithOpacity(f.Image, width, height, filter, IsOpaque(f.Image))
