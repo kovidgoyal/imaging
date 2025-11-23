@@ -17,7 +17,6 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/kovidgoyal/go-shm"
 	"github.com/kovidgoyal/imaging/nrgb"
 	"github.com/kovidgoyal/imaging/prism/meta"
 	"github.com/kovidgoyal/imaging/prism/meta/gifmeta"
@@ -36,18 +35,7 @@ var MagickExe = sync.OnceValue(func() string {
 })
 var HasMagick = sync.OnceValue(func() bool { return MagickExe() != "magick" })
 
-var TempDirInRAMIfPossible = sync.OnceValue(func() string {
-	if shm.SHM_DIR != "" {
-		tempFile, err := os.CreateTemp(shm.SHM_DIR, "write_check_*")
-		if err != nil {
-			return os.TempDir()
-		}
-		tempFile.Close()
-		os.Remove(tempFile.Name())
-		return shm.SHM_DIR
-	}
-	return os.TempDir()
-})
+var TempDirInRAMIfPossible = sync.OnceValue(func() string { return get_temp_dir() })
 
 type ImageFrame struct {
 	Width, Height, Left, Top int
