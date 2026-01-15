@@ -61,6 +61,12 @@ func TestAnimation(t *testing.T) {
 	require.NoError(t, err)
 	// this tests the background == none disposal behavior
 	assert_disposal(t, gif, 0, 1, 2, 3, 4, 5, 6, 7)
+	gif, err = OpenAll("testdata/disposal-background-with-delay.gif")
+	require.NoError(t, err)
+	// this tests the background == none disposal behavior
+	onto := make([]uint, len(gif.Frames)-4)
+	onto = append(onto, 75, 76, 77, 78)
+	assert_disposal(t, gif, onto...)
 
 	apng := gif.as_apng()
 	r := Image{}
