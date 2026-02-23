@@ -590,7 +590,7 @@ func test_flex(t *testing.T, path string) {
 		t.Parallel()
 		data, err := os.ReadFile(path)
 		require.NoError(t, err)
-		expected, err := stdlibjpeg.Decode(bytes.NewReader(data))
+		expected, err := Decode(bytes.NewReader(data))
 		require.NoError(t, err)
 		d := decoder{force_flex: true}
 		actual, err := d.decode(bytes.NewReader(data), false)
