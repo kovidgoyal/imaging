@@ -1,6 +1,6 @@
 module github.com/kovidgoyal/imaging
 
-go 1.24.0
+go 1.25.0
 
 require (
 	github.com/google/go-cmp v0.7.0
@@ -9,7 +9,7 @@ require (
 	github.com/rwcarlsen/goexif v0.0.0-20190401172101-9e8deecbddbd
 	github.com/stretchr/testify v1.11.1
 	golang.org/x/image v0.36.0
-	golang.org/x/sys v0.41.0
+	golang.org/x/sys v0.42.0
 )
 
 require (
