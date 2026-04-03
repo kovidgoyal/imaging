@@ -148,6 +148,18 @@ func (c *ConvertColor) XYZToSRGB(X, Y, Z float64) (r, g, b float64) {
 	if inGamut(r, g, b) {
 		return
 	}
+	// When values are only marginally out of gamut (typically due to
+	// floating-point precision in fused matrix operations), clamping produces
+	// more accurate results than the Lab-based gamut mapping which can
+	// introduce color shifts, especially when the input matrix has been
+	// modified via AddPreviousMatrix making the inputs non-XYZ values.
+	// The threshold of 0.002 (~0.5/255 in 8-bit) is imperceptible and
+	// covers precision loss from fusing multiple 3x3 matrices, while
+	// remaining well below the excursions of truly out-of-gamut colors.
+	const eps = 0.002
+	if r >= -eps && r <= 1+eps && g >= -eps && g <= 1+eps && b >= -eps && b <= 1+eps {
+		return clamp01(r), clamp01(g), clamp01(b)
+	}
 	L, a, bb := c.XYZToLab(X, Y, Z)
 	return c.LabToSRGB(L, a, bb)
 }
