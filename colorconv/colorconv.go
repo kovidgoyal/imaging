@@ -384,6 +384,7 @@ func (c *ConvertColor) gamutMapChromaScale(L, a, b float64) (r, g, bl float64) {
 	hi := 1.0
 	var mid float64
 	var foundR, foundG, foundB float64
+	found := false
 	// If even fully desaturated (a=b=0) is out of gamut, we'll clip
 	for range 24 {
 		mid = (lo + hi) / 2.0
@@ -392,6 +393,7 @@ func (c *ConvertColor) gamutMapChromaScale(L, a, b float64) (r, g, bl float64) {
 		r0, g0, b0 := c.LabToSRGBNoGamutMap(L, a2, b2)
 		if inGamut(r0, g0, b0) {
 			foundR, foundG, foundB = r0, g0, b0
+			found = true
 			// can try to keep more chroma
 			lo = mid
 		} else {
@@ -399,7 +401,7 @@ func (c *ConvertColor) gamutMapChromaScale(L, a, b float64) (r, g, bl float64) {
 		}
 	}
 	// If we never found a valid in-gamut during binary search, try a= b =0
-	if !(inGamut(foundR, foundG, foundB)) {
+	if !found {
 		r0, g0, b0 := c.LabToSRGBNoGamutMap(L, 0, 0)
 		// if still out-of-gamut (very unlikely), clip
 		return clamp01(r0), clamp01(g0), clamp01(b0)
