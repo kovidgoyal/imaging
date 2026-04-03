@@ -155,6 +155,12 @@ func (c *ConvertColor) XYZToSRGB(X, Y, Z float64) (r, g, b float64) {
 	if inGamut(r, g, b) {
 		return
 	}
+	// When only slightly out of gamut clamp for performance instead of doing actual mapping
+	const lower = -0.001
+	const upper = 1 - lower
+	if r >= lower && r <= upper && g >= lower && g <= upper && b >= lower && b <= upper {
+		return clamp01(r), clamp01(g), clamp01(b)
+	}
 	X, Y, Z = mulMat3Vec(c.previous_matrices, Vec3{X, Y, Z})
 	c = c.out_of_gamut_handler
 	L, a, bb := c.XYZToLab(X, Y, Z)
