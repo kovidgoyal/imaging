@@ -61,6 +61,8 @@ var profiles = map[string]opt{
 	"displayp3.icc": {srgb_tolerance: 0.45 * THRESHOLD8},
 	// Adobe RGB matrix/TRC PCS=XYZ profile
 	"prophoto.icc": {inv_tolerance: 0.1 * THRESHOLD8, srgb_tolerance: 0.7 * THRESHOLD8},
+	// Display P3 gamut with sRGB transfer function
+	"displayp3-with-srgb-transfer.icc": {srgb_tolerance: 0.45 * THRESHOLD8},
 }
 
 // testDir returns the absolute path to the directory containing the test file.
