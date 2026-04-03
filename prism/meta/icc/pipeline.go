@@ -64,7 +64,7 @@ func (p *Pipeline) finalize(optimize bool) {
 		// Check if the last transform can absorb previous matrices
 		if len(p.transformers) > 1 {
 			last := p.transformers[len(p.transformers)-1]
-			if apm, ok := last.(*XYZtosRGB); ok {
+			if apm, ok := last.(*XYZtosRGB); ok && apm.CanAbsorbMatrix() {
 				p.transformers = p.transformers[:len(p.transformers)-1]
 				for {
 					m := p.remove_last_matrix3()

@@ -188,23 +188,32 @@ func NewUniformFunctionTransformer(name string, f func(unit_float) unit_float) *
 }
 
 type XYZtosRGB struct {
-	c *colorconv.ConvertColor
-	t func(l, a, b unit_float) (x, y, z unit_float)
+	c         *colorconv.ConvertColor
+	t         func(l, a, b unit_float) (x, y, z unit_float)
+	map_gamut bool
 }
 
 func NewXYZtosRGB(whitepoint XYZType, clamp, map_gamut bool) *XYZtosRGB {
 	c := colorconv.NewConvertColor(whitepoint.X, whitepoint.Y, whitepoint.Z, 1)
 	if clamp {
 		if map_gamut {
-			return &XYZtosRGB{c, c.XYZToSRGB}
+			return &XYZtosRGB{c, c.XYZToSRGB, true}
 		}
-		return &XYZtosRGB{c, c.XYZToSRGBNoGamutMap}
+		return &XYZtosRGB{c, c.XYZToSRGBNoGamutMap, false}
 	}
-	return &XYZtosRGB{c, c.XYZToSRGBNoClamp}
+	return &XYZtosRGB{c, c.XYZToSRGBNoClamp, false}
 }
 
 func (n *XYZtosRGB) AddPreviousMatrix(m Matrix3) {
 	n.c.AddPreviousMatrix(m[0], m[1], m[2])
+}
+
+// CanAbsorbMatrix reports whether it is safe for the pipeline optimizer to
+// fuse preceding matrices into this transformer. When gamut mapping is
+// active, the fallback path converts via Lab which requires the input to be
+// actual XYZ values, so matrix absorption would break that invariant.
+func (n *XYZtosRGB) CanAbsorbMatrix() bool {
+	return !n.map_gamut
 }
 
 func (c *XYZtosRGB) Transform(l, a, b unit_float) (unit_float, unit_float, unit_float) {
