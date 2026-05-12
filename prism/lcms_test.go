@@ -143,7 +143,9 @@ func TestCGOConversion(t *testing.T) {
 	defer lab.Close()
 	_, err := CreateCMSProfile([]byte("invalid profile"))
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "Got 15 bytes, block should be")
+	if !strings.Contains(err.Error(), "LCMS2 error: 5: Read from memory error") {
+		assert.Contains(t, err.Error(), "Got 15 bytes, block should be")
+	}
 
 	expected := []float64{0.2569, 0.1454, 0.7221}
 	pcs, err := xyz.TransformRGB8bitToPCS([]byte{128, 64, 255}, icc.RelativeColorimetricRenderingIntent)
