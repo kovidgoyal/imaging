@@ -30,39 +30,48 @@ const THRESHOLD8 = 1. / math.MaxUint8
 
 var profiles = map[string]opt{
 	// simplest case: matrix/trc profile
-	srgb_xyz_profile_name: {srgb_tolerance: 0.4 * THRESHOLD8, inv_tolerance: 6 * THRESHOLD16},
+	srgb_xyz_profile_name: {srgb_tolerance: 18 * THRESHOLD16, inv_tolerance: 6 * THRESHOLD16},
 	// sRGB XYZ v4 profile matrix/TRC based distributed in Linux
-	"sRGB.icc": {srgb_tolerance: 0.4 * THRESHOLD8},
+	"sRGB.icc": {srgb_tolerance: 18 * THRESHOLD16},
 	// sRGB XYZ v4 profile matrix/TRC based, small size
-	"sRGB-v4.icc": {srgb_tolerance: 0.35 * THRESHOLD8},
+	"sRGB-v4.icc": {srgb_tolerance: 18 * THRESHOLD16},
 	// LutAtoBType profile with PCS=XYZ (need higher tolerance for
 	// because of lcms does interpolation and matrix calculation using 16bit
 	// numbers, we use 64bit numbers)
-	"jpegli.icc": {pcs_tolerance: 0.07 * THRESHOLD8, inv_tolerance: 0.25 * THRESHOLD8, srgb_tolerance: 0.94 * THRESHOLD8},
+	"jpegli.icc": {pcs_tolerance: 0.07 * THRESHOLD8, inv_tolerance: 0.25 * THRESHOLD8, srgb_tolerance: 0.85 * THRESHOLD8},
 	// LutAtoBType profile with PCS=LAB. Their is some numerical
 	// instability in the lcms code because of conversion to and from float
 	// and fixed point representations, hence higher tolerances.
-	srgb_lab_profile_name: {inv_tolerance: 0.05 * THRESHOLD8, srgb_tolerance: 0.35 * THRESHOLD8},
+	srgb_lab_profile_name: {inv_tolerance: 0.05 * THRESHOLD8, srgb_tolerance: 28 * THRESHOLD16},
 	// profile created by lcms to check browser compatibility using V2 LUTs
-	"lcms-check-lut.icc": {skip_inv: true, srgb_tolerance: 5 * THRESHOLD16},
+	"lcms-check-lut.icc": {skip_inv: true, srgb_tolerance: 2 * THRESHOLD16},
 	// profile created by lcms to check browser compatibility uses both matrix and LUTs
-	"lcms-check-full.icc": {skip_inv: true, srgb_tolerance: 5 * THRESHOLD16},
+	"lcms-check-full.icc": {skip_inv: true, srgb_tolerance: 2 * THRESHOLD16},
 	// profile created by lcms to check browser compatibility uses v4
 	// constructs uses LutAtoBType with PCS=LAB
-	"lcms-stress.icc": {skip_inv: true, pcs_tolerance: 2 * THRESHOLD16, srgb_tolerance: 4 * THRESHOLD16},
+	"lcms-stress.icc": {skip_inv: true, pcs_tolerance: 2 * THRESHOLD16, srgb_tolerance: 2 * THRESHOLD16},
 	// CMYK profile using LAB space
-	"cmyk.icc": {pcs_tolerance: 2 * THRESHOLD16, inv_tolerance: 0.05 * THRESHOLD8, srgb_tolerance: 0.2 * THRESHOLD8},
-	"cmyk.jpg": {pcs_tolerance: 2 * THRESHOLD16, inv_tolerance: 0.05 * THRESHOLD8, srgb_tolerance: 0.05 * THRESHOLD8},
+	"cmyk.icc": {pcs_tolerance: 2 * THRESHOLD16, inv_tolerance: 0.05 * THRESHOLD8, srgb_tolerance: 32 * THRESHOLD16},
+	"cmyk.jpg": {pcs_tolerance: 2 * THRESHOLD16, inv_tolerance: 0.05 * THRESHOLD8, srgb_tolerance: 6 * THRESHOLD16},
 	// Adobe RGB matrix/TRC PCS=XYZ profile
-	"adobergb.icc": {inv_tolerance: 0.2 * THRESHOLD8, srgb_tolerance: 0.5 * THRESHOLD8},
+	"adobergb.icc": {inv_tolerance: 0.2 * THRESHOLD8, srgb_tolerance: 16 * THRESHOLD16},
 	// Apple Display P3 matrix/TRC PCS=XYZ
-	"display-p3-v4-with-v2-desc.icc": {srgb_tolerance: 0.45 * THRESHOLD8},
+	"display-p3-v4-with-v2-desc.icc": {srgb_tolerance: 11 * THRESHOLD16},
 	// Apple Display P3 matrix/TRC PCS=XYZ
-	"displayp3.icc": {srgb_tolerance: 0.45 * THRESHOLD8},
+	"displayp3.icc": {srgb_tolerance: 11 * THRESHOLD16},
 	// Adobe RGB matrix/TRC PCS=XYZ profile
-	"prophoto.icc": {inv_tolerance: 0.1 * THRESHOLD8, srgb_tolerance: 0.7 * THRESHOLD8},
+	"prophoto.icc": {inv_tolerance: 0.1 * THRESHOLD8, srgb_tolerance: 6 * THRESHOLD16},
 	// Display P3 gamut with sRGB transfer function
-	"displayp3-with-srgb-transfer.icc": {srgb_tolerance: 0.45 * THRESHOLD8},
+	"displayp3-with-srgb-transfer.icc": {srgb_tolerance: 16 * THRESHOLD16},
+	// Monochrome profiles, see gray_fixture_profiles
+	"gray-v4-srgb.icc":         {},
+	"gray-v2-gamma1.8-d65.icc": {},
+	"gray-v4-lab-gamma2.2.icc": {},
+	// lcms evaluates tabulated curves with 16 bit precision
+	"gray-v2-tabulated-prtr.icc": {inv_tolerance: 24 * THRESHOLD16, srgb_tolerance: 5 * THRESHOLD16},
+	// lcms quantizes the inputs of 16 bit CLUTs to 16 bits
+	"gray-v4-lut.icc": {pcs_tolerance: 5 * THRESHOLD16, inv_tolerance: 8 * THRESHOLD16, srgb_tolerance: 8 * THRESHOLD16},
+	"gray-v2-lut.icc": {pcs_tolerance: 5 * THRESHOLD16, inv_tolerance: 25 * THRESHOLD16, srgb_tolerance: 8 * THRESHOLD16},
 }
 
 // testDir returns the absolute path to the directory containing the test file.
@@ -323,9 +332,12 @@ func test_profile(t *testing.T, name string) {
 		srgb, err := p.CreateTransformerToSRGB(p.Header.RenderingIntent, false, dev_channels, false, false, true)
 		require.NoError(t, err)
 		if !is_image {
-			if dev_channels == 3 {
+			switch dev_channels {
+			case 1:
+				pts = gray_points()
+			case 3:
 				pts = icc.Points_for_transformer_comparison3()
-			} else {
+			default:
 				pts = icc.Points_for_transformer_comparison4()
 			}
 		}
@@ -512,5 +524,38 @@ func TestDevelop(t *testing.T) {
 		// 	develop_inverse(p, lcms, t, name, opt.inv_tolerance)
 		// }
 		develop_to_srgb(p, lcms, t, name, opt.srgb_tolerance)
+	}
+}
+
+func TestAllIntentsAgainstLCMS2(t *testing.T) {
+	for name := range profiles {
+		if ext := filepath.Ext(name); ext != ".icc" && ext != ".icm" {
+			continue
+		}
+		p := profile(t, name)
+		lcms := lcms_profile(t, name)
+		nc := lcms.NumDeviceChannels()
+		pts := icc.IfElse(nc == 3, icc.Points_for_transformer_comparison3(), icc.Points_for_transformer_comparison4())
+		lcms_pts := pts
+		if nc == 4 {
+			lcms_pts = make([]float64, len(pts))
+			for i, x := range pts {
+				lcms_pts[i] = x * 100
+			}
+		}
+		// the tolerances in profiles are for the default rendering intent
+		tolerance := 2 * options_for_profile(name).srgb_tolerance
+		for _, intent := range all_intents {
+			t.Run(name+"/"+intent.String(), func(t *testing.T) {
+				t.Parallel()
+				srgb, err := p.CreateTransformerToSRGB(intent, false, nc, false, false, true)
+				require.NoError(t, err)
+				actual := make([]float64, 3*len(pts)/nc)
+				run_general(srgb, pts, actual, nc, 3, len(pts)/nc)
+				expected, err := lcms.TransformFloatToSRGB(lcms_pts, intent)
+				require.NoError(t, err)
+				in_delta_rgb(t, "to sRGB", nc, 3, pts, expected, actual, tolerance, max_diff)
+			})
+		}
 	}
 }

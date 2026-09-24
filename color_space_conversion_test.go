@@ -263,3 +263,93 @@ func TestProfileApplication(t *testing.T) {
 	run(image.NewPaletted(r, make(color.Palette, 256)), 0)
 	run(image.NewNYCbCrA(r, image.YCbCrSubsampleRatio444), 0)
 }
+
+// image types that are handled by the generic code paths in convert()
+type settable_nrgba struct{ *image.NRGBA }           // uses draw.Image
+type unsettable_nrgba64 struct{ img *image.NRGBA64 } // uses the fallback
+
+func (u unsettable_nrgba64) ColorModel() color.Model { return u.img.ColorModel() }
+func (u unsettable_nrgba64) Bounds() image.Rectangle { return u.img.Bounds() }
+func (u unsettable_nrgba64) At(x, y int) color.Color { return u.img.At(x, y) }
+
+func TestProfileApplicationWithTransparency(t *testing.T) {
+	r := image.Rect(-3, 2, -3+17, 2+5)
+	ct := &icc.Translation{6 / 255., 7 / 255., 8 / 255.}
+	p := &icc.Pipeline{}
+	p.Append(ct)
+	p.Finalize(true)
+	alpha := func(x, y int) uint8 {
+		switch (x + 2*y) % 4 {
+		case 0:
+			return 0
+		case 1:
+			return 128
+		}
+		return 255
+	}
+	base := func(x, y int) uint8 { return uint8(10*(x-r.Min.X) + 3*(y-r.Min.Y)) }
+	nycbcra := image.NewNYCbCrA(r, image.YCbCrSubsampleRatio444)
+	nrgba := image.NewNRGBA(r)
+	nrgba64 := image.NewNRGBA64(r)
+	for y := r.Min.Y; y < r.Max.Y; y++ {
+		for x := r.Min.X; x < r.Max.X; x++ {
+			v, a := base(x, y), alpha(x, y)
+			// YCbCr with Cb = Cr = 128 is gray
+			nycbcra.Y[nycbcra.YOffset(x, y)], nycbcra.Cb[nycbcra.COffset(x, y)], nycbcra.Cr[nycbcra.COffset(x, y)] = v, 128, 128
+			nycbcra.A[nycbcra.AOffset(x, y)] = a
+			nrgba.SetNRGBA(x, y, color.NRGBA{R: v, G: v + 1, B: v + 2, A: a})
+			nrgba64.SetNRGBA64(x, y, color.NRGBA64{R: uint16(v) * 257, G: uint16(v+1) * 257, B: uint16(v+2) * 257, A: uint16(a) * 257})
+		}
+	}
+	for _, tc := range []struct {
+		name  string
+		img   image.Image
+		green func(v uint8) uint8
+	}{
+		{"NYCbCrA", nycbcra, func(v uint8) uint8 { return v }},
+		{"draw.Image", settable_nrgba{nrgba}, func(v uint8) uint8 { return v + 1 }},
+		{"fallback", unsettable_nrgba64{nrgba64}, func(v uint8) uint8 { return v + 1 }},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			out, err := convert(p, tc.img)
+			require.NoError(t, err)
+			for y := r.Min.Y; y < r.Max.Y; y++ {
+				for x := r.Min.X; x < r.Max.X; x++ {
+					v, a := base(x, y), alpha(x, y)
+					c := color.NRGBA64Model.Convert(out.At(x, y)).(color.NRGBA64)
+					require.Equal(t, int(a), int(c.A>>8), "alpha not preserved at: %d, %d", x, y)
+					if a < 255 {
+						// premultiplication loses precision
+						continue
+					}
+					require.InDelta(t, int(tc.green(v))+7, int(c.G>>8), 1, "wrong color at: %d, %d", x, y)
+				}
+			}
+		})
+	}
+}
+
+func TestProfileApplicationToGrayImage(t *testing.T) {
+	// a gray image with an RGB profile
+	p := &icc.Pipeline{}
+	p.Append(&icc.Translation{20 / 255., 20 / 255., 20 / 255.})
+	p.Finalize(true)
+	img := image.NewGray(image.Rect(0, 0, 4, 1))
+	copy(img.Pix, []uint8{0, 50, 128, 200})
+	out, err := convert(p, img)
+	require.NoError(t, err)
+	require.Equal(t, []uint8{20, 70, 148, 220}, out.(*image.Gray).Pix)
+}
+
+func TestProfileApplicationToEmptyImages(t *testing.T) {
+	p := &icc.Pipeline{}
+	p.Append(&icc.Translation{0.1, 0.1, 0.1})
+	p.Finalize(true)
+	for _, r := range []image.Rectangle{image.Rect(0, 0, 0, 5), image.Rect(0, 0, 5, 0), image.Rect(2, 2, 2, 2)} {
+		for _, img := range []image.Image{nrgb.NewNRGB(r), image.NewNRGBA(r), image.NewNRGBA64(r), image.NewRGBA(r), image.NewRGBA64(r), image.NewCMYK(r), image.NewGray(r), image.NewYCbCr(r, image.YCbCrSubsampleRatio420), image.NewNYCbCrA(r, image.YCbCrSubsampleRatio444), unsettable_nrgba64{image.NewNRGBA64(r)}} {
+			out, err := convert(p, img)
+			require.NoError(t, err, "%T", img)
+			require.Equal(t, r, out.Bounds(), "%T", img)
+		}
+	}
+}

@@ -26,11 +26,15 @@ func TestSRGBProfileDetection(t *testing.T) {
 		"sRGB.icm":          true,
 		"sRGB.icc":          true,
 		"tinyrgb.icc":       true,
+		"gray-v4-srgb.icc":  true,
 
 		"ClayRGB1998.icm":                false,
 		"jpegli.icc":                     false,
 		"display-p3-v4-with-v2-desc.icc": false,
 		"cmyk.icc":                       false,
+		"gray-v2-gamma1.8-d65.icc":       false,
+		"gray-v4-lab-gamma2.2.icc":       false,
+		"gray-v4-lut.icc":                false,
 	} {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
