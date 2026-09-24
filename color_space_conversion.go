@@ -30,6 +30,33 @@ func f8i(x float64) uint8   { return uint8(x * math.MaxUint8) }
 func f16(x uint16) float64  { return float64(x) / math.MaxUint16 }
 func f16i(x float64) uint16 { return uint16(x * math.MaxUint16) }
 
+// n_channels_to_nrgb returns a row-range worker that applies tr (via
+// TransformGeneral) to each pixel of an N-channel source image (srcPix,
+// srcStride, numChannels per pixel) and writes the resulting RGB into d.
+func n_channels_to_nrgb(tr *icc.Pipeline, width int, srcPix []byte, srcStride, numChannels int, d *nrgb.Image) func(start, limit int) {
+	g := tr.TransformGeneral
+	return func(start, limit int) {
+		var inp, outp [4]float64
+		i, o := inp[:], outp[:]
+		for y := start; y < limit; y++ {
+			row := srcPix[srcStride*y:]
+			drow := d.Pix[d.Stride*y:]
+			_ = row[numChannels*(width-1)]
+			_ = drow[3*(width-1)]
+			for range width {
+				for c := range numChannels {
+					inp[c] = f8(row[c])
+				}
+				g(o, i)
+				r := drow[0:3:3]
+				r[0], r[1], r[2] = f8i(outp[0]), f8i(outp[1]), f8i(outp[2])
+				row = row[numChannels:]
+				drow = drow[3:]
+			}
+		}
+	}
+}
+
 func convert(tr *icc.Pipeline, image_any image.Image) (ans image.Image, err error) {
 	t := tr.Transform
 	b := image_any.Bounds()
@@ -142,29 +169,14 @@ func convert(tr *icc.Pipeline, image_any image.Image) (ans image.Image, err erro
 			}
 		}
 		return
-	case *image.CMYK:
-		g := tr.TransformGeneral
+	case *image.Gray:
 		d := nrgb.NewNRGB(b)
 		ans = d
-		f = func(start, limit int) {
-			var inp, outp [4]float64
-			i, o := inp[:], outp[:]
-			for y := start; y < limit; y++ {
-				row := img.Pix[img.Stride*y:]
-				drow := d.Pix[d.Stride*y:]
-				_ = row[4*(width-1)]
-				_ = drow[3*(width-1)]
-				for range width {
-					r := row[0:4:4]
-					inp[0], inp[1], inp[2], inp[3] = f8(r[0]), f8(r[1]), f8(r[2]), f8(r[3])
-					g(o, i)
-					r = drow[0:3:3]
-					r[0], r[1], r[2] = f8i(outp[0]), f8i(outp[1]), f8i(outp[2])
-					row = row[4:]
-					drow = drow[3:]
-				}
-			}
-		}
+		f = n_channels_to_nrgb(tr, width, img.Pix, img.Stride, 1, d)
+	case *image.CMYK:
+		d := nrgb.NewNRGB(b)
+		ans = d
+		f = n_channels_to_nrgb(tr, width, img.Pix, img.Stride, 4, d)
 	case *image.YCbCr:
 		d := nrgb.NewNRGB(b)
 		ans = d

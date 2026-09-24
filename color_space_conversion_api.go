@@ -18,8 +18,11 @@ func ConvertToSRGB(p *icc.Profile, intent icc.RenderingIntent, use_blackpoint_co
 		return image_any, nil
 	}
 	num_channels := 3
-	if _, is_cmyk := image_any.(*image.CMYK); is_cmyk {
+	switch image_any.(type) {
+	case *image.CMYK:
 		num_channels = 4
+	case *image.Gray:
+		num_channels = 1
 	}
 	tr, err := p.CreateTransformerToSRGB(intent, use_blackpoint_compensation, num_channels, true, true, true)
 	if err != nil {
