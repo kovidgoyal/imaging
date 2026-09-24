@@ -250,3 +250,39 @@ func (m *XYZtoLAB) TransformGeneral(o, i []unit_float)   { tg33(m.Transform, o, 
 func (n *XYZtoLAB) IOSig() (int, int)                    { return 3, 3 }
 func (n *XYZtoLAB) String() string                       { return fmt.Sprintf("%T%s", n, n.c.String()) }
 func (n *XYZtoLAB) Iter(f func(ChannelTransformer) bool) { f(n) }
+
+// GrayToXYZ expands a single achromatic value into a PCS XYZ tristimulus,
+// scaled by the profile's media white point, per the matrix/TRC model for
+// monochrome (Gray) profiles described in ICC.1-2010 section F.2.
+type GrayToXYZ struct{ white XYZType }
+
+func NewGrayToXYZ(white XYZType) *GrayToXYZ { return &GrayToXYZ{white} }
+
+func (n *GrayToXYZ) IOSig() (int, int)                    { return 1, 3 }
+func (n *GrayToXYZ) Iter(f func(ChannelTransformer) bool) { f(n) }
+func (n *GrayToXYZ) String() string                       { return fmt.Sprintf("GrayToXYZ{%v}", n.white) }
+func (n *GrayToXYZ) Transform(r, g, b unit_float) (unit_float, unit_float, unit_float) {
+	return r * n.white.X, r * n.white.Y, r * n.white.Z
+}
+func (n *GrayToXYZ) TransformGeneral(o, i []unit_float) {
+	o[0], o[1], o[2] = i[0]*n.white.X, i[0]*n.white.Y, i[0]*n.white.Z
+}
+
+// XYZToGray is the inverse of GrayToXYZ: it recovers the achromatic value
+// from a PCS XYZ tristimulus using its luminance (Y) component.
+type XYZToGray struct {
+	white       XYZType
+	inv_white_y unit_float
+}
+
+func NewXYZToGray(white XYZType) *XYZToGray { return &XYZToGray{white, 1 / white.Y} }
+
+func (n *XYZToGray) IOSig() (int, int)                    { return 3, 1 }
+func (n *XYZToGray) Iter(f func(ChannelTransformer) bool) { f(n) }
+func (n *XYZToGray) String() string                       { return fmt.Sprintf("XYZToGray{%v}", n.white) }
+func (n *XYZToGray) Transform(r, g, b unit_float) (unit_float, unit_float, unit_float) {
+	return clamp01(g * n.inv_white_y), 0, 0
+}
+func (n *XYZToGray) TransformGeneral(o, i []unit_float) {
+	o[0] = clamp01(i[1] * n.inv_white_y)
+}

@@ -43,11 +43,59 @@ func TestSRGBProfileDetection(t *testing.T) {
 	}
 }
 
-func TestProfileReader(t *testing.T) {
-	var profileSize uint32
-	var profileID [16]byte
-	var reservedBytes [28]byte
+// writeTestHeader writes a minimal 128-byte ICC header for tests, using
+// dataColorSpace as the device colour space (RGB when the zero value).
+// It returns the random profile size and zero profile ID that were written,
+// so callers can assert the reader parsed them back correctly.
+func writeTestHeader(w io.Writer, profileSig [4]byte, dataColorSpace [4]byte) (profileSize uint32, profileID [16]byte) {
+	if dataColorSpace == [4]byte{} {
+		dataColorSpace = [4]byte{'R', 'G', 'B', ' '}
+	}
+	profileSize = uint32(rand.Int31())
+	binary.Write(w, binary.BigEndian, profileSize)
 
+	_, _ = w.Write([]byte{'t', 'e', 's', 't'})                 // Preferred CMM
+	_, _ = w.Write([]byte{4, 0, 0, 0})                         // Version
+	_, _ = w.Write([]byte{'t', 'e', 's', 't'})                 // Device class
+	_, _ = w.Write(dataColorSpace[:])                          // Data colour space
+	_, _ = w.Write([]byte{'X', 'Y', 'Z', ' '})                 // Profile connection space
+	_, _ = w.Write([]byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}) // Creation date/time
+	_, _ = w.Write(profileSig[:])                              // Profile signature
+	_, _ = w.Write([]byte{'t', 'e', 's', 't'})                 // Primary platform
+	_, _ = w.Write([]byte{0, 0, 0, 0})                         // Profile flags
+	_, _ = w.Write([]byte{0, 0, 0, 0})                         // Device manufacturer
+	_, _ = w.Write([]byte{0, 0, 0, 0})                         // Device model
+	_, _ = w.Write([]byte{0, 0, 0, 0, 0, 0, 0, 0})             // Device attributes
+	_, _ = w.Write([]byte{0, 0, 0, 0})                         // Rendering intent
+	_, _ = w.Write([]byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}) // PCS illuminant
+	_, _ = w.Write([]byte{0, 0, 0, 0})                         // Profile creator
+	_, _ = w.Write(profileID[:])
+	_, _ = w.Write(make([]byte, 28)) // Reserved
+	return
+}
+
+// writeTestTagTable writes an ICC tag table (count, directory, then
+// concatenated tag data) for tests.
+func writeTestTagTable(w io.Writer, tags map[[4]byte][]byte) {
+	_ = binary.Write(w, binary.BigEndian, uint32(len(tags)))
+
+	offset := 128 + 4 + len(tags)*12
+
+	tagTableData := &bytes.Buffer{}
+
+	for tagSig, tagData := range tags {
+		_, _ = w.Write(tagSig[:])
+		_ = binary.Write(w, binary.BigEndian, uint32(offset))
+		_ = binary.Write(w, binary.BigEndian, uint32(len(tagData)))
+		offset += len(tagData)
+
+		_, _ = tagTableData.Write(tagData)
+	}
+
+	_, _ = w.Write(tagTableData.Bytes())
+}
+
+func TestProfileReader(t *testing.T) {
 	loadTestProfile := func(profileFileName string) (*Profile, error) {
 		profileFile, err := os.Open(path.Join("test-profiles", profileFileName))
 		if err != nil {
@@ -60,53 +108,16 @@ func TestProfileReader(t *testing.T) {
 		return reader.ReadProfile()
 	}
 
-	writeHeader := func(w io.Writer, profileSig [4]byte) {
-		profileSize = uint32(rand.Int31())
-		binary.Write(w, binary.BigEndian, profileSize)
-
-		_, _ = w.Write([]byte{'t', 'e', 's', 't'})                 // Preferred CMM
-		_, _ = w.Write([]byte{4, 0, 0, 0})                         // Version
-		_, _ = w.Write([]byte{'t', 'e', 's', 't'})                 // Device class
-		_, _ = w.Write([]byte{'R', 'G', 'B', ' '})                 // Data colour space
-		_, _ = w.Write([]byte{'X', 'Y', 'Z', ' '})                 // Profile connection space
-		_, _ = w.Write([]byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}) // Creation date/time
-		_, _ = w.Write(profileSig[:])                              // Profile signature
-		_, _ = w.Write([]byte{'t', 'e', 's', 't'})                 // Primary platform
-		_, _ = w.Write([]byte{0, 0, 0, 0})                         // Profile flags
-		_, _ = w.Write([]byte{0, 0, 0, 0})                         // Device manufacturer
-		_, _ = w.Write([]byte{0, 0, 0, 0})                         // Device model
-		_, _ = w.Write([]byte{0, 0, 0, 0, 0, 0, 0, 0})             // Device attributes
-		_, _ = w.Write([]byte{0, 0, 0, 0})                         // Rendering intent
-		_, _ = w.Write([]byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}) // PCS illuminant
-		_, _ = w.Write([]byte{0, 0, 0, 0})                         // Profile creator
-		_, _ = w.Write(profileID[:])
-		_, _ = w.Write(reservedBytes[:])
+	writeHeader := func(w io.Writer, profileSig [4]byte) (uint32, [16]byte) {
+		return writeTestHeader(w, profileSig, [4]byte{})
 	}
-
-	writeTagTable := func(w io.Writer, tags map[[4]byte][]byte) {
-		_ = binary.Write(w, binary.BigEndian, uint32(len(tags)))
-
-		offset := 128 + 4 + len(tags)*12
-
-		tagTableData := &bytes.Buffer{}
-
-		for tagSig, tagData := range tags {
-			_, _ = w.Write(tagSig[:])
-			_ = binary.Write(w, binary.BigEndian, uint32(offset))
-			_ = binary.Write(w, binary.BigEndian, uint32(len(tagData)))
-			offset += len(tagData)
-
-			_, _ = tagTableData.Write(tagData)
-		}
-
-		_, _ = w.Write(tagTableData.Bytes())
-	}
+	writeTagTable := writeTestTagTable
 
 	t.Run("readHeader()", func(t *testing.T) {
 
 		t.Run("parses valid header successfully", func(t *testing.T) {
 			headerData := &bytes.Buffer{}
-			writeHeader(headerData, [4]byte{'a', 'c', 's', 'p'})
+			profileSize, profileID := writeHeader(headerData, [4]byte{'a', 'c', 's', 'p'})
 			pr := NewProfileReader(headerData)
 
 			header := Header{}

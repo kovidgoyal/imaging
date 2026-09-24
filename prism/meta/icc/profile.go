@@ -48,13 +48,9 @@ func (p *Profile) get_effective_chromatic_adaption(forward bool, intent Renderin
 		return nil, nil
 	}
 	pcs_whitepoint := p.Header.ParsedPCSIlluminant()
-	x, err := p.TagTable.get_parsed(MediaWhitePointTagSignature, p.Header.DataColorSpace, p.Header.ProfileConnectionSpace)
+	wtpt, err := p.TagTable.load_media_white_point()
 	if err != nil {
 		return nil, err
-	}
-	wtpt, ok := x.(*XYZType)
-	if !ok {
-		return nil, fmt.Errorf("wtpt tag is not of XYZType")
 	}
 	if pcs_whitepoint == *wtpt {
 		return nil, nil
@@ -75,6 +71,9 @@ func (p *Profile) get_effective_chromatic_adaption(forward bool, intent Renderin
 func (p *Profile) create_matrix_trc_transformer(forward bool, chromatic_adaptation *Matrix3, pipeline *Pipeline) (err error) {
 	if p.Header.ProfileConnectionSpace != ColorSpaceXYZ {
 		return fmt.Errorf("matrix/TRC based profile using non XYZ PCS color space: %v", p.Header.ProfileConnectionSpace)
+	}
+	if p.Header.DataColorSpace == ColorSpaceGray {
+		return p.create_gray_trc_transformer(forward, chromatic_adaptation, pipeline)
 	}
 	// See section F.3 of ICC.1-2202-5.pdf for how these transforms are composed
 	var rc, gc, bc Curve1D
@@ -101,6 +100,26 @@ func (p *Profile) create_matrix_trc_transformer(forward bool, chromatic_adaptati
 		pipeline.Append(c, m, chromatic_adaptation)
 	} else {
 		pipeline.Append(chromatic_adaptation, m, NewInverseCurveTransformer("TRC", rc, gc, bc))
+	}
+	return nil
+}
+
+// See section F.2 of ICC.1-2202-5.pdf: monochrome profiles use a single
+// grayTRCTag and no colorant matrix; the achromatic device value is scaled
+// by the profile's media white point to produce (or is recovered from) PCS XYZ.
+func (p *Profile) create_gray_trc_transformer(forward bool, chromatic_adaptation *Matrix3, pipeline *Pipeline) (err error) {
+	gc, err := p.TagTable.load_curve_tag(GrayTRCTagSignature)
+	if err != nil {
+		return err
+	}
+	white, err := p.TagTable.load_media_white_point()
+	if err != nil {
+		return err
+	}
+	if forward {
+		pipeline.Append(NewCurveTransformer("GrayTRC", gc), NewGrayToXYZ(*white), chromatic_adaptation)
+	} else {
+		pipeline.Append(chromatic_adaptation, NewXYZToGray(*white), NewInverseCurveTransformer("GrayTRC", gc))
 	}
 	return nil
 }

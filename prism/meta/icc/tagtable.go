@@ -216,6 +216,18 @@ func (t *TagTable) load_curve_tag(s Signature) (Curve1D, error) {
 	}
 }
 
+func (t *TagTable) load_media_white_point() (*XYZType, error) {
+	x, err := t.get_parsed(MediaWhitePointTagSignature, ColorSpaceGray, ColorSpaceXYZ)
+	if err != nil {
+		return nil, fmt.Errorf("could not load wtpt tag from profile with error: %w", err)
+	}
+	wtpt, ok := x.(*XYZType)
+	if !ok {
+		return nil, fmt.Errorf("wtpt tag is not of XYZType")
+	}
+	return wtpt, nil
+}
+
 func (t *TagTable) load_rgb_matrix(forward bool) (ans *Matrix3, err error) {
 	r, err := t.get_parsed(RedMatrixColumnTagSignature, ColorSpaceRGB, ColorSpaceXYZ)
 	if err != nil {
