@@ -7,6 +7,7 @@ package apng
 import (
 	"bytes"
 	"image/color"
+	"image/png"
 	"os"
 	"strings"
 	"testing"
@@ -398,5 +399,36 @@ func TestDecodeConfig(t *testing.T) {
 	if cfg.ColorModel != color.RGBAModel {
 		t.Error("Expected RGBA color model.")
 		return
+	}
+}
+
+func TestInterlacedRGB8(t *testing.T) {
+	// An interlaced 8-bit RGB image without transparency decodes into an
+	// *nrgb.Image, each of whose passes must be merged into the result.
+	data, err := os.ReadFile("tests/InterlacedRGB8.png")
+	if err != nil {
+		t.Fatal(err)
+	}
+	want, err := png.Decode(bytes.NewReader(data))
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := Decode(bytes.NewReader(data))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Bounds() != want.Bounds() {
+		t.Fatalf("bounds: got %v, want %v", got.Bounds(), want.Bounds())
+	}
+	b := want.Bounds()
+	for y := b.Min.Y; y < b.Max.Y; y++ {
+		for x := b.Min.X; x < b.Max.X; x++ {
+			gr, gg, gb, ga := got.At(x, y).RGBA()
+			wr, wg, wb, wa := want.At(x, y).RGBA()
+			if gr != wr || gg != wg || gb != wb || ga != wa {
+				t.Fatalf("pixel (%d, %d): got %v, want %v", x, y,
+					got.At(x, y), want.At(x, y))
+			}
+		}
 	}
 }
