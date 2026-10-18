@@ -847,6 +847,10 @@ func (d *decoder) mergePassInto(dst image.Image, src image.Image, pass int) {
 		srcPix = src.(*image.NRGBA64).Pix
 		dstPix, stride, rect = target.Pix, target.Stride, target.Rect
 		bytesPerPixel = 8
+	case *nrgb.Image:
+		srcPix = src.(*nrgb.Image).Pix
+		dstPix, stride, rect = target.Pix, target.Stride, target.Rect
+		bytesPerPixel = 3
 	case *image.Paletted:
 		source := src.(*image.Paletted)
 		srcPix = source.Pix
