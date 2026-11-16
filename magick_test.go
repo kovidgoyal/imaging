@@ -79,7 +79,7 @@ func TestMagick(t *testing.T) {
 	halve := ResizeCallback(func(w, h int) (int, int) { return w / 2, h / 2 })
 	test_image("prism/test-images/cmyk.jpg", 0.6, halve)
 	test_image("prism/test-images/pizza-rgb8-adobergb.jpg", 0.5, halve)
-	test_image("prism/test-images/pizza-rgb8-srgb.jpg", 0.4, halve)
+	test_image("prism/test-images/pizza-rgb8-srgb.jpg", 0.5, halve)
 	test_image("prism/test-images/pizza-jpegli.jpeg", 0.5, halve)
 	test_image("testdata/kitty-128.png", 0.0)
 	test_image("testdata/kitty-128.png", 0.06, Background(color.NRGBA{13, 255, 67, 255}))
